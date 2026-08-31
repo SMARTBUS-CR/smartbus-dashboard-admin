@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'smartbus' => [
+        'gateway' => [
+            'url' => env('API_GATEWAY_URL', 'https://smartbus-api-gateway.test'),
+        ]
+    ]
+
 ];
