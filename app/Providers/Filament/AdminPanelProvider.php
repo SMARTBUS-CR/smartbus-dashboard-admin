@@ -31,7 +31,7 @@ class AdminPanelProvider extends PanelProvider
             ->login(Login::class) // Use the package's login page
             ->authGuard('external') // Use the external guard
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => '#2563eb',
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')

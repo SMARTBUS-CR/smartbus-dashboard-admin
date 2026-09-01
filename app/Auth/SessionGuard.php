@@ -11,9 +11,10 @@ class SessionGuard implements Guard
 {
     use GuardHelpers;
 
-    public function __construct(protected Request $request, protected Session $session)
-    {
-    }
+    public function __construct(
+        protected Request $request, 
+        protected Session $session
+    ) {}
 
     public function user()
     {
@@ -32,8 +33,8 @@ class SessionGuard implements Guard
 
     public function validate(array $credentials = []): bool
     {
-        return $this->session->has('external_auth_token') &&
-            $this->session->has('external_user_data');
+        return $this->session->has('external_auth_token') 
+            && $this->session->has('external_user_data');
     }
 
     public function check(): bool

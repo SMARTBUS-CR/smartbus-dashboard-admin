@@ -47,6 +47,51 @@ class ExternalAuthService
         }
     }
 
+    public function getUser(string $token): ?array
+    {
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->get(config('services.smartbus.gateway.url') . '/auth/user');
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        return $response->json();
+    }
+
+    public function logout(string $token): bool
+    {
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->post(config('services.smartbus.gateway.url') . '/auth/logout');
+
+        return $response->successful();
+    }
+
+    public function sendPasswordResetCode(string $email): bool
+    {
+        $response = Http::acceptJson()
+            ->post(config('services.smartbus.gateway.url').'/auth/password/forgot', [
+                'email' => $email,
+            ]);
+
+        return $response->successful();
+    }
+
+    public function resetPassword(string $email, string $code, string $password): bool
+    {
+        $response = Http::acceptJson()
+            ->post(config('services.smartbus.gateway.url').'/auth/password/reset', [
+                'email' => $email,
+                'code' => $code,
+                'password' => $password,
+                'password_confirmation' => $password,
+            ]);
+
+        return $response->successful();
+    }
+
     private function logWarning(string $message, string $email, array $context): void
     {
         if (config('api-login.log_failures', true)) {
