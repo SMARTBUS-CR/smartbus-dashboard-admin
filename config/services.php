@@ -38,7 +38,9 @@ return [
     'smartbus' => [
         'gateway' => [
             'url' => env('API_GATEWAY_URL', 'https://smartbus-api-gateway.test'),
-        ]
-    ]
+            'timeout' => env('API_GATEWAY_TIMEOUT', 30),
+            'log_failures' => env('API_GATEWAY_LOG_FAILURES', true),
+        ],
+    ],
 
 ];
