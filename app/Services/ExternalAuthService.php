@@ -9,6 +9,7 @@ use Throwable;
 class ExternalAuthService
 {
     protected string $baseUrl;
+
     protected int $timeout;
 
     public function __construct()
@@ -204,7 +205,7 @@ class ExternalAuthService
     /**
      * Extract role identifiers/values from JSON:API response structure.
      *
-     * @param array<string, mixed> $json
+     * @param  array<string, mixed>  $json
      * @return array<string>
      */
     protected function extractRoles(array $json): array
@@ -261,7 +262,7 @@ class ExternalAuthService
     /**
      * Extract permissions from JSON:API response structure.
      *
-     * @param array<string, mixed> $json
+     * @param  array<string, mixed>  $json
      * @return array<string>
      */
     protected function extractPermissions(array $json): array
@@ -286,4 +287,3 @@ class ExternalAuthService
         }
     }
 }
-

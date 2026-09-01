@@ -46,7 +46,6 @@ class Company extends Model
         )->withTimestamps();
     }
 
-
     public function buses(): HasMany
     {
         return $this->hasMany(Bus::class);

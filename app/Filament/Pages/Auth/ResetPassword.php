@@ -15,6 +15,7 @@ class ResetPassword extends BaseResetPassword
 
     /**
      * !! REVISAR, No funciona correctamente !!
+     *
      * @return array<int, TextInput>
      */
     protected function getForms(): array

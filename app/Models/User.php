@@ -55,7 +55,6 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
         )->withTimestamps();
     }
 
-
     /**
      * Restrict panel access to super-admin and company-admin only.
      */
@@ -75,7 +74,6 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
     {
         return $this->getAttribute('role') === UserRole::CompanyAdmin->value;
     }
-
 
     /**
      * Return accessible tenants for this user.
@@ -109,4 +107,3 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
         return (string) ($this->name ?? $this->email);
     }
 }
-

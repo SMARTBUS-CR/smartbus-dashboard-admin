@@ -9,7 +9,7 @@ use Illuminate\Database\Seeder;
 class CompanySeeder extends Seeder
 {
     public function run(): void
-    {                                                                                                                     
+    {
         $company = Company::firstOrCreate(
             ['slug' => 'smartbus-demo'],
             [
@@ -21,7 +21,7 @@ class CompanySeeder extends Seeder
                 'is_active' => true,
             ]
         );
-                                                                                                   
+
         $user = User::first();
 
         if ($user) {
@@ -30,7 +30,6 @@ class CompanySeeder extends Seeder
             $this->command->info("Empresa vinculada exitosamente al usuario: {$user->email}");
         }
 
-                                                                                                                   
         $company->buses()->firstOrCreate(
             ['plate_number' => 'ABC-1234'],
             [

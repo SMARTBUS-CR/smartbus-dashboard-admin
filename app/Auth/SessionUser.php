@@ -137,7 +137,6 @@ class SessionUser implements Authenticatable, FilamentUser, HasName, HasTenants
         return $this->hasRole(UserRole::CompanyAdmin);
     }
 
-
     /**
      * Tenants available for this user in Filament.
      */
@@ -225,4 +224,3 @@ class SessionUser implements Authenticatable, FilamentUser, HasName, HasTenants
         return $this->attributes;
     }
 }
-

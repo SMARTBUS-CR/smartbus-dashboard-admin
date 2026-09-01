@@ -74,4 +74,3 @@ class Login extends BaseLogin
         return app(LoginResponse::class);
     }
 }
-
