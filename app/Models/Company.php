@@ -2,10 +2,11 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class Company extends Model
 {
@@ -34,16 +35,26 @@ class Company extends Model
     }
 
     /**
-     * Users associated with this tenant from MySQL database.
+     * Users associated with this tenant from the MySQL users database.
      */
-    public function users(): BelongsToMany
+    public function users(): Builder
     {
-        return $this->belongsToMany(
-            User::class,
-            'company_user',
-            'company_id',
-            'user_id'
-        )->withTimestamps();
+        $userIds = DB::connection('pgsql')
+            ->table('company_user')
+            ->where('company_id', $this->getKey())
+            ->pluck('user_id');
+
+        return User::on('mysql')
+            ->whereIn('id', $userIds)
+            ->orderBy('name');
+    }
+
+    public function attachUser(User $user): void
+    {
+        DB::connection('pgsql')->table('company_user')->updateOrInsert([
+            'company_id' => $this->getKey(),
+            'user_id' => $user->getKey(),
+        ], []);
     }
 
     public function buses(): HasMany

@@ -148,9 +148,14 @@ class SessionUser implements Authenticatable, FilamentUser, HasName, HasTenants
 
         $userId = $this->getAuthIdentifier();
 
+        $companyIds = \Illuminate\Support\Facades\DB::connection('pgsql')
+            ->table('company_user')
+            ->where('user_id', $userId)
+            ->pluck('company_id');
+
         return Company::query()
             ->where('is_active', true)
-            ->whereHas('users', fn ($query) => $query->where('users.id', $userId))
+            ->whereIn('id', $companyIds)
             ->get();
     }
 
@@ -165,10 +170,10 @@ class SessionUser implements Authenticatable, FilamentUser, HasName, HasTenants
 
         $userId = $this->getAuthIdentifier();
 
-        return Company::query()
-            ->where('id', $tenant->getKey())
-            ->where('is_active', true)
-            ->whereHas('users', fn ($query) => $query->where('users.id', $userId))
+        return \Illuminate\Support\Facades\DB::connection('pgsql')
+            ->table('company_user')
+            ->where('user_id', $userId)
+            ->where('company_id', $tenant->getKey())
             ->exists();
     }
 

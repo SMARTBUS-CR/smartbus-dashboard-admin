@@ -25,7 +25,7 @@ class CompanySeeder extends Seeder
         $user = User::first();
 
         if ($user) {
-            $company->users()->syncWithoutDetaching([$user->id]);
+            $company->attachUser($user);
 
             $this->command->info("Empresa vinculada exitosamente al usuario: {$user->email}");
         }

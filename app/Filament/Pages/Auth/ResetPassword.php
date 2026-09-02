@@ -13,11 +13,6 @@ class ResetPassword extends BaseResetPassword
 {
     public ?string $code = null;
 
-    /**
-     * !! REVISAR, No funciona correctamente !!
-     *
-     * @return array<int, TextInput>
-     */
     protected function getForms(): array
     {
         return [
@@ -26,7 +21,7 @@ class ResetPassword extends BaseResetPassword
                     ->schema([
                         $this->getEmailFormComponent(),
                         TextInput::make('code')
-                            ->label(__('Código de Verificación (6 dígitos)'))
+                            ->label(__('Código de verificación (6 dígitos)'))
                             ->required()
                             ->length(6)
                             ->numeric()
@@ -44,24 +39,37 @@ class ResetPassword extends BaseResetPassword
         $data = $this->form->getState();
 
         $authService = app(ExternalAuthService::class);
-        $success = $authService->resetPassword(
+        $result = $authService->resetPassword(
             $data['email'] ?? $this->email,
-            $data['code'],
-            $data['password']
+            (string) ($data['code'] ?? ''),
+            (string) ($data['password'] ?? '')
         );
 
-        if (! $success) {
-            throw ValidationException::withMessages([
-                'data.code' => __('El código es inválido o ha expirado. Por favor solicita uno nuevo.'),
-            ]);
+        if (! $result['success']) {
+            throw ValidationException::withMessages($this->normalizeGatewayErrors($result['errors'], $result['message']));
         }
 
         Notification::make()
             ->title(__('Contraseña restablecida'))
-            ->body(__('Tu contraseña ha sido actualizada exitosamente. Ya puedes iniciar sesión.'))
+            ->body($result['message'])
             ->success()
             ->send();
 
         return app(PasswordResetResponse::class);
+    }
+
+    /**
+     * @param  array<string, array<int, string>>  $errors
+     * @return array<string, array<int, string>>
+     */
+    protected function normalizeGatewayErrors(array $errors, string $fallback): array
+    {
+        if ($errors !== []) {
+            return $errors;
+        }
+
+        return [
+            'data.code' => [$fallback],
+        ];
     }
 }

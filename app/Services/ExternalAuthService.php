@@ -14,7 +14,7 @@ class ExternalAuthService
 
     public function __construct()
     {
-        $this->baseUrl = rtrim((string) config('services.smartbus.gateway.url', env('API_GATEWAY_URL', 'http://127.0.0.1:8001/api')), '/');
+        $this->baseUrl = rtrim((string) config('services.smartbus.gateway.url'), '/');
         $this->timeout = (int) config('services.smartbus.gateway.timeout', 30);
     }
 
@@ -37,7 +37,7 @@ class ExternalAuthService
                 ]);
 
             if (! $response->successful()) {
-                $this->logWarning('External API authentication failed', $email, [
+                $this->log('warning', 'External API authentication failed', $email, [
                     'status' => $response->status(),
                     'response' => $response->json() ?? $response->body(),
                 ]);
@@ -71,7 +71,7 @@ class ExternalAuthService
                 ],
             ];
         } catch (Throwable $e) {
-            $this->logWarning('External API authentication error', $email, ['error' => $e->getMessage()]);
+            $this->log('error', 'External API authentication error', $email, ['error' => $e->getMessage()]);
 
             return null;
         }
@@ -115,7 +115,7 @@ class ExternalAuthService
                 'included' => $json['included'] ?? [],
             ];
         } catch (Throwable $e) {
-            Log::error('Error fetching external user: '.$e->getMessage());
+            $this->log('error', 'Error fetching external user: '.$e->getMessage(), null, []);
 
             return null;
         }
@@ -134,7 +134,7 @@ class ExternalAuthService
 
             return $response->successful() && ($response->json('meta.valid') === true);
         } catch (Throwable $e) {
-            Log::error('Error validating token: '.$e->getMessage());
+            $this->log('error', 'Error validating token: '.$e->getMessage(), null, []);
 
             return false;
         }
@@ -150,10 +150,15 @@ class ExternalAuthService
                 ->withToken($token)
                 ->accept('application/vnd.api+json, application/json')
                 ->post("{$this->baseUrl}/auth/logout");
+            
+            $this->log('info', 'External logout request sent', null, [
+                'status' => $response->status(),
+                'response' => $response->json() ?? $response->body(),
+            ]);
 
             return $response->successful();
         } catch (Throwable $e) {
-            Log::error('Error during external logout: '.$e->getMessage());
+            $this->log('error', 'Error during external logout: '.$e->getMessage(), null, []);
 
             return false;
         }
@@ -161,8 +166,10 @@ class ExternalAuthService
 
     /**
      * Request 6-digit password reset code at API Gateway /auth/password/forgot.
+     *
+     * @return array{success: bool, message: string, errors: array<string, array<int, string>>}
      */
-    public function sendPasswordResetCode(string $email): bool
+    public function sendPasswordResetCode(string $email): array
     {
         try {
             $response = Http::timeout($this->timeout)
@@ -171,18 +178,43 @@ class ExternalAuthService
                     'email' => $email,
                 ]);
 
-            return $response->successful();
-        } catch (Throwable $e) {
-            Log::error('Error sending password reset code: '.$e->getMessage());
+            $this->log('info', 'Password reset code sent', null, [
+                'status' => $response->status(),
+                'response' => $response->json() ?? $response->body(),
+            ]);
 
-            return false;
+            $payload = $response->json() ?? [];
+
+            if ($response->successful()) {
+                return [
+                    'success' => true,
+                    'message' => $this->extractGatewayMessage($payload, 'Hemos enviado un código de 6 dígitos a tu correo electrónico.'),
+                    'errors' => [],
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => $this->extractGatewayMessage($payload, 'No se pudo enviar el código de restablecimiento.'),
+                'errors' => $this->extractGatewayErrors($payload),
+            ];
+        } catch (Throwable $e) {
+            $this->log('error', 'Error sending password reset code: '.$e->getMessage(), null, []);
+
+            return [
+                'success' => false,
+                'message' => 'No se pudo enviar el código de restablecimiento. Intenta nuevamente.',
+                'errors' => [],
+            ];
         }
     }
 
     /**
      * Reset password using code at API Gateway /auth/password/reset.
+     *
+     * @return array{success: bool, message: string, errors: array<string, array<int, string>>}
      */
-    public function resetPassword(string $email, string $code, string $password): bool
+    public function resetPassword(string $email, string $code, string $password): array
     {
         try {
             $response = Http::timeout($this->timeout)
@@ -194,11 +226,29 @@ class ExternalAuthService
                     'password_confirmation' => $password,
                 ]);
 
-            return $response->successful();
-        } catch (Throwable $e) {
-            Log::error('Error resetting password: '.$e->getMessage());
+            $payload = $response->json() ?? [];
 
-            return false;
+            if ($response->successful()) {
+                return [
+                    'success' => true,
+                    'message' => $this->extractGatewayMessage($payload, 'Tu contraseña ha sido actualizada exitosamente.'),
+                    'errors' => [],
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => $this->extractGatewayMessage($payload, 'El código es inválido o ha expirado.'),
+                'errors' => $this->extractGatewayErrors($payload),
+            ];
+        } catch (Throwable $e) {
+            $this->log('error', 'Error resetting password: '.$e->getMessage(), null, []);
+
+            return [
+                'success' => false,
+                'message' => 'No se pudo restablecer la contraseña. Intenta nuevamente.',
+                'errors' => [],
+            ];
         }
     }
 
@@ -208,6 +258,47 @@ class ExternalAuthService
      * @param  array<string, mixed>  $json
      * @return array<string>
      */
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, array<int, string>>
+     */
+    protected function extractGatewayErrors(array $payload): array
+    {
+        $errors = $payload['errors'] ?? [];
+
+        if (! is_array($errors)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($errors as $key => $value) {
+            if (is_array($value)) {
+                $normalized[(string) $key] = array_map(static fn ($error) => (string) $error, $value);
+            } elseif (is_string($value)) {
+                $normalized[(string) $key] = [(string) $value];
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    protected function extractGatewayMessage(array $payload, string $fallback): string
+    {
+        if (isset($payload['meta']['message']) && is_string($payload['meta']['message'])) {
+            return $payload['meta']['message'];
+        }
+
+        if (isset($payload['message']) && is_string($payload['message'])) {
+            return $payload['message'];
+        }
+
+        return $fallback;
+    }
+
     protected function extractRoles(array $json): array
     {
         $roles = [];
@@ -280,10 +371,14 @@ class ExternalAuthService
         return [];
     }
 
-    private function logWarning(string $message, string $email, array $context): void
+    private function log(string $type, string $message, ?string $email = null, array $context): void
     {
         if (config('services.smartbus.gateway.log_failures', true)) {
-            Log::warning($message, array_merge(['email' => $email], $context));
+            match ($type) {
+                'warning' => Log::warning($message, ['email' => $email, ...$context]),
+                'error' => Log::error($message, ['email' => $email, ...$context]),
+                default => Log::info($message, ['email' => $email, ...$context]),
+            };
         }
     }
 }

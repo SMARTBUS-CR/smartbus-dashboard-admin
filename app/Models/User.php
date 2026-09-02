@@ -10,12 +10,13 @@ use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
@@ -43,16 +44,19 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
     }
 
     /**
-     * Cross-database Eloquent relationship to companies in PostgreSQL.
+     * Companies for this user in PostgreSQL.
      */
-    public function companies(): BelongsToMany
+    public function companies(): Builder
     {
-        return $this->belongsToMany(
-            Company::class,
-            'company_user',
-            'user_id',
-            'company_id'
-        )->withTimestamps();
+        $companyIds = DB::connection('pgsql')
+            ->table('company_user')
+            ->where('user_id', $this->getKey())
+            ->pluck('company_id');
+
+        return Company::on('pgsql')
+            ->whereIn('id', $companyIds)
+            ->where('is_active', true)
+            ->orderBy('name');
     }
 
     /**
@@ -84,7 +88,7 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
             return Company::query()->where('is_active', true)->get();
         }
 
-        return $this->companies()->where('is_active', true)->get();
+        return $this->companies()->get();
     }
 
     /**
@@ -97,8 +101,7 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
         }
 
         return $this->companies()
-            ->where('companies.id', $tenant->getKey())
-            ->where('is_active', true)
+            ->where('id', $tenant->getKey())
             ->exists();
     }
 
