@@ -7,7 +7,10 @@ use Filament\Actions\Action;
 use Filament\Auth\Pages\PasswordReset\RequestPasswordReset as BaseRequestPasswordReset;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\HtmlString;
 use Illuminate\Validation\ValidationException;
 
 class RequestPasswordReset extends BaseRequestPasswordReset
@@ -24,6 +27,11 @@ class RequestPasswordReset extends BaseRequestPasswordReset
 
     public function request(): void
     {
+        if ($this->showResetForm) {
+            $this->confirmReset();
+            return;
+        }
+
         $data = $this->form->getState();
 
         $authService = app(ExternalAuthService::class);
@@ -39,14 +47,14 @@ class RequestPasswordReset extends BaseRequestPasswordReset
             throw ValidationException::withMessages($errors);
         }
 
-        $this->email = $data['email'];
-        $this->showResetForm = true;
-
         Notification::make()
             ->title(__('Código de restablecimiento enviado'))
             ->body($result['message'])
             ->success()
             ->send();
+
+        $this->email = $data['email'];
+        $this->showResetForm = true;
     }
 
     public function confirmReset(): void
@@ -60,8 +68,20 @@ class RequestPasswordReset extends BaseRequestPasswordReset
             (string) ($data['password'] ?? ''),
         );
 
+        Log::debug('Response from password reset', [
+            'errors' => $result['errors'] ?? null,
+            'message' => $result['message'] ?? null,
+            'success' => $result['success'] ?? null,
+        ]);
+
         if (! $result['success']) {
-            throw ValidationException::withMessages($this->normalizeGatewayErrors($result['errors'], $result['message']));
+            $errors = $this->normalizeGatewayErrors($result['errors'], $result['message']);
+            Notification::make()
+                ->title('Error')
+                ->body($errors['password'][0] ?? '')
+                ->danger()
+                ->send();
+            throw ValidationException::withMessages($errors);
         }
 
         Notification::make()
@@ -85,6 +105,7 @@ class RequestPasswordReset extends BaseRequestPasswordReset
                     ->required()
                     ->autocomplete('email')
                     ->disabled(fn () => $this->showResetForm)
+                    ->dehydrated()
                     ->default($this->email),
 
                 TextInput::make('code')
@@ -95,12 +116,36 @@ class RequestPasswordReset extends BaseRequestPasswordReset
                     ->autofocus()
                     ->visible(fn () => $this->showResetForm),
 
+                //!! VERIFICAR LA FORMA DE HACER QUE ESTE ELEMENTO ACTUALICE SU ESTADO CUANDO SE CAMBIE EL VALOR DE PASSWORD
+                Callout::make(new HtmlString(sprintf(
+                    '<p style="font-weight:700;">%s</p>',
+                    __('Requisitos de la contraseña')
+                )))
+                    ->description(new HtmlString(sprintf(
+                        '<div style="display:block; color:inherit; font-size:0.875rem; line-height:1.6;">
+                            <ol style="margin:0; padding-left:1.25rem; list-style:decimal;">
+                                <li style="margin-bottom:0.35rem;">%s</li>
+                                <li style="margin-bottom:0.35rem;">%s</li>
+                                <li style="margin-bottom:0.35rem;">%s</li>
+                                <li>%s</li>
+                            </ol>
+                        </div>',
+                        __('Tener al menos 8 caracteres de longitud.'),
+                        __('Tener al menos una letra mayúscula, una letra minúscula y un símbolo.'),
+                        __('Tener al menos un número.'),
+                        __('No estar comprometida en una filtración de datos conocida.'),
+                    )))
+                    ->icon('heroicon-o-information-circle')
+                    ->warning()
+                    ->visible(fn () => $this->showResetForm),
+
                 TextInput::make('password')
                     ->label(__('Nueva contraseña'))
                     ->password()
                     ->required()
                     ->autocomplete('new-password')
-                    ->visible(fn () => $this->showResetForm),
+                    ->visible(fn () => $this->showResetForm)
+                    ->revealable(true),
 
                 TextInput::make('passwordConfirmation')
                     ->label(__('Confirmar contraseña'))
@@ -108,7 +153,8 @@ class RequestPasswordReset extends BaseRequestPasswordReset
                     ->required()
                     ->same('password')
                     ->autocomplete('new-password')
-                    ->visible(fn () => $this->showResetForm),
+                    ->visible(fn () => $this->showResetForm)
+                    ->revealable(true),
             ]);
     }
 
@@ -121,8 +167,8 @@ class RequestPasswordReset extends BaseRequestPasswordReset
                 ->visible(fn () => ! $this->showResetForm),
 
             Action::make('confirmReset')
-                ->label(__('Guardar nueva contraseña'))
-                ->submit('confirmReset')
+                ->label(__('Cambiar contraseña'))
+                ->submit('request')
                 ->visible(fn () => $this->showResetForm),
         ];
     }

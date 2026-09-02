@@ -226,6 +226,11 @@ class ExternalAuthService
                     'password_confirmation' => $password,
                 ]);
 
+            $this->log('info', 'Response from password reset', null, [
+                'status' => $response->status(),
+                'response' => $response->json() ?? $response->body(),
+            ]);
+
             $payload = $response->json() ?? [];
 
             if ($response->successful()) {
