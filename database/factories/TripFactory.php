@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\Trip;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * @extends Factory<Trip>
@@ -19,9 +20,9 @@ class TripFactory extends Factory
     public function definition(): array
     {
         return [
-            'route_id' => 1,
-            'bus_id' => 1,
-            'driver_id' => null,
+            'route_id' => (string) Str::uuid(),
+            'bus_id' => (string) Str::uuid(),
+            'driver_id' => (string) Str::uuid(),
             'status' => 'scheduled',
             'started_at' => null,
             'completed_at' => null,

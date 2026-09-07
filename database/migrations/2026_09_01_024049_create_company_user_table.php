@@ -17,7 +17,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::connection($this->connection)->create('company_user', function (Blueprint $table) {
-            $table->uuid('id')->primary();
+            $table->id();
             $table->foreignUuid('company_id')->constrained('companies')->cascadeOnDelete();
             $table->uuid('user_id')->index();
             $table->timestamps();

@@ -20,9 +20,8 @@ class DriverFactory extends Factory
     public function definition(): array
     {
         return [
-            'id' => (string) Str::uuid(),
-            'user_id' => User::on('mysql')->value('id'),
-            'company_id' => 1,
+            'user_id' => (string) Str::uuid(),
+            'company_id' => (string) Str::uuid(),
             'license' => fake()->bothify('LIC-####-??'),
             'status' => 'active',
         ];
