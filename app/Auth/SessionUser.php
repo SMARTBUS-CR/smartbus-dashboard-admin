@@ -11,6 +11,7 @@ use Filament\Panel;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class SessionUser implements Authenticatable, FilamentUser, HasName, HasTenants
 {
@@ -148,7 +149,7 @@ class SessionUser implements Authenticatable, FilamentUser, HasName, HasTenants
 
         $userId = $this->getAuthIdentifier();
 
-        $companyIds = \Illuminate\Support\Facades\DB::connection('pgsql')
+        $companyIds = DB::connection('pgsql')
             ->table('company_user')
             ->where('user_id', $userId)
             ->pluck('company_id');
@@ -170,7 +171,7 @@ class SessionUser implements Authenticatable, FilamentUser, HasName, HasTenants
 
         $userId = $this->getAuthIdentifier();
 
-        return \Illuminate\Support\Facades\DB::connection('pgsql')
+        return DB::connection('pgsql')
             ->table('company_user')
             ->where('user_id', $userId)
             ->where('company_id', $tenant->getKey())

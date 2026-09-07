@@ -17,10 +17,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::connection($this->connection)->create('company_user', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete();
-            // user_id references MySQL users table (without cross-database foreign key constraint)
-            $table->unsignedBigInteger('user_id')->index();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('company_id')->constrained('companies')->cascadeOnDelete();
+            $table->uuid('user_id')->index();
             $table->timestamps();
 
             $table->unique(['company_id', 'user_id']);

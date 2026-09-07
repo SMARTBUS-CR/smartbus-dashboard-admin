@@ -150,7 +150,7 @@ class ExternalAuthService
                 ->withToken($token)
                 ->accept('application/vnd.api+json, application/json')
                 ->post("{$this->baseUrl}/auth/logout");
-            
+
             $this->log('info', 'External logout request sent', null, [
                 'status' => $response->status(),
                 'response' => $response->json() ?? $response->body(),
@@ -376,7 +376,7 @@ class ExternalAuthService
         return [];
     }
 
-    private function log(string $type, string $message, ?string $email = null, array $context): void
+    private function log(string $type, string $message, ?string $email, array $context): void
     {
         if (config('services.smartbus.gateway.log_failures', true)) {
             match ($type) {

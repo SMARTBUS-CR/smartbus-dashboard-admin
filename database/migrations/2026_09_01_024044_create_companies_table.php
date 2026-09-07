@@ -17,7 +17,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::connection($this->connection)->create('companies', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('name');
             $table->string('slug')->unique();
             $table->string('legal_id')->nullable();

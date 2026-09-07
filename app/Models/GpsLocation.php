@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Bus extends Model
+class GpsLocation extends Model
 {
     use HasFactory, HasUuids;
 
@@ -18,30 +18,26 @@ class Bus extends Model
     public $incrementing = false;
 
     protected $fillable = [
-        'company_id',
-        'plate_number',
-        'unit_number',
-        'brand',
-        'model',
-        'year',
-        'capacity',
-        'is_active',
+        'trip_id',
+        'latitude',
+        'longitude',
+        'speed_kmh',
+        'recorded_at',
+        'location',
     ];
 
-    /**
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
-            'is_active' => 'boolean',
-            'capacity' => 'integer',
-            'year' => 'integer',
+            'latitude' => 'decimal:7',
+            'longitude' => 'decimal:7',
+            'speed_kmh' => 'decimal:2',
+            'recorded_at' => 'datetime',
         ];
     }
 
-    public function company(): BelongsTo
+    public function trip(): BelongsTo
     {
-        return $this->belongsTo(Company::class);
+        return $this->belongsTo(Trip::class);
     }
 }

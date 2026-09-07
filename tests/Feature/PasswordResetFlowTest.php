@@ -3,7 +3,7 @@
 use App\Filament\Pages\Auth\RequestPasswordReset;
 
 it('shows the verification form after the reset code is sent', function () {
-    $page = new RequestPasswordReset();
+    $page = new RequestPasswordReset;
     $page->email = 'demo@smartbus.com';
     $page->showResetForm = true;
 

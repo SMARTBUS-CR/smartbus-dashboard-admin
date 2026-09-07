@@ -17,8 +17,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::connection($this->connection)->create('routes', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('company_id')->constrained('companies')->cascadeOnDelete();
             $table->string('code')->index();
             $table->string('name');
             $table->text('description')->nullable();

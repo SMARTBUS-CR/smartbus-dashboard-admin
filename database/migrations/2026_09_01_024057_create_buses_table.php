@@ -17,8 +17,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::connection($this->connection)->create('buses', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('company_id')->constrained('companies')->cascadeOnDelete();
             $table->string('plate_number')->unique();
             $table->string('unit_number');
             $table->string('brand')->nullable();

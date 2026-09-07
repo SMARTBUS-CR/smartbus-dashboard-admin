@@ -29,6 +29,7 @@ class RequestPasswordReset extends BaseRequestPasswordReset
     {
         if ($this->showResetForm) {
             $this->confirmReset();
+
             return;
         }
 
@@ -116,7 +117,7 @@ class RequestPasswordReset extends BaseRequestPasswordReset
                     ->autofocus()
                     ->visible(fn () => $this->showResetForm),
 
-                //!! VERIFICAR LA FORMA DE HACER QUE ESTE ELEMENTO ACTUALICE SU ESTADO CUANDO SE CAMBIE EL VALOR DE PASSWORD
+                // !! VERIFICAR LA FORMA DE HACER QUE ESTE ELEMENTO ACTUALICE SU ESTADO CUANDO SE CAMBIE EL VALOR DE PASSWORD
                 Callout::make(new HtmlString(sprintf(
                     '<p style="font-weight:700;">%s</p>',
                     __('Requisitos de la contraseña')
