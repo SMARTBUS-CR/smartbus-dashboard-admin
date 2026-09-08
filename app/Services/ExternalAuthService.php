@@ -2,15 +2,20 @@
 
 namespace App\Services;
 
+use App\Traits\ApiLogger;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Throwable;
+
+use function is_array;
+use function is_string;
 
 class ExternalAuthService
 {
-    protected string $baseUrl;
+    use ApiLogger;
 
-    protected int $timeout;
+    protected readonly string $baseUrl;
+
+    protected readonly int $timeout;
 
     public function __construct()
     {
@@ -21,6 +26,8 @@ class ExternalAuthService
     /**
      * Authenticate credentials against API Gateway /auth/login.
      *
+     * @param  string  $email  The user's email address
+     * @param  string  $password  The user's password
      * @return array{access_token: string, token_type: string, expires_at: ?string, user: array<string, mixed>}|null
      */
     public function authenticate(string $email, string $password): ?array
@@ -37,7 +44,8 @@ class ExternalAuthService
                 ]);
 
             if (! $response->successful()) {
-                $this->log('warning', 'External API authentication failed', $email, [
+                $this->log('warning', 'External API authentication failed', [
+                    'email' => $email,
                     'status' => $response->status(),
                     'response' => $response->json() ?? $response->body(),
                 ]);
@@ -66,12 +74,13 @@ class ExternalAuthService
                     ...$userData['attributes'] ?? [],
                     'roles' => $roles,
                     'permissions' => $permissions,
-                    'relationships' => $userData['relationships'] ?? [],
-                    'included' => $json['included'] ?? [],
                 ],
             ];
         } catch (Throwable $e) {
-            $this->log('error', 'External API authentication error', $email, ['error' => $e->getMessage()]);
+            $this->log('error', 'External API authentication error', [
+                'email' => $email,
+                'error' => $e->getMessage(),
+            ]);
 
             return null;
         }
@@ -79,6 +88,9 @@ class ExternalAuthService
 
     /**
      * Get authenticated user info from API Gateway /auth/user.
+     *
+     * @param  string  $token  The access token to use for authentication
+     * @return array<string, mixed>|null The user data or null if not found
      */
     public function getUser(string $token): ?array
     {
@@ -111,11 +123,12 @@ class ExternalAuthService
                 ...$userData['attributes'] ?? [],
                 'roles' => $roles,
                 'permissions' => $permissions,
-                'relationships' => $userData['relationships'] ?? [],
-                'included' => $json['included'] ?? [],
             ];
         } catch (Throwable $e) {
-            $this->log('error', 'Error fetching external user: '.$e->getMessage(), null, []);
+            $this->log('error', 'Error fetching external user: '.$e->getMessage(), [
+                'token' => $token,
+                'error' => $e->getMessage(),
+            ]);
 
             return null;
         }
@@ -123,6 +136,9 @@ class ExternalAuthService
 
     /**
      * Validate an existing access token with API Gateway /auth/token/validate.
+     *
+     * @param  string  $token  The access token to validate
+     * @return bool True if the token is valid, false otherwise
      */
     public function validateToken(string $token): bool
     {
@@ -132,9 +148,12 @@ class ExternalAuthService
                 ->accept('application/vnd.api+json, application/json')
                 ->post("{$this->baseUrl}/auth/token/validate");
 
-            return $response->successful() && ($response->json('meta.valid') === true);
+            return $response->successful() && $response->json('meta.valid') === true;
         } catch (Throwable $e) {
-            $this->log('error', 'Error validating token: '.$e->getMessage(), null, []);
+            $this->log('error', 'Error validating token: '.$e->getMessage(), [
+                'token' => $token,
+                'error' => $e->getMessage(),
+            ]);
 
             return false;
         }
@@ -142,6 +161,9 @@ class ExternalAuthService
 
     /**
      * Revoke access token at API Gateway /auth/logout.
+     *
+     * @param  string  $token  The access token to revoke
+     * @return bool True if the logout was successful, false otherwise
      */
     public function logout(string $token): bool
     {
@@ -151,14 +173,12 @@ class ExternalAuthService
                 ->accept('application/vnd.api+json, application/json')
                 ->post("{$this->baseUrl}/auth/logout");
 
-            $this->log('info', 'External logout request sent', null, [
-                'status' => $response->status(),
-                'response' => $response->json() ?? $response->body(),
-            ]);
-
             return $response->successful();
         } catch (Throwable $e) {
-            $this->log('error', 'Error during external logout: '.$e->getMessage(), null, []);
+            $this->log('error', 'Error during external logout: '.$e->getMessage(), [
+                'token' => $token,
+                'error' => $e->getMessage(),
+            ]);
 
             return false;
         }
@@ -167,6 +187,7 @@ class ExternalAuthService
     /**
      * Request 6-digit password reset code at API Gateway /auth/password/forgot.
      *
+     * @param  string  $email  The user's email address
      * @return array{success: bool, message: string, errors: array<string, array<int, string>>}
      */
     public function sendPasswordResetCode(string $email): array
@@ -178,7 +199,8 @@ class ExternalAuthService
                     'email' => $email,
                 ]);
 
-            $this->log('info', 'Password reset code sent', null, [
+            $this->log('info', 'Password reset code sent', [
+                'email' => $email,
                 'status' => $response->status(),
                 'response' => $response->json() ?? $response->body(),
             ]);
@@ -199,7 +221,10 @@ class ExternalAuthService
                 'errors' => $this->extractGatewayErrors($payload),
             ];
         } catch (Throwable $e) {
-            $this->log('error', 'Error sending password reset code: '.$e->getMessage(), null, []);
+            $this->log('error', 'Error sending password reset code: '.$e->getMessage(), [
+                'email' => $email,
+                'error' => $e->getMessage(),
+            ]);
 
             return [
                 'success' => false,
@@ -212,6 +237,9 @@ class ExternalAuthService
     /**
      * Reset password using code at API Gateway /auth/password/reset.
      *
+     * @param  string  $email  The user's email address
+     * @param  string  $code  The 6-digit reset code
+     * @param  string  $password  The new password
      * @return array{success: bool, message: string, errors: array<string, array<int, string>>}
      */
     public function resetPassword(string $email, string $code, string $password): array
@@ -226,7 +254,8 @@ class ExternalAuthService
                     'password_confirmation' => $password,
                 ]);
 
-            $this->log('info', 'Response from password reset', null, [
+            $this->log('info', 'Response from password reset', [
+                'email' => $email,
                 'status' => $response->status(),
                 'response' => $response->json() ?? $response->body(),
             ]);
@@ -247,7 +276,10 @@ class ExternalAuthService
                 'errors' => $this->extractGatewayErrors($payload),
             ];
         } catch (Throwable $e) {
-            $this->log('error', 'Error resetting password: '.$e->getMessage(), null, []);
+            $this->log('error', 'Error resetting password: '.$e->getMessage(), [
+                'email' => $email,
+                'error' => $e->getMessage(),
+            ]);
 
             return [
                 'success' => false,
@@ -260,10 +292,6 @@ class ExternalAuthService
     /**
      * Extract role identifiers/values from JSON:API response structure.
      *
-     * @param  array<string, mixed>  $json
-     * @return array<string>
-     */
-    /**
      * @param  array<string, mixed>  $payload
      * @return array<string, array<int, string>>
      */
@@ -289,6 +317,8 @@ class ExternalAuthService
     }
 
     /**
+     * Extract a user-friendly message from the API Gateway response payload.
+     *
      * @param  array<string, mixed>  $payload
      */
     protected function extractGatewayMessage(array $payload, string $fallback): string
@@ -304,17 +334,21 @@ class ExternalAuthService
         return $fallback;
     }
 
+    /**
+     * Extract role identifiers/values from JSON:API payload.
+     *
+     * @param  array<string, mixed>  $json
+     * @return array<string>
+     */
     protected function extractRoles(array $json): array
     {
         $roles = [];
 
-        // 1. Extract from 'included' resources (JSON:API standard compound document)
         if (! empty($json['included']) && is_array($json['included'])) {
             foreach ($json['included'] as $includedItem) {
                 if (is_array($includedItem) && ($includedItem['type'] ?? null) === 'roles') {
                     $roleValue = $includedItem['attributes']['value']
                         ?? $includedItem['attributes']['name']
-                        ?? $includedItem['attributes']['slug']
                         ?? $includedItem['id']
                         ?? null;
 
@@ -325,30 +359,17 @@ class ExternalAuthService
             }
         }
 
-        // 2. Extract from 'data.relationships.roles.data'
         if (empty($roles) && ! empty($json['data']['relationships']['roles']['data'])) {
             $rolesData = $json['data']['relationships']['roles']['data'];
             if (is_array($rolesData)) {
                 foreach ($rolesData as $roleItem) {
                     if (is_array($roleItem)) {
-                        $roleValue = $roleItem['value'] ?? $roleItem['name'] ?? $roleItem['id'] ?? null;
+                        $roleValue = $roleItem['value'] ?? $roleItem['id'] ?? null;
                         if ($roleValue) {
                             $roles[] = (string) $roleValue;
                         }
                     }
                 }
-            }
-        }
-
-        // 3. Fallback: check data.attributes.roles
-        if (empty($roles) && ! empty($json['data']['attributes']['roles'])) {
-            $attrRoles = $json['data']['attributes']['roles'];
-            if (is_array($attrRoles)) {
-                foreach ($attrRoles as $role) {
-                    $roles[] = is_array($role) ? ($role['value'] ?? $role['name'] ?? '') : (string) $role;
-                }
-            } elseif (is_string($attrRoles)) {
-                $roles[] = $attrRoles;
             }
         }
 
@@ -374,16 +395,5 @@ class ExternalAuthService
         }
 
         return [];
-    }
-
-    private function log(string $type, string $message, ?string $email, array $context): void
-    {
-        if (config('services.smartbus.gateway.log_failures', true)) {
-            match ($type) {
-                'warning' => Log::warning($message, ['email' => $email, ...$context]),
-                'error' => Log::error($message, ['email' => $email, ...$context]),
-                default => Log::info($message, ['email' => $email, ...$context]),
-            };
-        }
     }
 }

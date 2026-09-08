@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Trip;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -8,21 +9,16 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Operational data resides in PostgreSQL.
-     */
-    protected $connection = 'pgsql';
-
-    /**
      * Run the migrations.
      */
     public function up(): void
     {
-        DB::connection($this->connection)->statement('CREATE EXTENSION IF NOT EXISTS postgis');
+        DB::statement('CREATE EXTENSION IF NOT EXISTS postgis');
 
-        Schema::connection($this->connection)->create('gps_locations', function (Blueprint $table) {
+        Schema::create('gps_locations', function (Blueprint $table) {
             $table->uuid('id')->primary();
 
-            $table->foreignUuid('trip_id')
+            $table->foreignUuidFor(Trip::class)
                 ->constrained('trips')
                 ->cascadeOnDelete();
 
@@ -52,6 +48,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::connection($this->connection)->dropIfExists('gps_locations');
+        Schema::dropIfExists('gps_locations');
     }
 };

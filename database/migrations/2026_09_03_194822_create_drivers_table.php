@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Company;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -7,22 +8,17 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Operational data resides in PostgreSQL.
-     */
-    protected $connection = 'pgsql';
-
-    /**
      * Run the migrations.
      */
     public function up(): void
     {
-        Schema::connection($this->connection)->create('drivers', function (Blueprint $table) {
+        Schema::create('drivers', function (Blueprint $table) {
             $table->uuid('id')->primary();
 
             $table->uuid('user_id')
                 ->unique();
 
-            $table->foreignUuid('company_id')
+            $table->foreignUuidFor(Company::class)
                 ->constrained('companies')
                 ->cascadeOnDelete();
 
@@ -40,6 +36,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::connection($this->connection)->dropIfExists('drivers');
+        Schema::dropIfExists('drivers');
     }
 };

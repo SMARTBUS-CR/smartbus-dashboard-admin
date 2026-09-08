@@ -10,7 +10,7 @@ class CompanySeeder extends Seeder
 {
     public function run(): void
     {
-        $company = Company::firstOrCreate(
+        $company1 = Company::firstOrCreate(
             ['slug' => 'smartbus-demo'],
             [
                 'name' => 'Transportes SmartBus Demo',
@@ -22,15 +22,28 @@ class CompanySeeder extends Seeder
             ]
         );
 
+        $company2 = Company::firstOrCreate(
+            ['slug' => 'transporte-urbano'],
+            [
+                'name' => 'Transporte Urbano S.A.',
+                'legal_id' => '1790012345002',
+                'phone' => '+593 98 888 8888',
+                'email' => 'contacto@transporteurbano.com',
+                'address' => 'Calle 123 y Av. Principal',
+                'is_active' => true,
+            ]
+        );
+
         $user = User::first();
 
         if ($user) {
-            $company->attachUser($user);
+            $company1->attachUser($user);
+            $company2->attachUser($user);
 
-            $this->command->info("Empresa vinculada exitosamente al usuario: {$user->email}");
+            $this->command->info("Empresas vinculadas exitosamente al usuario: {$user->email}");
         }
 
-        $company->buses()->firstOrCreate(
+        $company1->buses()->firstOrCreate(
             ['plate_number' => 'ABC-1234'],
             [
                 'unit_number' => 'U-01',
@@ -42,7 +55,7 @@ class CompanySeeder extends Seeder
             ]
         );
 
-        $company->routes()->firstOrCreate(
+        $company1->routes()->firstOrCreate(
             ['code' => 'R-101'],
             [
                 'name' => 'Línea 1 - Norte / Terminal',

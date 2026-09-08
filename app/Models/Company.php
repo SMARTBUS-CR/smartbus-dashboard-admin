@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Filament\Models\Contracts\HasCurrentTenantLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
-class Company extends Model
+class Company extends Model implements HasCurrentTenantLabel
 {
     use HasFactory, HasUuids;
 
@@ -70,5 +71,10 @@ class Company extends Model
     public function routes(): HasMany
     {
         return $this->hasMany(Route::class);
+    }
+
+    public function getCurrentTenantLabel(): string
+    {
+        return 'Activo';
     }
 }

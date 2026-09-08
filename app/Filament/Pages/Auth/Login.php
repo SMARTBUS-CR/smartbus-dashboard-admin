@@ -2,12 +2,10 @@
 
 namespace App\Filament\Pages\Auth;
 
-use App\Enums\UserRole;
-use App\Services\ExternalAuthService;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Auth\Pages\Login as BaseLogin;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class Login extends BaseLogin
@@ -16,37 +14,19 @@ class Login extends BaseLogin
     {
         $data = $this->form->getState();
 
-        $externalAuthService = app(ExternalAuthService::class);
-        $authResult = $externalAuthService->authenticate(
-            $data['email'],
-            $data['password']
-        );
-
-        if (! $authResult) {
+        if (! Filament::auth()->attempt([
+            'email' => $data['email'],
+            'password' => $data['password'],
+        ], $data['remember'] ?? false)) {
             throw ValidationException::withMessages([
                 'data.email' => __('auth.failed'),
             ]);
         }
 
-        $userData = $authResult['user'] ?? [];
-        $roles = $userData['roles'] ?? [];
+        $user = Filament::auth()->user();
 
-        Log::info('External API authentication successful', [
-            'user_id' => $userData['id'] ?? null,
-            'email' => $userData['email'] ?? null,
-            'roles' => $roles,
-        ]);
-
-        // Strict role validation: only super-admin and company-admin allowed
-        $allowedRoles = UserRole::adminRoles();
-
-        $hasAccess = count(array_intersect($allowedRoles, $roles)) > 0;
-
-        if (! $hasAccess) {
-            // Revoke generated token on API Gateway
-            if (! empty($authResult['access_token'])) {
-                $externalAuthService->logout($authResult['access_token']);
-            }
+        if (! $user->canAccessPanel(Filament::getCurrentOrDefaultPanel())) {
+            Filament::auth()->logout();
 
             Notification::make()
                 ->title(__('Acceso denegado'))
@@ -58,16 +38,6 @@ class Login extends BaseLogin
                 'data.email' => __('No tienes permisos para acceder al panel administrativo.'),
             ]);
         }
-
-        // Store external auth token and user data in session
-        session([
-            'external_auth_token' => $authResult['access_token'],
-            'external_user_data' => $userData,
-            'user_id' => $userData['id'] ?? null,
-            'user_email' => $userData['email'] ?? null,
-            'user_name' => $userData['name'] ?? null,
-            'user_roles' => $roles,
-        ]);
 
         session()->regenerate();
 

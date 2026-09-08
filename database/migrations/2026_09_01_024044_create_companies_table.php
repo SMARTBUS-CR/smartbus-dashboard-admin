@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Company;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -7,16 +8,11 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Database connection for operational data.
-     */
-    protected $connection = 'pgsql';
-
-    /**
      * Run the migrations.
      */
     public function up(): void
     {
-        Schema::connection($this->connection)->create('companies', function (Blueprint $table) {
+        Schema::create('companies', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('name');
             $table->string('slug')->unique();
@@ -27,6 +23,17 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
+
+        Schema::create('company_user', function (Blueprint $table) {
+            $table->id();
+            $table->foreignUuidFor(Company::class)
+                ->constrained('companies')
+                ->cascadeOnDelete();
+            $table->uuid('user_id')->index();
+            $table->timestamps();
+
+            $table->unique(['company_id', 'user_id']);
+        });
     }
 
     /**
@@ -34,6 +41,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::connection($this->connection)->dropIfExists('companies');
+        Schema::dropIfExists('companies');
+        Schema::dropIfExists('company_user');
     }
 };

@@ -25,12 +25,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Register the custom authentication guard
-        Auth::extend('external_session', function ($app, $name, $config) {
-            return new SessionGuard(
-                $app['request'],
-                $app['session.store']
-            );
-        });
+        Auth::extend('external_session', fn ($app, $name, $config) => new SessionGuard(
+            $app['request'],
+            $app['session.store']
+        ));
 
         $this->app->resolving(HttpFactory::class, function (HttpFactory $factory) {
             $factory->globalMiddleware(
