@@ -10,14 +10,23 @@ use Illuminate\Validation\ValidationException;
 
 class Login extends BaseLogin
 {
+    /**
+     * Handle the authentication process for the user.
+     *
+     * @return LoginResponse Response indicating the result of the authentication attempt.
+     */
     public function authenticate(): ?LoginResponse
     {
         $data = $this->form->getState();
+        $authenticated = Filament::auth()->attempt(
+            [
+                'email' => $data['email'],
+                'password' => $data['password'],
+            ],
+            $data['remember'] ?? false
+        );
 
-        if (! Filament::auth()->attempt([
-            'email' => $data['email'],
-            'password' => $data['password'],
-        ], $data['remember'] ?? false)) {
+        if (! $authenticated) {
             throw ValidationException::withMessages([
                 'data.email' => __('auth.failed'),
             ]);
@@ -29,13 +38,13 @@ class Login extends BaseLogin
             Filament::auth()->logout();
 
             Notification::make()
-                ->title(__('Acceso denegado'))
-                ->body(__('Tu cuenta no cuenta con permisos administrativos para ingresar al panel.'))
+                ->title(__('auth.login.errors.title'))
+                ->body(__('auth.login.errors.message'))
                 ->danger()
                 ->send();
 
             throw ValidationException::withMessages([
-                'data.email' => __('No tienes permisos para acceder al panel administrativo.'),
+                'data.email' => __('auth.login.errors.field_message'),
             ]);
         }
 

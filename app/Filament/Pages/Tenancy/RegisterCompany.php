@@ -9,11 +9,22 @@ use Filament\Schemas\Schema;
 
 class RegisterCompany extends RegisterTenant
 {
+    /**
+     * Get the label for the RegisterCompany page.
+     *
+     * @return string The label for the page.
+     */
     public static function getLabel(): string
     {
-        return 'Registrar Empresa';
+        return 'Registrar nueva empresa';
     }
 
+    /**
+     * Define the form schema for the company registration process.
+     *
+     * @param  Schema  $schema  The schema instance to define the form components.
+     * @return Schema The modified schema with the company registration form components.
+     */
     public function form(Schema $schema): Schema
     {
         return $schema
@@ -27,6 +38,12 @@ class RegisterCompany extends RegisterTenant
             ]);
     }
 
+    /**
+     * Handle the company registration process.
+     *
+     * @param  array  $data  The data submitted from the registration form.
+     * @return Company The newly created company instance.
+     */
     protected function handleRegistration(array $data): Company
     {
         $company = Company::create($data);

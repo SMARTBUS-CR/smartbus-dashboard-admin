@@ -63,6 +63,7 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
+            ->profile()
             ->tenant(Company::class, slugAttribute: 'slug')
             ->tenantRegistration(RegisterCompany::class);
     }

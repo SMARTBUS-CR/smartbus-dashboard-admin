@@ -3,17 +3,19 @@
 namespace App\Filament\Pages\Auth;
 
 use App\Services\ExternalAuthService;
+use App\Traits\ApiLogger;
 use Filament\Actions\Action;
 use Filament\Auth\Pages\PasswordReset\RequestPasswordReset as BaseRequestPasswordReset;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Schema;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class RequestPasswordReset extends BaseRequestPasswordReset
 {
+    use ApiLogger;
+
     public bool $showResetForm = false;
 
     public ?string $email = null;
@@ -24,6 +26,9 @@ class RequestPasswordReset extends BaseRequestPasswordReset
 
     public ?string $passwordConfirmation = null;
 
+    /**
+     * Handle the password reset request process.
+     */
     public function request(): void
     {
         if ($this->showResetForm) {
@@ -38,6 +43,12 @@ class RequestPasswordReset extends BaseRequestPasswordReset
         $result = $authService->sendPasswordResetCode($data['email']);
 
         if (! $result['success']) {
+            $this->log('error', 'Password reset request failed', [
+                'email' => $data['email'],
+                'errors' => $result['errors'] ?? null,
+                'message' => $result['message'] ?? null,
+            ]);
+
             $errors = $this->normalizeGatewayErrors($result['errors'], $result['message']);
             Notification::make()
                 ->title($errors['email'][0] ?? '')
@@ -48,7 +59,7 @@ class RequestPasswordReset extends BaseRequestPasswordReset
         }
 
         Notification::make()
-            ->title(__('Código de restablecimiento enviado'))
+            ->title(__('Reset password code sent'))
             ->body($result['message'])
             ->success()
             ->send();
@@ -57,6 +68,9 @@ class RequestPasswordReset extends BaseRequestPasswordReset
         $this->showResetForm = true;
     }
 
+    /**
+     * Handle the password reset confirmation process.
+     */
     public function confirmReset(): void
     {
         $data = $this->form->getState();
@@ -68,13 +82,13 @@ class RequestPasswordReset extends BaseRequestPasswordReset
             (string) ($data['password'] ?? ''),
         );
 
-        Log::debug('Response from password reset', [
-            'errors' => $result['errors'] ?? null,
-            'message' => $result['message'] ?? null,
-            'success' => $result['success'] ?? null,
-        ]);
-
         if (! $result['success']) {
+            $this->log('error', 'Password reset failed', [
+                'email' => $this->email ?? $data['email'],
+                'errors' => $result['errors'] ?? null,
+                'message' => $result['message'] ?? null,
+            ]);
+
             $errors = $this->normalizeGatewayErrors($result['errors'], $result['message']);
             Notification::make()
                 ->title('Error')
@@ -85,7 +99,7 @@ class RequestPasswordReset extends BaseRequestPasswordReset
         }
 
         Notification::make()
-            ->title(__('Contraseña actualizada'))
+            ->title(__('Password Updated'))
             ->body($result['message'])
             ->success()
             ->send();
@@ -94,13 +108,19 @@ class RequestPasswordReset extends BaseRequestPasswordReset
         $this->form->fill();
     }
 
+    /**
+     * Define the form schema for the password reset request and confirmation.
+     *
+     * @param  Schema  $schema  Schema instance to define the form structure.
+     * @return Schema Modified schema with form components for password reset.
+     */
     public function form(Schema $schema): Schema
     {
         return $schema
             ->statePath('data')
             ->components([
                 TextInput::make('email')
-                    ->label(__('Correo electrónico'))
+                    ->label(__('form.email.label'))
                     ->email()
                     ->required()
                     ->autocomplete('email')
@@ -109,7 +129,7 @@ class RequestPasswordReset extends BaseRequestPasswordReset
                     ->default($this->email),
 
                 TextInput::make('code')
-                    ->label(__('Código de verificación'))
+                    ->label(__('form.request-password.code.label'))
                     ->required()
                     ->length(6)
                     ->numeric()
@@ -117,7 +137,7 @@ class RequestPasswordReset extends BaseRequestPasswordReset
                     ->visible(fn () => $this->showResetForm),
 
                 TextInput::make('password')
-                    ->label(__('Nueva contraseña'))
+                    ->label(__('form.password.label'))
                     ->password()
                     ->revealable()
                     ->required()
@@ -134,7 +154,7 @@ class RequestPasswordReset extends BaseRequestPasswordReset
                     ->visible(fn () => $this->showResetForm),
 
                 TextInput::make('passwordConfirmation')
-                    ->label(__('Confirmar contraseña'))
+                    ->label(__('form.password-confirmation.label'))
                     ->password()
                     ->required()
                     ->same('password')
@@ -144,27 +164,39 @@ class RequestPasswordReset extends BaseRequestPasswordReset
             ]);
     }
 
+    /**
+     * Define the actions available on the password reset form.
+     *
+     * @return array List of actions for the form, including request and confirm reset actions.
+     */
     public function getFormActions(): array
     {
         return [
             Action::make('request')
-                ->label(__('Enviar código'))
+                ->label(__('form.request-password.actions.request.label'))
                 ->submit('request')
                 ->visible(fn () => ! $this->showResetForm),
 
             Action::make('confirmReset')
-                ->label(__('Cambiar contraseña'))
+                ->label(__('form.request-password.actions.confirm-reset.label'))
                 ->submit('request')
                 ->visible(fn () => $this->showResetForm),
         ];
     }
 
     /**
+     * Normalize the errors returned from the external authentication service.
+     *
      * @param  array<string, array<int, string>>  $errors
      * @return array<string, array<int, string>>
      */
     protected function normalizeGatewayErrors(array $errors, string $fallback): array
     {
+        $this->log('debug', 'Normalizing gateway errors', [
+            'errors' => $errors,
+            'fallback' => $fallback,
+        ]);
+
         if ($errors !== []) {
             return $errors;
         }
