@@ -14,10 +14,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 use function count;
@@ -29,7 +29,7 @@ use function is_array;
 class User extends Authenticatable implements FilamentUser, HasName, HasTenants
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasUuids, Notifiable;
+    use HasFactory, HasUuids, Notifiable, SoftDeletes;
 
     /**
      * User data resides strictly in MySQL.
@@ -180,14 +180,11 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
      */
     public function companies(): Builder
     {
-        $companyIds = DB::connection('pgsql')
-            ->table('company_user')
-            ->where('user_id', $this->getKey())
+        $companyIds = CompanyUser::where('user_id', $this->getKey())
             ->pluck('company_id');
 
         return Company::on('pgsql')
             ->whereIn('id', $companyIds)
-            ->where('is_active', true)
             ->orderBy('name');
     }
 
@@ -218,7 +215,7 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
     public function getTenants(Panel $panel): array|Collection
     {
         if ($this->isSuperAdmin()) {
-            return Company::query()->where('is_active', true)->get();
+            return Company::query()->get();
         }
 
         return $this->companies()->get();

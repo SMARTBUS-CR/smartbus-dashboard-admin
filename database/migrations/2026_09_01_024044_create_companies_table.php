@@ -20,8 +20,8 @@ return new class extends Migration
             $table->string('phone')->nullable();
             $table->string('email')->nullable();
             $table->text('address')->nullable();
-            $table->boolean('is_active')->default(true);
             $table->timestamps();
+            $table->softDeletes();
         });
 
         Schema::create('company_user', function (Blueprint $table) {
@@ -31,6 +31,7 @@ return new class extends Migration
                 ->cascadeOnDelete();
             $table->uuid('user_id')->index();
             $table->timestamps();
+            $table->softDeletes();
 
             $table->unique(['company_id', 'user_id']);
         });

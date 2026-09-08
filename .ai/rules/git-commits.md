@@ -3,7 +3,7 @@
 Always structure commit messages as follows:
 
 ```text
-DD-MMM-YYYY Commit summary
+DD-MM-YYYY Commit summary
 
 Detailed commit description explaining why the changes were made.
 
@@ -13,6 +13,6 @@ Detailed commit description explaining why the changes were made.
 
 ### Date format
 - `DD`: 2-digit day (e.g. 08)
-- `MMM`: Abbreviated month (e.g. sept)
+- `MM`: 2-digit month (e.g. 09)
 - `YYYY`: 4-digit year (e.g. 2026)
 

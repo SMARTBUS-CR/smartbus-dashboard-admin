@@ -8,11 +8,11 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Company extends Model implements HasCurrentTenantLabel
 {
-    use HasFactory, HasUuids;
+    use HasFactory, HasUuids, SoftDeletes;
 
     protected $connection = 'pgsql';
 
@@ -27,7 +27,6 @@ class Company extends Model implements HasCurrentTenantLabel
         'phone',
         'email',
         'address',
-        'is_active',
     ];
 
     /**
@@ -35,9 +34,7 @@ class Company extends Model implements HasCurrentTenantLabel
      */
     protected function casts(): array
     {
-        return [
-            'is_active' => 'boolean',
-        ];
+        return [];
     }
 
     /**
@@ -45,9 +42,7 @@ class Company extends Model implements HasCurrentTenantLabel
      */
     public function users(): Builder
     {
-        $userIds = DB::connection('pgsql')
-            ->table('company_user')
-            ->where('company_id', $this->getKey())
+        $userIds = CompanyUser::where('company_id', $this->getKey())
             ->pluck('user_id');
 
         return User::on('mysql')
@@ -57,10 +52,31 @@ class Company extends Model implements HasCurrentTenantLabel
 
     public function attachUser(User $user): void
     {
-        DB::connection('pgsql')->table('company_user')->updateOrInsert([
-            'company_id' => $this->getKey(),
-            'user_id' => $user->getKey(),
-        ], []);
+        $pivot = CompanyUser::withTrashed()
+            ->where('company_id', $this->getKey())
+            ->where('user_id', $user->getKey())
+            ->first();
+
+        if ($pivot?->trashed()) {
+            $pivot->restore();
+        } else {
+            CompanyUser::create([
+                'company_id' => $this->getKey(),
+                'user_id' => $user->getKey(),
+            ]);
+        }
+    }
+
+    /**
+     * Detach a user from this company.
+     *
+     * @param  User  $user  The user to detach from the company.
+     */
+    public function detachUser(User $user): void
+    {
+        CompanyUser::where('company_id', $this->getKey())
+            ->where('user_id', $user->getKey())
+            ->delete();
     }
 
     public function buses(): HasMany
@@ -75,6 +91,6 @@ class Company extends Model implements HasCurrentTenantLabel
 
     public function getCurrentTenantLabel(): string
     {
-        return 'Activo';
+        return __('Active');
     }
 }

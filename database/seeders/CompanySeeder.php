@@ -18,7 +18,6 @@ class CompanySeeder extends Seeder
                 'phone' => '+593 99 999 9999',
                 'email' => 'operaciones@smartbus.com',
                 'address' => 'Av. Principal y Terminal Terrestre',
-                'is_active' => true,
             ]
         );
 
@@ -30,7 +29,6 @@ class CompanySeeder extends Seeder
                 'phone' => '+593 98 888 8888',
                 'email' => 'contacto@transporteurbano.com',
                 'address' => 'Calle 123 y Av. Principal',
-                'is_active' => true,
             ]
         );
 

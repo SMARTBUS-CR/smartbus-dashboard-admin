@@ -141,7 +141,6 @@ class RequestPasswordReset extends BaseRequestPasswordReset
                     ->password()
                     ->revealable()
                     ->required()
-                    ->live(onBlur: false)
                     ->rule(
                         Password::min(8)
                             ->letters()

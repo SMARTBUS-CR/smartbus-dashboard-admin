@@ -44,6 +44,7 @@ return [
         ],
         'external' => [
             'driver' => 'external_session',
+            'provider' => 'external_users',
         ],
     ],
 
@@ -67,6 +68,11 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
+            'model' => env('AUTH_MODEL', User::class),
+        ],
+
+        'external_users' => [
+            'driver' => 'external_provider',
             'model' => env('AUTH_MODEL', User::class),
         ],
 

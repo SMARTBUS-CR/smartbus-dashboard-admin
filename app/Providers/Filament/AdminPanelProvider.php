@@ -2,16 +2,14 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\RequestPasswordReset;
-use App\Filament\Pages\Auth\ResetPassword;
+use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\Tenancy\RegisterCompany;
 use App\Models\Company;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -32,10 +30,10 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            // ->spa(hasPrefetching: true)
+            ->spa(hasPrefetching: true)
             ->authGuard('external')
-            ->login(Login::class)
-            ->passwordReset(RequestPasswordReset::class, ResetPassword::class)
+            ->login()
+            ->passwordReset(RequestPasswordReset::class)
             ->colors([
                 'primary' => Color::Indigo,
             ])
@@ -63,7 +61,6 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
-            ->profile()
             ->tenant(Company::class, slugAttribute: 'slug')
             ->tenantRegistration(RegisterCompany::class);
     }

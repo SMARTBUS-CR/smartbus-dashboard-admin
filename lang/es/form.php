@@ -25,4 +25,16 @@ return [
             ],
         ],
     ],
+    'register-tenant' => [
+        'title' => 'Registrar nueva empresa',
+        'description' => 'Crear una nueva cuenta de empresa',
+        'actions' => [
+            'register' => [
+                'label' => 'Registrar',
+            ],
+            'back' => [
+                'label' => 'Regresar',
+            ],
+        ],
+    ],
 ];
