@@ -16,14 +16,14 @@ RUN apt-get update && apt-get install -y \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
+    libicu-dev \
+    libzip-dev \
     zip \
-    unzip
+    unzip \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Limpiar caché para reducir el tamaño de la imagen
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# 5. Instalar extensiones de PHP fundamentales para el framework
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
+# 5. Instalar extensiones de PHP fundamentales para el framework y paquetes como Filament / OpenSpout
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd intl zip
 
 # 6. Instalar Composer copiándolo desde su imagen oficial
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
