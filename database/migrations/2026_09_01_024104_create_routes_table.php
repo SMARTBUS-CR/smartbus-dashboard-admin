@@ -19,13 +19,14 @@ return new class extends Migration
                 ->cascadeOnDelete();
             $table->string('code')->index();
             $table->string('name');
-            $table->text('description')->nullable();
+            // $table->text('description')->nullable();
             $table->string('origin');
             $table->string('destination');
             $table->decimal('distance_km', 8, 2)->nullable();
             $table->unsignedSmallInteger('estimated_duration_minutes')->nullable();
-            $table->boolean('is_active')->default(true);
+            // $table->boolean('is_active')->default(true);
             $table->timestamps();
+            $table->softDeletes();
 
             $table->index(['company_id', 'is_active']);
         });
