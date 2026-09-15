@@ -21,8 +21,8 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Illuminate\Support\Collection;
 use Filament\Support\Enums\Alignment;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\HtmlString;
@@ -47,7 +47,7 @@ class RouteForm
     /**
      * Configures and returns the complete Filament form schema.
      *
-     * @param Schema $schema The incoming Filament schema instance.
+     * @param  Schema  $schema  The incoming Filament schema instance.
      * @return Schema The configured Filament schema.
      */
     public static function configure(Schema $schema): Schema
@@ -135,7 +135,7 @@ class RouteForm
                                             $km = round($routeData['distance_meters'] / 1000, 2);
                                             $minutes = (int) round($routeData['duration_seconds'] / 60);
                                             $formattedDuration = static::formatDuration($routeData['duration_seconds']);
-                                            
+
                                             $set('overview_polyline', $routeData['polyline']);
                                             $set('distance_km', $km);
                                             $set('duration_minutes', $minutes);
@@ -147,8 +147,8 @@ class RouteForm
                                                 ->send();
                                         }),
                                 ])
-                                ->alignment(Alignment::Between)
-                                ->columnSpan(1),
+                                    ->alignment(Alignment::Between)
+                                    ->columnSpan(1),
                             ]),
 
                         static::buildMapPicker()->columnSpan(1),
@@ -184,9 +184,9 @@ class RouteForm
     /**
      * Builds a GeoSearchInput component with reverse geocoding capabilities.
      *
-     * @param string $name Component state key name.
-     * @param string $label Component UI label.
-     * @param string $targetField Hidden field target storing coordinate state.
+     * @param  string  $name  Component state key name.
+     * @param  string  $label  Component UI label.
+     * @param  string  $targetField  Hidden field target storing coordinate state.
      * @return GeoSearchInput The initialized search input instance.
      */
     protected static function buildGeoSearchInput(string $name, string $label, string $targetField): GeoSearchInput
@@ -384,12 +384,15 @@ class RouteForm
             ->onMapClick(null)
             ->onLayerClick(static function (mixed $layer, Get $get, Set $set): void {
                 $id = $layer?->getId();
-                if (! $id) return;
+                if (! $id) {
+                    return;
+                }
 
                 if ($id === 'origin-marker') {
                     $set('origin', null);
                     $set('origin_search', null);
                     $set('overview_polyline', null);
+
                     return;
                 }
 
@@ -397,6 +400,7 @@ class RouteForm
                     $set('destination', null);
                     $set('destination_search', null);
                     $set('overview_polyline', null);
+
                     return;
                 }
 
@@ -414,7 +418,7 @@ class RouteForm
     /**
      * Resets calculated metric states in the form.
      *
-     * @param Set $set Filament state setter callback.
+     * @param  Set  $set  Filament state setter callback.
      */
     protected static function resetCalculatedValues(Set $set): void
     {
@@ -427,7 +431,7 @@ class RouteForm
     /**
      * Resets all route configuration and calculated states.
      *
-     * @param Set $set Filament state setter callback.
+     * @param  Set  $set  Filament state setter callback.
      */
     protected static function resetRouteState(Set $set): void
     {
@@ -442,7 +446,7 @@ class RouteForm
     /**
      * Formats raw duration seconds into a human-readable string.
      *
-     * @param float $seconds Total duration in seconds.
+     * @param  float  $seconds  Total duration in seconds.
      * @return string Formatted string representation (e.g., "1 h 15 min").
      */
     protected static function formatDuration(float $seconds): string
@@ -464,7 +468,7 @@ class RouteForm
     /**
      * Parses and normalizes waypoint data from array or JSON string formats.
      *
-     * @param mixed $waypoints Raw waypoint input.
+     * @param  mixed  $waypoints  Raw waypoint input.
      * @return array<int, array{lat: float|null, lng: float|null}> Normalized collection of points.
      */
     protected static function parseWaypoints(mixed $waypoints): array
@@ -483,7 +487,7 @@ class RouteForm
     /**
      * Normalizes various coordinate inputs into a uniform array structure.
      *
-     * @param mixed $point Coordinate payload (Coordinate object, standard object, array, or null).
+     * @param  mixed  $point  Coordinate payload (Coordinate object, standard object, array, or null).
      * @return array{lat: float|null, lng: float|null} Uniform spatial coordinate array.
      */
     protected static function normalizePoint(mixed $point): array
@@ -516,8 +520,8 @@ class RouteForm
     /**
      * Reversely geocodes coordinates into a human-readable display address with caching.
      *
-     * @param float $lat Latitude coordinate.
-     * @param float $lng Longitude coordinate.
+     * @param  float  $lat  Latitude coordinate.
+     * @param  float  $lng  Longitude coordinate.
      * @return string|null Resolved display name or null on failure.
      */
     protected static function reverseGeocode(float $lat, float $lng): ?string

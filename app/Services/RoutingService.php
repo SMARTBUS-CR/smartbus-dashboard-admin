@@ -11,8 +11,6 @@ class RoutingService
 {
     /**
      * The Mapbox API token used for routing requests.
-     * 
-     * @var string
      */
     protected string $token;
 
@@ -23,10 +21,10 @@ class RoutingService
 
     /**
      * Generates an encoded polyline connecting origin, waypoints, and destination via real streets.
-     * 
-     * @param array|object $origin The starting point with 'lat' and 'lng'.
-     * @param array|object $destination The ending point with 'lat' and 'lng'.
-     * @param array<int, array|object> $waypoints Optional intermediate points.
+     *
+     * @param  array|object  $origin  The starting point with 'lat' and 'lng'.
+     * @param  array|object  $destination  The ending point with 'lat' and 'lng'.
+     * @param  array<int, array|object>  $waypoints  Optional intermediate points.
      * @return array{polyline: string, distance_meters: float, duration_seconds: float}|null Returns routing data or null on failure.
      */
     public function calculateRoute(array|object $origin, array|object $destination, array $waypoints = []): ?array
