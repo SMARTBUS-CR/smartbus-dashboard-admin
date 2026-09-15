@@ -32,6 +32,9 @@ return new class extends Migration
             // useful for rendering on maps without heavy data transfer
             $table->text('overview_polyline')->nullable();
 
+            $table->decimal('distance_km', 8, 2)->nullable(); // Total distance in kilometers
+            $table->unsignedInteger('duration_minutes')->nullable(); // Total duration in minutes
+
             // PostGIS LineString for native spatial queries in the database
             $table->geography('path', subtype: 'linestring', srid: 4326)->nullable();
 

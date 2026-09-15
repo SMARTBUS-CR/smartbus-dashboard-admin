@@ -25,6 +25,8 @@ class Route extends Model
         'destination_lat',
         'destination_lng',
         'overview_polyline',
+        'distance_km',
+        'duration_minutes',
         'path',
         'waypoints',
         'is_active',
@@ -34,6 +36,8 @@ class Route extends Model
         'path' => 'string', // PostGIS LineString stored as WKT (Well-Known Text)
         'waypoints' => 'array',
         'is_active' => 'boolean',
+        'distance_km' => 'decimal:2',
+        'duration_minutes' => 'integer',
         'origin' => Coordinate::class.':origin_lat,origin_lng',
         'destination' => Coordinate::class.':destination_lat,destination_lng',
     ];

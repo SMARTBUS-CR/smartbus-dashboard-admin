@@ -35,6 +35,11 @@ return [
         ],
     ],
 
+    'mapbox' => [
+        'token' => env('MAPBOX_ACCESS_TOKEN'),
+        'tile_size' => env('MAPBOX_TILE_SIZE', 512),
+    ],
+
     'smartbus' => [
         'gateway' => [
             'url' => env('API_GATEWAY_URL', 'https://smartbus-api-gateway.test'),

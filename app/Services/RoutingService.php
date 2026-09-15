@@ -4,33 +4,73 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 
+use function ord;
+use function strlen;
+
 class RoutingService
 {
     /**
-     * Generates an encoded polyline connecting origin, waypoints, and destination via real streets.
+     * The Mapbox API token used for routing requests.
+     * 
+     * @var string
      */
-    public function calculateRoutePolyline(array $origin, array $destination, array $waypoints = []): ?string
-    {
-        $coordinates = ["{$origin['lng']},{$origin['lat']}"];
+    protected string $token;
 
-        foreach ($waypoints as $waypoint) {
-            if (isset($waypoint['lat'], $waypoint['lng'])) {
-                $coordinates[] = "{$waypoint['lng']},{$waypoint['lat']}";
+    public function __construct()
+    {
+        $this->token = config('services.mapbox.token');
+    }
+
+    /**
+     * Generates an encoded polyline connecting origin, waypoints, and destination via real streets.
+     * 
+     * @param array|object $origin The starting point with 'lat' and 'lng'.
+     * @param array|object $destination The ending point with 'lat' and 'lng'.
+     * @param array<int, array|object> $waypoints Optional intermediate points.
+     * @return array{polyline: string, distance_meters: float, duration_seconds: float}|null Returns routing data or null on failure.
+     */
+    public function calculateRoute(array|object $origin, array|object $destination, array $waypoints = []): ?array
+    {
+        $originArr = (array) $origin;
+        $destArr = (array) $destination;
+
+        if (empty($originArr['lat']) || empty($destArr['lat'])) {
+            return null;
+        }
+
+        $coordinates = [
+            "{$originArr['lng']},{$originArr['lat']}",
+        ];
+
+        foreach ($waypoints as $wp) {
+            $wpArr = (array) $wp;
+            if (! empty($wpArr['lat']) && ! empty($wpArr['lng'])) {
+                $coordinates[] = "{$wpArr['lng']},{$wpArr['lat']}";
             }
         }
 
-        $coordinates[] = "{$destination['lng']},{$destination['lat']}";
-        $coordsString = implode(';', $coordinates);
+        $coordinates[] = "{$destArr['lng']},{$destArr['lat']}";
+        $coordString = implode(';', $coordinates);
 
-        $url = "https://router.project-osrm.org/route/v1/driving/{$coordsString}?overview=full&geometries=polyline";
+        $response = Http::get("https://api.mapbox.com/directions/v5/mapbox/driving/{$coordString}", [
+            'geometries' => 'polyline',
+            'overview' => 'full',
+            'access_token' => $this->token,
+        ]);
 
-        $response = Http::timeout(10)->get($url);
+        if ($response->failed() || empty($response->json('routes.0'))) {
+            \Log::error('Error Mapbox Directions API: '.$response->body());
 
-        if ($response->successful() && isset($response->json()['routes'][0]['geometry'])) {
-            return $response->json()['routes'][0]['geometry'];
+            return null;
         }
 
-        return null;
+        $route = $response->json('routes.0');
+
+        return [
+            'polyline' => $route['geometry'],
+            'distance_meters' => (float) $route['distance'],
+            'duration_seconds' => (float) $route['duration'],
+        ];
     }
 
     /**
