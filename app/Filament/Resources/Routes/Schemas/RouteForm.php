@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Routes\Schemas;
 
+use App\Enums\LucideIcon;
+use App\Models\Route;
 use App\Services\RoutingService;
 use EduardoRibeiroDev\FilamentLeaflet\Enums\GeoSearchProvider;
 use EduardoRibeiroDev\FilamentLeaflet\Fields\GeoSearchInput;
@@ -12,8 +14,8 @@ use EduardoRibeiroDev\FilamentLeaflet\ValueObjects\Coordinate;
 use EduardoRibeiroDev\FilamentLeaflet\ValueObjects\GeoSearchResult;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Grid;
@@ -22,7 +24,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
-use Illuminate\Support\Collection;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\HtmlString;
@@ -54,61 +56,73 @@ class RouteForm
     {
         return $schema
             ->components([
-                Section::make('Información Básica')
+                Section::make(__('Basic Information'))
                     ->schema([
                         TextInput::make('name')
-                            ->label('Nombre de la Ruta')
+                            ->label(__('Route Name'))
                             ->required()
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->prefixIcon(Heroicon::Map),
 
                         TextInput::make('code')
-                            ->label('Código')
+                            ->label(__('Code'))
                             ->required()
-                            ->maxLength(50),
+                            ->maxLength(50)
+                            ->prefixIcon(LucideIcon::Barcode),
 
-                        Toggle::make('is_active')
-                            ->label('Ruta Activa')
+                        Select::make('is_active')
+                            ->label(__('Status'))
+                            ->options([
+                                true => __('Active'),
+                                false => __('Inactive'),
+                            ])
                             ->default(true)
-                            ->columnSpanFull(),
+                            ->required()
+                            ->prefixIcon(Heroicon::CheckCircle)
+                            ->disablePlaceholderSelection(),
                     ])
                     ->columns(2)
                     ->columnSpanFull(),
 
-                Section::make('Trazado de la Ruta')
+                Section::make(__('Route Layout'))
                     ->schema([
                         Grid::make(1)
                             ->schema([
-                                static::buildGeoSearchInput('origin_search', 'Buscar Origen', 'origin'),
-                                static::buildGeoSearchInput('destination_search', 'Buscar Destino', 'destination'),
+                                static::buildGeoSearchInput('origin_search', __('Origin'), 'origin')
+                                    ->prefixIcon(Heroicon::OutlinedMapPin),
+                                static::buildGeoSearchInput('destination_search', __('Destination'), 'destination')
+                                    ->prefixIcon(Heroicon::MapPin),
 
                                 TextInput::make('distance_km')
-                                    ->label('Distancia Total (km)')
+                                    ->label(__('Total Distance (km)'))
+                                    ->prefixIcon(LucideIcon::Route)
                                     ->numeric()
                                     ->readOnly()
                                     ->suffix('km')
                                     ->dehydrated(),
 
                                 TextInput::make('duration_formatted')
-                                    ->label('Tiempo Estimado')
+                                    ->label(__('Estimated Time'))
+                                    ->prefixIcon(Heroicon::Clock)
                                     ->readOnly()
-                                    ->suffix('aprox.')
+                                    ->suffix(__('aprox.'))
                                     ->dehydrated(false)
                                     ->afterStateHydrated(function (TextInput $component, $record) {
                                         if ($record?->duration_minutes !== null) {
-                                            $component->state(static::formatDuration($record->duration_minutes * 60));
+                                            $component->state(Route::formatDuration($record->duration_minutes * 60));
                                         }
                                     }),
 
                                 Actions::make([
                                     Action::make('clear_all')
-                                        ->label('Resetear Ruta')
+                                        ->label(__('Reset Route'))
                                         ->color('danger')
-                                        ->icon('heroicon-m-arrow-path')
+                                        ->icon(Heroicon::ArrowPath)
                                         ->action(static::resetRouteState(...)),
 
                                     Action::make('calcularRuta')
-                                        ->label('Calcular Ruta')
-                                        ->icon('heroicon-o-map')
+                                        ->label(__('Calculate Route'))
+                                        ->icon(Heroicon::OutlinedMap)
                                         ->disabled(function (Get $get) {
                                             $origin = static::normalizePoint($get('origin'));
                                             $destination = static::normalizePoint($get('destination'));
@@ -125,7 +139,7 @@ class RouteForm
 
                                             if (! $routeData) {
                                                 Notification::make()
-                                                    ->title('No se pudo calcular la ruta')
+                                                    ->title(__('Could not calculate route'))
                                                     ->danger()
                                                     ->send();
 
@@ -134,7 +148,7 @@ class RouteForm
 
                                             $km = round($routeData['distance_meters'] / 1000, 2);
                                             $minutes = (int) round($routeData['duration_seconds'] / 60);
-                                            $formattedDuration = static::formatDuration($routeData['duration_seconds']);
+                                            $formattedDuration = Route::formatDuration($routeData['duration_seconds']);
 
                                             $set('overview_polyline', $routeData['polyline']);
                                             $set('distance_km', $km);
@@ -142,7 +156,10 @@ class RouteForm
                                             $set('duration_formatted', $formattedDuration);
 
                                             Notification::make()
-                                                ->title("Ruta calculada: {$km} km ({$formattedDuration})")
+                                                ->title(__('Calculated route: :km km (:duration)', [
+                                                    'km' => $km,
+                                                    'duration' => $formattedDuration,
+                                                ]))
                                                 ->success()
                                                 ->send();
                                         }),
@@ -191,14 +208,17 @@ class RouteForm
      */
     protected static function buildGeoSearchInput(string $name, string $label, string $targetField): GeoSearchInput
     {
+        $translatedMessage = __('Updating location...');
+        $loadingIndicatorHtml = new HtmlString("
+            <div wire:loading wire:target=\"callSchemaComponentMethod\" class=\"flex items-center gap-x-2 text-sm text-gray-500 dark:text-gray-400\">
+                <x-filament::loading-indicator class=\"h-4 w-4 text-primary-600 dark:text-primary-400\" />
+                <span>$translatedMessage</span>
+            </div>
+        ");
+
         return GeoSearchInput::make($name)
             ->label($label)
-            ->hint(new HtmlString(
-                '<div wire:loading wire:target="callSchemaComponentMethod" class="flex items-center gap-x-2 text-sm text-gray-500 dark:text-gray-400">
-                    <x-filament::loading-indicator class="h-4 w-4 text-primary-600 dark:text-primary-400" />
-                    <span>Actualizando ubicación...</span>
-                </div>'
-            ))
+            ->hint($loadingIndicatorHtml)
             ->provider(GeoSearchProvider::Nominatim)
             ->live()
             ->language(app()->getLocale())
@@ -217,6 +237,7 @@ class RouteForm
                 }
                 $set('overview_polyline', null);
             })
+            ->required()
             ->columnSpan(1);
     }
 
@@ -228,7 +249,7 @@ class RouteForm
     protected static function buildMapPicker(): MapPicker
     {
         return MapPicker::make('route_map')
-            ->label('Mapa de la Ruta')
+            ->label(__('Mapa de la Ruta'))
             ->height(450)
             ->reactive()
             ->zoomControl()
@@ -240,55 +261,19 @@ class RouteForm
                 static::parseWaypoints($get('waypoints') ?? $record?->waypoints),
                 $get('overview_polyline') ?? $record?->overview_polyline,
             ])))
+            ->zoom(12)
+            ->center(static::DEFAULT_CENTER)
+            ->fitBounds(static fn (Get $get, $record) =>
+                // Fit bounds if polyline exists
+                filled($get('overview_polyline')) ||
+                filled($record?->overview_polyline)
+            )
             ->autoCenter(static function (Get $get, $record): bool {
-                $origin = static::normalizePoint($get('origin') ?? $record?->origin);
+                $origin = static::normalizePoint($get('origin')['lat'] ?? $record?->origin);
 
                 return blank($record)
                     && blank($origin['lat'])
                     && blank($get('overview_polyline'));
-            })
-            ->center(static function (Get $get, $record): array {
-                $encodedPolyline = $get('overview_polyline') ?? $record?->overview_polyline;
-
-                // Calculate map center based on route polyline average coordinates
-                if (filled($encodedPolyline)) {
-                    $points = app(RoutingService::class)->decodePolyline($encodedPolyline);
-
-                    if (! empty($points)) {
-                        /** @var Collection<int, array> $collection */
-                        $collection = collect($points);
-
-                        return [
-                            'lat' => $collection->avg(fn ($p) => (float) ($p[0] ?? $p['lat'])),
-                            'lng' => $collection->avg(fn ($p) => (float) ($p[1] ?? $p['lng'])),
-                        ];
-                    }
-                }
-
-                $origin = static::normalizePoint($get('origin') ?? $record?->origin);
-                $destination = static::normalizePoint($get('destination') ?? $record?->destination);
-
-                // Midpoint center if both origin and destination exist
-                if (! empty($origin['lat']) && ! empty($destination['lat'])) {
-                    return [
-                        'lat' => ((float) $origin['lat'] + (float) $destination['lat']) / 2,
-                        'lng' => ((float) $origin['lng'] + (float) $destination['lng']) / 2,
-                    ];
-                }
-
-                // Center directly on origin if available
-                if (! empty($origin['lat'])) {
-                    return [(float) $origin['lat'], (float) $origin['lng']];
-                }
-
-                // Default fallback location
-                return self::DEFAULT_CENTER;
-            })
-            ->zoom(static function (Get $get, $record): int {
-                $origin = static::normalizePoint($get('origin') ?? $record?->origin);
-                $destination = static::normalizePoint($get('destination') ?? $record?->destination);
-
-                return (! empty($origin['lat']) && ! empty($destination['lat'])) ? 9 : 7;
             })
             ->markers(static function (Get $get, $record): array {
                 $markers = [];
@@ -301,8 +286,9 @@ class RouteForm
                 if (! empty($originState) && ! empty($origin['lat']) && ! empty($origin['lng'])) {
                     $markers[] = Marker::make((float) $origin['lat'], (float) $origin['lng'])
                         ->id('origin-marker')
-                        ->green()
-                        ->title('Origen');
+                        ->title(__('Origin'))
+                        ->heroicon(Heroicon::PlayCircle->value)
+                        ->green();
                 }
 
                 // Resolve destination point
@@ -313,8 +299,9 @@ class RouteForm
                 if (! empty($destinationState) && ! empty($destination['lat']) && ! empty($destination['lng'])) {
                     $markers[] = Marker::make((float) $destination['lat'], (float) $destination['lng'])
                         ->id('destination-marker')
-                        ->red()
-                        ->title('Destino');
+                        ->title(__('Destination'))
+                        ->heroicon(Heroicon::StopCircle->value)
+                        ->red();
                 }
 
                 // Resolve waypoints
@@ -324,8 +311,9 @@ class RouteForm
                     if (($point['lat']) !== null && ($point['lng']) !== null) {
                         $markers[] = Marker::make((float) $point['lat'], (float) $point['lng'])
                             ->id("waypoint-{$index}")
+                            ->heroicon(Heroicon::MapPin->value)
                             ->orange()
-                            ->title('Parada de la Ruta (clic para eliminar)');
+                            ->title(__('Waypoint (click to remove)'));
                     }
                 }
 
@@ -333,8 +321,7 @@ class RouteForm
             })
             ->shapes(static function (Get $get, $record): array {
                 $polylineState = $get('overview_polyline');
-                $encoded = filled($polylineState) ? $polylineState : $record?->overview_polyline;
-                // $encoded = ($polylineState === null || $polylineState === '') ? null : ($polylineState ?? $record?->overview_polyline);
+                $encoded = ($polylineState === null || $polylineState === '') ? null : ($polylineState ?? $record?->overview_polyline);
 
                 // Render calculated polyline shape if present
                 if (filled($encoded)) {
@@ -380,38 +367,6 @@ class RouteForm
                         ->weight(2)
                         ->dashArray('8, 8'),
                 ];
-            })
-            ->onMapClick(null)
-            ->onLayerClick(static function (mixed $layer, Get $get, Set $set): void {
-                $id = $layer?->getId();
-                if (! $id) {
-                    return;
-                }
-
-                if ($id === 'origin-marker') {
-                    $set('origin', null);
-                    $set('origin_search', null);
-                    $set('overview_polyline', null);
-
-                    return;
-                }
-
-                if ($id === 'destination-marker') {
-                    $set('destination', null);
-                    $set('destination_search', null);
-                    $set('overview_polyline', null);
-
-                    return;
-                }
-
-                if (str_starts_with($id, 'waypoint-')) {
-                    $index = (int) str_replace('waypoint-', '', $id);
-                    $waypoints = $get('waypoints') ?? [];
-
-                    unset($waypoints[$index]);
-                    $set('waypoints', array_values($waypoints));
-                    $set('overview_polyline', null);
-                }
             });
     }
 
@@ -441,28 +396,6 @@ class RouteForm
         $set('destination_search', null);
         $set('waypoints', []);
         static::resetCalculatedValues($set);
-    }
-
-    /**
-     * Formats raw duration seconds into a human-readable string.
-     *
-     * @param  float  $seconds  Total duration in seconds.
-     * @return string Formatted string representation (e.g., "1 h 15 min").
-     */
-    protected static function formatDuration(float $seconds): string
-    {
-        $minutes = (int) round($seconds / 60);
-
-        if ($minutes < 60) {
-            return "{$minutes} min";
-        }
-
-        $hours = intdiv($minutes, 60);
-        $remainingMinutes = $minutes % 60;
-
-        return $remainingMinutes === 0
-            ? "{$hours} h"
-            : "{$hours} h {$remainingMinutes} min";
     }
 
     /**

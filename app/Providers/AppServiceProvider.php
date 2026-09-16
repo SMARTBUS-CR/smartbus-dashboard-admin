@@ -6,6 +6,7 @@ use App\Auth\ExternalUserProvider;
 use App\Auth\SessionGuard;
 use App\Models\User;
 use App\Services\ExternalAuthService;
+use Filament\Tables\Table;
 use GuzzleHttp\Middleware;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Auth;
@@ -54,5 +55,12 @@ class AppServiceProvider extends ServiceProvider
                 ))
             );
         });
+
+        // Configure default date and time formats for Filament tables
+        Table::configureUsing(fn (Table $table) => $table
+            ->defaultDateDisplayFormat('d M, Y')
+            ->defaultTimeDisplayFormat('h:i A')
+            ->defaultDateTimeDisplayFormat('d M, Y - h:i A')
+        );
     }
 }

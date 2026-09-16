@@ -48,6 +48,21 @@ class RouteResource extends Resource
         ];
     }
 
+    public static function getModelLabel(): string
+    {
+        return __('Route');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('Routes');
+    }
+
+    public static function getNavigationGroup(): ?string
+    {
+        return __('Transport Management');
+    }
+
     public static function getRecordRouteBindingEloquentQuery(): Builder
     {
         return parent::getRecordRouteBindingEloquentQuery()

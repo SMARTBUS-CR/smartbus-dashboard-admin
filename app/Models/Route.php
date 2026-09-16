@@ -27,13 +27,11 @@ class Route extends Model
         'overview_polyline',
         'distance_km',
         'duration_minutes',
-        'path',
         'waypoints',
         'is_active',
     ];
 
     protected $casts = [
-        'path' => 'string', // PostGIS LineString stored as WKT (Well-Known Text)
         'waypoints' => 'array',
         'is_active' => 'boolean',
         'distance_km' => 'decimal:2',
@@ -53,20 +51,42 @@ class Route extends Model
     }
 
     /**
-     * Mutator to synchronize the 'path' column in PostGIS from overview_polyline.
+     * The "booted" method of the model is called after the model is booted and ready for use.
+     * It allows you to define model event listeners, such as "saving", "creating", "updating", etc.
      *
-     * This ensures that whenever the overview_polyline is set, the corresponding
-     * LineString geometry is updated in the database for spatial queries.
-     *
-     * @param  string|null  $value  The encoded polyline string
+     * In this case, we are listening for the "saving" event to automatically update the "path" attribute
+     * based on the "overview_polyline" attribute.
      */
-    public function setOverviewPolylineAttribute(?string $value): void
+    protected static function booted(): void
     {
-        $this->attributes['overview_polyline'] = $value;
+        static::saving(function (Route $route) {
+            if ($route->isDirty('overview_polyline') && ! empty($route->overview_polyline)) {
+                $route->path = DB::raw("ST_LineFromEncodedPolyline('{$route->overview_polyline}', 6)");
+            } elseif (empty($route->overview_polyline)) {
+                $route->path = null;
+            }
+        });
+    }
 
-        if ($value) {
-            // Converts the encoded polyline to a LineString geometry in PostGIS
-            $this->attributes['path'] = DB::raw("ST_LineFromEncodedPolyline('{$value}', 6)");
+    /**
+     * Formats raw duration seconds into a human-readable string.
+     *
+     * @param  float  $seconds  Total duration in seconds.
+     * @return string Formatted string representation (e.g., "1 h 15 min").
+     */
+    public static function formatDuration(float $seconds): string
+    {
+        $minutes = (int) round($seconds / 60);
+
+        if ($minutes < 60) {
+            return "{$minutes} min";
         }
+
+        $hours = intdiv($minutes, 60);
+        $remainingMinutes = $minutes % 60;
+
+        return $remainingMinutes === 0
+            ? "{$hours} h"
+            : "{$hours} h {$remainingMinutes} min";
     }
 }

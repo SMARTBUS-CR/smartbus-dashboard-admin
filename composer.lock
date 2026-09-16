@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a1cfe49fb22506c1cbcf23492980bd59",
+    "content-hash": "b11aea7c39ebb40b1d7152494ea48974",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -3353,6 +3353,66 @@
                 }
             ],
             "time": "2026-08-24T15:02:06+00:00"
+        },
+        {
+            "name": "mallardduck/blade-lucide-icons",
+            "version": "2.0.18",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/mallardduck/blade-lucide-icons.git",
+                "reference": "337812f82346b3f019c57f605c1c360ac19c6990"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/mallardduck/blade-lucide-icons/zipball/337812f82346b3f019c57f605c1c360ac19c6990",
+                "reference": "337812f82346b3f019c57f605c1c360ac19c6990",
+                "shasum": ""
+            },
+            "require": {
+                "blade-ui-kit/blade-icons": "^1.8",
+                "php": "^8.1"
+            },
+            "require-dev": {
+                "ext-dom": "*",
+                "ext-fileinfo": "*",
+                "orchestra/testbench": "^6.0|^7.0|^8.0|^9.0|^10.0",
+                "phpunit/phpunit": "^9.0|^10.0|^11.0",
+                "spatie/phpunit-snapshot-assertions": "^4.2.14|^5.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "MallardDuck\\LucideIcons\\BladeLucideIconsServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "MallardDuck\\LucideIcons\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Dan Pock"
+                }
+            ],
+            "description": "A package to easily make use of Lucide icons in your Laravel Blade views.",
+            "homepage": "https://github.com/mallardduck/blade-lucide-icons",
+            "keywords": [
+                "LucideIcons",
+                "blade",
+                "laravel"
+            ],
+            "support": {
+                "issues": "https://github.com/mallardduck/blade-lucide-icons/issues",
+                "source": "https://github.com/mallardduck/blade-lucide-icons/tree/2.0.18"
+            },
+            "time": "2026-09-15T03:10:38+00:00"
         },
         {
             "name": "monolog/monolog",
