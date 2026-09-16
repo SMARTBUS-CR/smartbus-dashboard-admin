@@ -8,4 +8,6 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateRoute extends CreateRecord
 {
     protected static string $resource = RouteResource::class;
+
+    protected ?bool $hasUnsavedDataChangesAlert = true;
 }

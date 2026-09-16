@@ -244,7 +244,7 @@
     "Search Destination": "Buscar Destino",
     "Total Distance (km)": "Distancia Total (km)",
     "Distance": "Distancia",
-    "Estimated Time": "Tiempo Estimado",
+    "Estimated Time (ETA)": "Tiempo Estimado (ETA)",
     "approx.": "aprox.",
     "Reset Route": "Resetear Ruta",
     "Calculate Route": "Calcular Ruta",
@@ -255,7 +255,5 @@
     "Could not calculate route": "No se pudo calcular la ruta",
     "Calculated route: :km km (:duration)": "Ruta calculada: :km km (:duration)",
     "Updating location...": "Actualizando ubicación...",
-    "Creation Date": "Fecha de Creación",
-    "Active Route Status": "Activa",
-    "Inactive Route Status": "Inactiva"
+    "Creation Date": "Fecha de Creación"
 }

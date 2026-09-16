@@ -43,7 +43,7 @@ class RoutesTable
                     ->sortable()
                     ->toggleable(),
                 TextColumn::make('duration_minutes')
-                    ->label('ETA')
+                    ->label(__('Estimated Time (ETA)'))
                     ->formatStateUsing(fn (?int $state): ?string => $state !== null ? Route::formatDuration($state * 60) : null)
                     ->badge()
                     ->color(Color::Yellow)
@@ -53,8 +53,8 @@ class RoutesTable
                     ->badge()
                     ->label(__('Status'))
                     ->formatStateUsing(fn (?bool $state): string => match ($state) {
-                        true => __('Active Route Status'),
-                        false => __('Inactive Route Status'),
+                        true => __('Activa'),
+                        false => __('Inactiva'),
                         default => __('Unknown'),
                     })
                     ->color(fn (?bool $state): string => match ($state) {

@@ -12,6 +12,8 @@ class EditRoute extends EditRecord
 {
     protected static string $resource = RouteResource::class;
 
+    protected ?bool $hasUnsavedDataChangesAlert = true;
+
     protected function getHeaderActions(): array
     {
         return [

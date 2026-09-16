@@ -22,6 +22,8 @@ class RouteResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedMap;
 
+    protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::Map;
+
     public static function form(Schema $schema): Schema
     {
         return RouteForm::configure($schema);

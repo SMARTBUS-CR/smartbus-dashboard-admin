@@ -6,6 +6,8 @@ use App\Auth\ExternalUserProvider;
 use App\Auth\SessionGuard;
 use App\Models\User;
 use App\Services\ExternalAuthService;
+use BezhanSalleh\LanguageSwitch\Enums\TriggerStyle;
+use BezhanSalleh\LanguageSwitch\LanguageSwitch;
 use Filament\Tables\Table;
 use GuzzleHttp\Middleware;
 use Illuminate\Http\Client\Factory as HttpFactory;
@@ -62,5 +64,16 @@ class AppServiceProvider extends ServiceProvider
             ->defaultTimeDisplayFormat('h:i A')
             ->defaultDateTimeDisplayFormat('d M, Y - h:i A')
         );
+
+        LanguageSwitch::configureUsing(function (LanguageSwitch $switch) {
+            $switch
+                ->locales(['es', 'en'])
+                ->flags([
+                    'es' => 'https://flagcdn.com/es.svg',
+                    'en' => 'https://flagcdn.com/us.svg',
+                ])
+                ->trigger(style: TriggerStyle::Flag)
+                ->nativeLabel();
+        });
     }
 }
