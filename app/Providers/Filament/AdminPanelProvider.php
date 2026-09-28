@@ -2,9 +2,7 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Pages\Auth\RequestPasswordReset;
 use App\Filament\Pages\Dashboard;
-use App\Filament\Pages\Tenancy\RegisterCompany;
 use App\Models\Company;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -33,7 +31,6 @@ class AdminPanelProvider extends PanelProvider
             ->spa(hasPrefetching: true)
             ->authGuard('external')
             ->login()
-            ->passwordReset(RequestPasswordReset::class)
             ->colors([
                 'primary' => Color::Indigo,
             ])
@@ -61,7 +58,8 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
-            ->tenant(Company::class, slugAttribute: 'slug')
-            ->tenantRegistration(RegisterCompany::class);
+            ->tenant(model: Company::class, slugAttribute: 'slug')
+            ->searchableTenantMenu()
+            ->tenantMenu(fn (): bool => ! auth()->user()->isSuperAdmin());
     }
 }

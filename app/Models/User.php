@@ -8,50 +8,32 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasName;
 use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Attributes\Connection;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
+use Spatie\Permission\Traits\HasRoles;
 
-use function count;
-use function in_array;
-use function is_array;
-
+#[Connection('mysql')]
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable implements FilamentUser, HasName, HasTenants
+class User extends Authenticatable implements FilamentUser, HasName, HasTenants, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasUuids, Notifiable, SoftDeletes;
-
-    /**
-     * User data resides strictly in MySQL.
-     */
-    protected $connection = 'mysql';
-
-    /**
-     * The "type" of the auto-incrementing ID.
-     *
-     * @var string
-     */
-    protected $keyType = 'string';
-
-    /**
-     * Indicates if the IDs are auto-incrementing.
-     */
-    public $incrementing = false;
+    use HasFactory, HasRoles, HasUuids, Notifiable, SoftDeletes;
 
     /**
      * Get the attributes that should be cast.
      *
-     * @return array<string, string> The attributes that should be cast.
+     * @return array<string, string>
      */
     protected function casts(): array
     {
@@ -62,95 +44,16 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
     }
 
     /**
-     * Get user roles from session or model attributes.
+     * Get the companies that this user belongs to.
      *
-     * @return array<string> The user's roles.
+     * @return BelongsToMany<Company, User>
      */
-    public function getRoles(): array
+    public function companies(): BelongsToMany
     {
-        $sessionRoles = session('user_roles', []);
-
-        if (! empty($sessionRoles) && is_array($sessionRoles)) {
-            return $sessionRoles;
-        }
-
-        $roleAttr = $this->getAttribute('role');
-
-        return $roleAttr ? [(string) $roleAttr] : [];
-    }
-
-    /**
-     * Check if the user has a specific role or any of the specified roles.
-     *
-     * @param  string|UserRole|array  $roles  The role(s) to check for.
-     * @return bool True if the user has the role or any of the roles, false otherwise.
-     */
-    public function hasRole(string|UserRole|array $roles): bool
-    {
-        $userRoles = $this->getRoles();
-        $checkRoles = is_array($roles) ? $roles : [$roles];
-
-        foreach ($checkRoles as $role) {
-            $roleValue = $role instanceof UserRole ? $role->value : (string) $role;
-            if (in_array($roleValue, $userRoles, true)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Get user permissions from session or model attributes.
-     *
-     * @return array<string> The user's permissions.
-     */
-    public function getPermissions(): array
-    {
-        $sessionPermissions = session('user_permissions', []);
-
-        if (! empty($sessionPermissions) && is_array($sessionPermissions)) {
-            return $sessionPermissions;
-        }
-
-        return [];
-    }
-
-    /**
-     * Check if the user has a specific permission.
-     *
-     * @param  string  $permission  The permission to check for.
-     * @return bool True if the user has the permission, false otherwise.
-     */
-    public function hasPermissionTo(string $permission): bool
-    {
-        // Los Super Admin suelen tener bypass de permisos
-        if ($this->isSuperAdmin()) {
-            return true;
-        }
-
-        Log::debug('Checking permission for user', [
-            'user_id' => $this->getKey(),
-            'permission' => $permission,
-            'user_permissions' => $this->getPermissions(),
-        ]);
-
-        return in_array($permission, $this->getPermissions(), true);
-    }
-
-    /**
-     * Check if the user has any of the specified permissions.
-     *
-     * @param  array<string>  $permissions  The permissions to check for.
-     * @return bool True if the user has any of the permissions, false otherwise.
-     */
-    public function hasAnyPermission(array $permissions): bool
-    {
-        if ($this->isSuperAdmin()) {
-            return true;
-        }
-
-        return count(array_intersect($permissions, $this->getPermissions())) > 0;
+        return $this->belongsToMany(Company::class, 'company_users')
+            ->using(CompanyUser::class)
+            ->withTimestamps()
+            ->chaperone();
     }
 
     /**
@@ -160,7 +63,7 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
      */
     public function isSuperAdmin(): bool
     {
-        return $this->hasRole(UserRole::SuperAdmin);
+        return self::hasRole(UserRole::SuperAdmin);
     }
 
     /**
@@ -170,81 +73,51 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
      */
     public function isCompanyAdmin(): bool
     {
-        return $this->hasRole(UserRole::CompanyAdmin);
+        return self::hasRole(UserRole::CompanyAdmin);
     }
 
     /**
-     * Companies for this user in PostgreSQL.
-     *
-     * @return Builder The query builder for the user's companies.
-     */
-    public function companies(): Builder
-    {
-        $companyIds = CompanyUser::where('user_id', $this->getKey())
-            ->pluck('company_id');
-
-        return Company::on('pgsql')
-            ->whereIn('id', $companyIds)
-            ->orderBy('name');
-    }
-
-    /**
-     * Restrict panel access to administrative roles.
-     *
-     * @param  Panel  $panel  The Filament panel to check access for.
-     * @return bool True if the user can access the panel, false otherwise.
+     * Determine if the user can access the given panel.
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        foreach ($this->getRoles() as $role) {
-            $roleEnum = UserRole::tryFrom($role);
-            if ($roleEnum?->hasAdminAccess()) {
-                return true;
-            }
+        return self::hasAnyRole(UserRole::adminRoles() ?? []);
+    }
+
+    /**
+     * Get the user's name for Filament display purposes.
+     * If the name is not set, it will fall back to the email address.
+     */
+    public function getFilamentName(): string
+    {
+        return (string) ($this->name ?? $this->email);
+    }
+
+    /**
+     * Determine if the user can access the given tenant (company).
+     */
+    public function canAccessTenant(Model $tenant): bool
+    {
+        if (self::isSuperAdmin()) {
+            return true;
+        }
+
+        if (self::isCompanyAdmin()) {
+            return $this->companies()
+                ->where('companies.id', $tenant->getKey())
+                ->exists();
         }
 
         return false;
     }
 
     /**
-     * Return accessible tenants for this user.
+     * Get the tenants that this user belongs to.
      *
-     * @param  Panel  $panel  The Filament panel to get tenants for.
-     * @return array|Collection The accessible tenants for the user.
+     * @return array<int, Model>|Collection<int, Model>
      */
     public function getTenants(Panel $panel): array|Collection
     {
-        if ($this->isSuperAdmin()) {
-            return Company::query()->get();
-        }
-
-        return $this->companies()->get();
-    }
-
-    /**
-     * Determine whether the user can access the tenant.
-     *
-     * @param  Model  $tenant  The tenant model to check access for.
-     * @return bool True if the user can access the tenant, false otherwise.
-     */
-    public function canAccessTenant(Model $tenant): bool
-    {
-        if ($this->isSuperAdmin()) {
-            return true;
-        }
-
-        return $this->companies()
-            ->where('id', $tenant->getKey())
-            ->exists();
-    }
-
-    /**
-     * Get the user's name for Filament.
-     *
-     * @return string The user's name or email if name is not set.
-     */
-    public function getFilamentName(): string
-    {
-        return (string) ($this->name ?? $this->email);
+        return $this->companies;
     }
 }

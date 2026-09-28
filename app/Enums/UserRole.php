@@ -18,33 +18,25 @@ enum UserRole: string implements HasColor, HasDescription, HasIcon, HasLabel
     case Passenger = 'passenger';
 
     /**
-     * Get the icon associated with the role.
+     * Get the color associated with the user role
+     * for UI representation.
+     *
+     * {@inheritDoc}
      */
-    public function getIcon(): string|BackedEnum|Htmlable|null
+    public function getColor(): string|array|null
     {
         return match ($this) {
-            self::SuperAdmin => Heroicon::OutlinedShieldCheck,
-            self::CompanyAdmin => Heroicon::OutlinedBuildingOffice,
-            self::Driver => Heroicon::OutlinedTruck,
-            self::Passenger => Heroicon::OutlinedUserGroup,
+            self::SuperAdmin => 'danger',
+            self::CompanyAdmin => 'primary',
+            self::Driver => 'success',
+            self::Passenger => 'secondary',
         };
     }
 
     /**
-     * Get human-readable label for the role.
-     */
-    public function getLabel(): string|Htmlable|null
-    {
-        return match ($this) {
-            self::SuperAdmin => __('roles.label.super-admin'),
-            self::CompanyAdmin => __('roles.label.company-admin'),
-            self::Driver => __('roles.label.driver'),
-            self::Passenger => __('roles.label.passenger'),
-        };
-    }
-
-    /**
-     * Get human-readable description for the role.
+     * Get the description associated with the user role.
+     *
+     * {@inheritDoc}
      */
     public function getDescription(): string|Htmlable|null
     {
@@ -57,15 +49,34 @@ enum UserRole: string implements HasColor, HasDescription, HasIcon, HasLabel
     }
 
     /**
-     * Get color associated with the role for UI representation.
+     * Get the icon associated with the user role
+     * for UI representation.
+     *
+     * {@inheritDoc}
      */
-    public function getColor(): string|array|null
+    public function getIcon(): string|BackedEnum|Htmlable|null
     {
         return match ($this) {
-            self::SuperAdmin => 'danger',
-            self::CompanyAdmin => 'primary',
-            self::Driver => 'success',
-            self::Passenger => 'secondary',
+            self::SuperAdmin => Heroicon::OutlinedShieldCheck,
+            self::CompanyAdmin => Heroicon::OutlinedBuildingOffice,
+            self::Driver => Heroicon::OutlinedTruck,
+            self::Passenger => Heroicon::OutlinedUserGroup,
+        };
+    }
+
+    /**
+     * Get the label associated with the user role
+     * for UI representation.
+     *
+     * {@inheritDoc}
+     */
+    public function getLabel(): string|Htmlable|null
+    {
+        return match ($this) {
+            self::SuperAdmin => __('roles.label.super-admin'),
+            self::CompanyAdmin => __('roles.label.company-admin'),
+            self::Driver => __('roles.label.driver'),
+            self::Passenger => __('roles.label.passenger'),
         };
     }
 

@@ -70,7 +70,6 @@ return [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
         ],
-
         'external_users' => [
             'driver' => 'external_provider',
             'model' => env('AUTH_MODEL', User::class),

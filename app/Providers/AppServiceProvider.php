@@ -5,7 +5,8 @@ namespace App\Providers;
 use App\Auth\ExternalUserProvider;
 use App\Auth\SessionGuard;
 use App\Models\User;
-use App\Services\ExternalAuthService;
+use App\Services\AuthService;
+use Filament\Tables\Table;
 use GuzzleHttp\Middleware;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Auth;
@@ -29,7 +30,7 @@ class AppServiceProvider extends ServiceProvider
     {
         // Register custom UserProvider for external authentication
         Auth::provider('external_provider', fn ($app, array $config) => new ExternalUserProvider(
-            $app->make(ExternalAuthService::class),
+            $app->make(AuthService::class),
             $config['model'] ?? User::class
         ));
 
@@ -54,5 +55,13 @@ class AppServiceProvider extends ServiceProvider
                 ))
             );
         });
+
+        // Configure default date and time formats for Filament tables
+        Table::configureUsing(fn (Table $table) => $table
+            ->defaultDateDisplayFormat('d M, Y')
+            ->defaultTimeDisplayFormat('h:i A')
+            ->defaultDateTimeDisplayFormat('d M, Y - h:i A')
+        );
+
     }
 }
