@@ -38,8 +38,7 @@ class SessionGuard implements StatefulGuard
     public function attemptWhen(array $credentials = [], array|callable|null $callbacks = null, bool $remember = false): bool
     {
         $user = $this->provider->retrieveByCredentials($credentials);
-        $validCredentials = $this->provider->validateCredentials($user, $credentials);
-        if (! $user || ! $validCredentials) {
+        if (! $user || ! $this->provider->validateCredentials($user, $credentials)) {
             return false;
         }
 

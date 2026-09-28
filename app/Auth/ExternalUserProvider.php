@@ -18,6 +18,16 @@ class ExternalUserProvider implements UserProvider
     ) {}
 
     /**
+     * Get the model class name used by the provider.
+     *
+     * @return string The model class name.
+     */
+    public function getModel(): string
+    {
+        return $this->model;
+    }
+
+    /**
      * Rehash the user's password if required and supported.
      *
      * @param  Authenticatable  $user  User instance to check for rehashing.

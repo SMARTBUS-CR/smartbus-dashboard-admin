@@ -32,6 +32,11 @@ class CompanyResource extends Resource
 
     protected static bool $isScopedToTenant = false;
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->isSuperAdmin() ?? false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return CompanyForm::configure($schema);

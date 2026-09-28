@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\CompanyStatus;
+use App\Enums\UserRole;
 use Database\Factories\CompanyFactory;
 use Filament\Models\Contracts\HasCurrentTenantLabel;
 use Filament\Models\Contracts\HasName;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
@@ -67,6 +69,16 @@ class Company extends Model implements HasCurrentTenantLabel, HasName
     }
 
     /**
+     * Get the roles that belong to this company.
+     *
+     * @return HasMany<Role>
+     */
+    public function roles(): HasMany
+    {
+        return $this->hasMany(Role::class);
+    }
+
+    /**
      * Generate a unique slug for the company based on the provided name.
      */
     public static function generateUniqueSlug(string $name): string
@@ -102,6 +114,22 @@ class Company extends Model implements HasCurrentTenantLabel, HasName
                     (string) ($company->trade_name ?: $company->legal_name)
                 );
             }
+        });
+
+        /**
+         * When a company is created, we need to create the default roles for that company.
+         * The roles are created in the same database transaction as the company, so if the
+         * company creation fails, the roles are not created.
+         *
+         * @see Company::created
+         * */
+        static::created(function (Company $company): void {
+            setPermissionsTeamId($company->getKey());
+
+            Role::findOrCreate(UserRole::Admin->value, 'web');
+            Role::findOrCreate(UserRole::Driver->value, 'web');
+
+            setPermissionsTeamId(null);
         });
     }
 

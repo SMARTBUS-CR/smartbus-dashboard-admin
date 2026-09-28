@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\UserRole;
 use App\Models\Company;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection as SupportCollection;
@@ -14,9 +15,7 @@ class CompanySeeder extends Seeder
 {
     private const DEMO_SLUG = 'smartbus-demo';
 
-    private const ADMIN_SLUG = 'smartbus-admin';
-
-    private const EXTRA_COMPANIES = 8;
+    private const EXTRA_COMPANIES = 9;
 
     /**
      * Run the database seeds.
@@ -38,18 +37,7 @@ class CompanySeeder extends Seeder
                 'email' => 'info@smartbus.com',
                 'address' => 'Av. Principal y Terminal Terrestre',
             ]),
-        );
-
-        $this->createCompany(self::ADMIN_SLUG,
-            Company::factory()->forCountry('CR')->raw([
-                'slug' => self::ADMIN_SLUG,
-                'legal_name' => 'Transportes SmartBus Admin',
-                'trade_name' => 'SmartBus Admin',
-                'phone' => '+506 8888 8889',
-                'email' => 'admin@smartbus.com',
-                'address' => 'Av. Principal y Terminal Terrestre',
-            ]),
-            UserRole::CompanyAdmin
+            UserRole::Admin
         );
 
         $missing = self::EXTRA_COMPANIES - Company::where('slug', '!=', self::DEMO_SLUG)->count();
@@ -57,7 +45,7 @@ class CompanySeeder extends Seeder
             $this->command?->info('  Creating '.$missing.' additional companies...');
 
             $companies = Company::factory($missing)->create();
-            $this->attachToUser($companies);
+            $this->attachToUser($companies, UserRole::Admin);
         }
 
         $this->command?->info('  Company seeding completed.');
@@ -72,21 +60,49 @@ class CompanySeeder extends Seeder
      */
     private function attachToUser(Company|SupportCollection|iterable $company, ?UserRole $userRole = null): void
     {
-        $userRole ??= UserRole::SuperAdmin;
-        $user = User::role($userRole)->first();
+        $userRole ??= UserRole::Admin;
+        $email = match ($userRole) {
+            UserRole::SuperAdmin => 'admin@superadmin.com',
+            UserRole::Admin => 'admin@company.com',
+            default => 'admin@company.com',
+        };
+
+        $user = User::where('email', $email)->first();
 
         if (! $user) {
-            $this->command?->error(' No super-admin or company-admin users found. Skipping company attachment.');
+            $this->command?->error('  User for role '.$userRole->value.' not found. Run the Auth seeders first.');
 
             return;
         }
 
-        // Converts any input (Company or Collection) into a clean list of IDs
         $companyIds = $company instanceof Company
             ? [$company->id]
             : collect($company)->pluck('id')->toArray();
 
         $user->companies()->syncWithoutDetaching($companyIds);
+
+        foreach ($companyIds as $companyId) {
+            setPermissionsTeamId($companyId);
+
+            // Create or find the role for the user in the context of the company
+            $adminRole = Role::firstOrCreate(
+                ['name' => UserRole::Admin->value, 'guard_name' => 'web', 'company_id' => $companyId],
+                ['display_name' => 'Administrador']
+            );
+
+            // Create or find the driver role for the company
+            Role::firstOrCreate(
+                ['name' => UserRole::Driver->value, 'guard_name' => 'web', 'company_id' => $companyId],
+                ['display_name' => 'Conductor']
+            );
+
+            // Spatie caches roles and permissions, so we need to clear them before assigning a new role.
+            $user->unsetRelation('roles')->unsetRelation('permissions');
+            $user->assignRole($adminRole);
+        }
+
+        setPermissionsTeamId(null);
+
         $this->command?->info('  Attached '.count($companyIds).' company(ies) to user '.$user->email.'.');
     }
 

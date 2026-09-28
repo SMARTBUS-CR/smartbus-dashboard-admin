@@ -3,7 +3,9 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\Dashboard;
+use App\Http\Middleware\SyncSpatieTeam;
 use App\Models\Company;
+use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -29,7 +31,6 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->spa(hasPrefetching: true)
-            ->authGuard('external')
             ->login()
             ->colors([
                 'primary' => Color::Indigo,
@@ -58,8 +59,15 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
+            ->plugins([
+                FilamentShieldPlugin::make()
+                    ->scopeToTenant(true)
+                    ->tenantRelationshipName('roles')
+                    ->tenantOwnershipRelationshipName('company'),
+            ])
+            ->tenantMiddleware([SyncSpatieTeam::class], isPersistent: true)
             ->tenant(model: Company::class, slugAttribute: 'slug')
             ->searchableTenantMenu()
-            ->tenantMenu(fn (): bool => ! auth()->user()->isSuperAdmin());
+            ->tenantMenu();
     }
 }

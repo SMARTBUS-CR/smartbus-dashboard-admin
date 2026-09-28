@@ -63,7 +63,13 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants,
      */
     public function isSuperAdmin(): bool
     {
-        return self::hasRole(UserRole::SuperAdmin);
+        return once(fn () => $this->getConnection()
+            ->table('model_has_roles as mhr')
+            ->join('roles as r', 'r.id', '=', 'mhr.role_id')
+            ->where('mhr.model_uuid', $this->getKey())
+            ->where('mhr.model_type', $this->getMorphClass())
+            ->where('r.name', UserRole::SuperAdmin->value)
+            ->exists());
     }
 
     /**
@@ -73,7 +79,13 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants,
      */
     public function isCompanyAdmin(): bool
     {
-        return self::hasRole(UserRole::CompanyAdmin);
+        return once(fn () => $this->getConnection()
+            ->table('model_has_roles as mhr')
+            ->join('roles as r', 'r.id', '=', 'mhr.role_id')
+            ->where('mhr.model_uuid', $this->getKey())
+            ->where('mhr.model_type', $this->getMorphClass())
+            ->where('r.name', UserRole::Admin->value)
+            ->exists());
     }
 
     /**
@@ -81,7 +93,11 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants,
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        return self::hasAnyRole(UserRole::adminRoles() ?? []);
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        return $this->isCompanyAdmin() && $this->companies()->exists();
     }
 
     /**
@@ -118,6 +134,12 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants,
      */
     public function getTenants(Panel $panel): array|Collection
     {
-        return $this->companies;
+        if ($this->isSuperAdmin()) {
+            return Company::all();
+        }
+
+        return $this->isCompanyAdmin()
+            ? $this->companies
+            : collect();
     }
 }

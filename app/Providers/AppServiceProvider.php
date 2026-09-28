@@ -4,14 +4,18 @@ namespace App\Providers;
 
 use App\Auth\ExternalUserProvider;
 use App\Auth\SessionGuard;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\AuthService;
 use Filament\Tables\Table;
 use GuzzleHttp\Middleware;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Psr\Http\Message\RequestInterface;
+use Spatie\Permission\PermissionRegistrar;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -28,6 +32,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::before(fn (User $user) => $user->isSuperAdmin() ? true : null);
+
+        app(PermissionRegistrar::class)
+            ->setPermissionClass(Permission::class)
+            ->setRoleClass(Role::class);
+
         // Register custom UserProvider for external authentication
         Auth::provider('external_provider', fn ($app, array $config) => new ExternalUserProvider(
             $app->make(AuthService::class),

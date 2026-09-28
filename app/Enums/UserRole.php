@@ -13,7 +13,7 @@ use Illuminate\Contracts\Support\Htmlable;
 enum UserRole: string implements HasColor, HasDescription, HasIcon, HasLabel
 {
     case SuperAdmin = 'super-admin';
-    case CompanyAdmin = 'company-admin';
+    case Admin = 'admin';
     case Driver = 'driver';
     case Passenger = 'passenger';
 
@@ -27,7 +27,7 @@ enum UserRole: string implements HasColor, HasDescription, HasIcon, HasLabel
     {
         return match ($this) {
             self::SuperAdmin => 'danger',
-            self::CompanyAdmin => 'primary',
+            self::Admin => 'primary',
             self::Driver => 'success',
             self::Passenger => 'secondary',
         };
@@ -42,7 +42,7 @@ enum UserRole: string implements HasColor, HasDescription, HasIcon, HasLabel
     {
         return match ($this) {
             self::SuperAdmin => __('roles.description.super-admin'),
-            self::CompanyAdmin => __('roles.description.company-admin'),
+            self::Admin => __('roles.description.admin'),
             self::Driver => __('roles.description.driver'),
             self::Passenger => __('roles.description.passenger'),
         };
@@ -58,7 +58,7 @@ enum UserRole: string implements HasColor, HasDescription, HasIcon, HasLabel
     {
         return match ($this) {
             self::SuperAdmin => Heroicon::OutlinedShieldCheck,
-            self::CompanyAdmin => Heroicon::OutlinedBuildingOffice,
+            self::Admin => Heroicon::OutlinedBuildingOffice,
             self::Driver => Heroicon::OutlinedTruck,
             self::Passenger => Heroicon::OutlinedUserGroup,
         };
@@ -74,7 +74,7 @@ enum UserRole: string implements HasColor, HasDescription, HasIcon, HasLabel
     {
         return match ($this) {
             self::SuperAdmin => __('roles.label.super-admin'),
-            self::CompanyAdmin => __('roles.label.company-admin'),
+            self::Admin => __('roles.label.admin'),
             self::Driver => __('roles.label.driver'),
             self::Passenger => __('roles.label.passenger'),
         };
@@ -86,7 +86,7 @@ enum UserRole: string implements HasColor, HasDescription, HasIcon, HasLabel
     public function hasAdminAccess(): bool
     {
         return match ($this) {
-            self::SuperAdmin, self::CompanyAdmin => true,
+            self::SuperAdmin, self::Admin => true,
             self::Driver, self::Passenger => false,
         };
     }
@@ -100,7 +100,17 @@ enum UserRole: string implements HasColor, HasDescription, HasIcon, HasLabel
     {
         return [
             self::SuperAdmin->value,
-            self::CompanyAdmin->value,
+            self::Admin->value,
+        ];
+    }
+
+    public static function protectedRoles(): array
+    {
+        return [
+            self::SuperAdmin->value,
+            self::Admin->value,
+            self::Driver->value,
+            self::Passenger->value,
         ];
     }
 }
