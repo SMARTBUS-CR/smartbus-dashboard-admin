@@ -27,13 +27,16 @@ use Filament\Panel;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 use Override;
 use UnitEnum;
@@ -89,6 +92,11 @@ class RoleResource extends Resource
                                     ->disabled()
                                     ->readOnly()
                                     ->dehydrated()
+                                    ->mutateStateForValidationUsing(fn (Get $get, ?Role $record): string => static::getRoleName($get, $record))
+                                    ->dehydrateStateUsing(fn (Get $get, ?Role $record): string => static::getRoleName($get, $record))
+                                    ->rule(fn (?Role $record) => ! Filament::auth()->user()->isSuperAdmin() && ! in_array($record?->name, UserRole::protectedRoles(), true)
+                                        ? Rule::notIn(UserRole::protectedRoles())
+                                        : null)
                                     ->unique(
                                         ignoreRecord: true, /** @phpstan-ignore-next-line */
                                         modifyRuleUsing: fn (Unique $rule): Unique => Utils::isTenancyEnabled() ? $rule->where(Utils::getTenantModelForeignKey(), Filament::getTenant()?->id) : $rule
@@ -161,7 +169,7 @@ class RoleResource extends Resource
                 DeleteAction::make()
                     ->hidden(fn (Role $record) => in_array($record->name, UserRole::protectedRoles(), true))
                     ->before(function (DeleteAction $action, Role $record): void {
-                        $usersCount = $record->users()->count();
+                        $usersCount = $record->users()->withoutGlobalScopes()->count();
 
                         if ($usersCount > 0) {
                             Notification::make()
@@ -176,7 +184,8 @@ class RoleResource extends Resource
                     }),
             ])
             ->toolbarActions([
-                DeleteBulkAction::make(),
+                DeleteBulkAction::make()
+                    ->authorizeIndividualRecords('delete'),
             ]);
     }
 
@@ -186,6 +195,31 @@ class RoleResource extends Resource
         return [
             //
         ];
+    }
+
+    protected static function getRoleName(Get $get, ?Role $record): string
+    {
+        return in_array($record?->name, UserRole::protectedRoles(), true)
+            ? $record->name
+            : Str::slug((string) $get('display_name'));
+    }
+
+    /**
+     * @param  Collection<int, string>  $permissions
+     */
+    public static function authorizePermissionAssignment(Collection $permissions, ?Role $record = null): void
+    {
+        $user = Filament::auth()->user();
+
+        if ($user->isSuperAdmin()) {
+            return;
+        }
+
+        $existingPermissions = $record?->permissions()->pluck('name') ?? collect();
+
+        foreach ($permissions->diff($existingPermissions) as $permission) {
+            abort_unless($user->can($permission), 403);
+        }
     }
 
     public static function getPages(): array

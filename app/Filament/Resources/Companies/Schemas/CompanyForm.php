@@ -8,8 +8,10 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Validation\Rules\Unique;
 
 class CompanyForm
 {
@@ -38,11 +40,13 @@ class CompanyForm
                         TextInput::make('legal_id')
                             ->label(__('Legal Identification'))
                             ->prefixIcon(Heroicon::OutlinedIdentification)
+                            ->unique(ignoreRecord: true, modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('country_code', strtoupper((string) $get('country_code'))))
                             ->maxLength(255),
 
                         TextInput::make('operator_number')
                             ->label(__('Operator Number'))
                             ->prefixIcon(LucideIcon::IDCardLanyard)
+                            ->unique(ignoreRecord: true, modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('country_code', strtoupper((string) $get('country_code'))))
                             ->maxLength(255),
                     ])
                     ->columns(2)
@@ -71,6 +75,7 @@ class CompanyForm
                         Textarea::make('address')
                             ->label(__('Address'))
                             ->required()
+                            ->maxLength(255)
                             ->rows(3)
                             ->columnSpanFull(),
                     ])

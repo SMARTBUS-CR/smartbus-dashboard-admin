@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
+use Spatie\Permission\PermissionRegistrar;
 
 #[Connection('pgsql')]
 class Company extends Model implements HasCurrentTenantLabel, HasName
@@ -118,18 +119,24 @@ class Company extends Model implements HasCurrentTenantLabel, HasName
 
         /**
          * When a company is created, we need to create the default roles for that company.
-         * The roles are created in the same database transaction as the company, so if the
-         * company creation fails, the roles are not created.
+         * Role creation must bypass Filament's tenant scope and creating observer,
+         * which would otherwise assign these roles to the currently selected company.
+         * MySQL roles and the PostgreSQL company do not share a transaction.
          *
          * @see Company::created
          * */
         static::created(function (Company $company): void {
-            setPermissionsTeamId($company->getKey());
+            Role::withoutEvents(function () use ($company): void {
+                foreach ([UserRole::Admin, UserRole::Driver] as $role) {
+                    Role::withoutGlobalScopes()->firstOrCreate([
+                        'company_id' => $company->getKey(),
+                        'name' => $role->value,
+                        'guard_name' => 'web',
+                    ]);
+                }
+            });
 
-            Role::findOrCreate(UserRole::Admin->value, 'web');
-            Role::findOrCreate(UserRole::Driver->value, 'web');
-
-            setPermissionsTeamId(null);
+            app(PermissionRegistrar::class)->forgetCachedPermissions();
         });
     }
 

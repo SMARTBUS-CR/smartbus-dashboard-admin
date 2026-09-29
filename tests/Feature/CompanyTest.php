@@ -1,65 +1,147 @@
 <?php
 
+use App\Enums\UserRole;
+use App\Filament\Resources\Companies\CompanyResource;
 use App\Models\Company;
+use App\Models\CompanyUser;
+use App\Models\Role;
 use App\Models\User;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Filament\Facades\Filament;
+use Illuminate\Database\UniqueConstraintViolationException;
 
-pest()->use(LazilyRefreshDatabase::class);
+describe('company slug lifecycle', function () {
+    test('generates a slug from the trade name when none is given', function () {
+        $company = createCompany(['trade_name' => 'SmartBus Demo', 'slug' => null]);
 
-beforeEach(function () {
-    config()->set('database.default', 'pgsql');
-    config()->set('database.connections.pgsql', [
-        'driver' => 'sqlite',
-        'database' => ':memory:',
-        'foreign_key_constraints' => true,
-    ]);
-    config()->set('database.connections.mysql', [
-        'driver' => 'sqlite',
-        'database' => ':memory:',
-        'foreign_key_constraints' => true,
-    ]);
-    $this->refreshDatabase();
+        expect($company->slug)->toBe('smartbus-demo');
+    });
+
+    test('falls back to the legal name when no trade name exists', function () {
+        $company = createCompany([
+            'legal_name' => 'Transportes del Norte SA',
+            'trade_name' => null,
+            'slug' => null,
+        ]);
+
+        expect($company->slug)->toBe('transportes-del-norte-sa');
+    });
+
+    test('suffixed slug when the base slug is taken', function () {
+        createCompany(['slug' => 'smartbus-demo']);
+        $replacement = createCompany(['trade_name' => 'SmartBus Demo', 'slug' => null]);
+
+        expect($replacement->slug)->toBe('smartbus-demo-2');
+    });
+
+    test('does not regenerate the slug when names change', function () {
+        $company = createCompany(['slug' => 'original-slug']);
+
+        $company->update(['legal_name' => 'Completely Different Name', 'trade_name' => 'Other Trade']);
+
+        // Product/design assumption: slug is the tenant URL key and stays immutable.
+        expect($company->fresh()->slug)->toBe('original-slug');
+    });
+
+    test('keeps soft-deleted slugs reserved', function () {
+        $company = createCompany(['slug' => 'smartbus-demo']);
+        $company->delete();
+
+        // PostgreSQL aborts the transaction on error: the failing-path
+        // assertion (duplicate must not exist live) goes last.
+        $replacement = createCompany(['trade_name' => 'SmartBus Demo', 'slug' => null]);
+
+        expect($replacement->slug)->toBe('smartbus-demo-2');
+        $this->assertSoftDeleted($company);
+    });
 });
 
-test('companies can be created with an automatic slug after migrations', function () {
-    $company = Company::factory()->create([
-        'trade_name' => 'SmartBus Demo',
-        'slug' => null,
-    ]);
+describe('cross-database membership', function () {
+    test('returns no users for an empty company and orders its active members by name', function () {
+        [$company, $empty] = createTenantPair();
+        $last = User::factory()->create(['name' => 'Zulu']);
+        $first = User::factory()->create(['name' => 'Alpha']);
+        $deleted = User::factory()->create(['name' => 'Deleted']);
+        foreach ([$last, $first, $deleted] as $user) {
+            $user->companies()->syncWithoutDetaching([$company->id]);
+        }
+        $deleted->delete();
 
-    $this->assertDatabaseHas('companies', [
-        'id' => $company->id,
-        'slug' => 'smartbus-demo',
-    ]);
+        expect($empty->users()->pluck('id')->all())->toBeEmpty()
+            ->and($company->users()->pluck('id')->all())->toBe([$first->id, $last->id]);
+    });
+
+    test('attaches a mysql user to a pgsql company without duplicate memberships', function () {
+        $user = User::factory()->create();
+        $company = createCompany();
+
+        $user->companies()->syncWithoutDetaching([$company->id]);
+        $user->companies()->syncWithoutDetaching([$company->id]);
+
+        expect(CompanyUser::where('company_id', $company->id)->count())->toBe(1)
+            ->and($user->companies()->where('companies.id', $company->id)->exists())->toBeTrue();
+    });
+
+    test('only returns users attached to that company, not other companies', function () {
+        // Would pass with a single record even if filtering were broken.
+        [$companyA, $companyB] = createTenantPair();
+        $userA = User::factory()->create();
+        $userB = User::factory()->create();
+        $userA->companies()->syncWithoutDetaching([$companyA->id]);
+        $userB->companies()->syncWithoutDetaching([$companyB->id]);
+
+        // Company::users() runs a manual cross-connection query (BelongsToMany
+        // cannot span connections): assert it filters, not its return type.
+        expect($companyA->users()->pluck('users.id')->all())->toBe([$userA->id])
+            ->and($companyB->users()->pluck('users.id')->all())->toBe([$userB->id]);
+    });
 });
 
-test('soft deleted companies keep their slugs reserved', function () {
-    $company = Company::factory()->create(['slug' => 'smartbus-demo']);
+test('the database reserves company identifiers by country even after soft deletion', function (string $field) {
+    $company = createCompany(['country_code' => 'CR']);
     $company->delete();
+    $duplicate = Company::factory()->make(['country_code' => 'CR', $field => $company->$field]);
 
-    $replacement = Company::factory()->create([
-        'trade_name' => 'SmartBus Demo',
-        'slug' => null,
-    ]);
+    // A constraint violation aborts the PostgreSQL transaction, so it is the final operation.
+    expect(fn () => $duplicate->save())->toThrow(UniqueConstraintViolationException::class);
+})->with(['slug', 'legal_id', 'operator_number']);
 
-    $this->assertSoftDeleted($company);
-    $this->assertDatabaseHas('companies', [
-        'id' => $replacement->id,
-        'slug' => 'smartbus-demo-2',
-    ]);
-});
+describe('company admin contract', function () {
+    test('only super-admins can access the companies resource', function () {
+        $superAdmin = createUserWithRole(UserRole::SuperAdmin);
+        $companyAdmin = createUserWithRole(UserRole::Admin, createCompany());
 
-test('a mysql user can attach and load companies from the pgsql connection without duplicate memberships', function () {
-    $user = (new User)->newFromBuilder(['id' => '01a0c691-4b83-72f5-b21c-8e2a486c086c']);
-    $company = Company::factory()->create();
+        $this->actingAs($superAdmin);
 
-    $user->companies()->syncWithoutDetaching([$company->id]);
-    $user->companies()->syncWithoutDetaching([$company->id]);
+        expect(CompanyResource::canAccess())->toBeTrue();
 
-    $this->assertDatabaseCount('company_users', 1, 'pgsql');
-    $this->assertDatabaseHas('company_users', [
-        'user_id' => $user->id,
-        'company_id' => $company->id,
-    ], 'pgsql');
-    expect($user->companies->modelKeys())->toBe([$company->id]);
+        $this->actingAs($companyAdmin);
+
+        // Resource hides itself: proves the denial path, not just a 200.
+        expect(CompanyResource::canAccess())->toBeFalse();
+    });
+
+    test('company admin resolves only assigned companies as tenants', function () {
+        // Confirmed product decision: admin sees/manages ONLY assigned companies.
+        [$assigned, $foreign] = createTenantPair();
+        $admin = createUserWithRole(UserRole::Admin);
+        $admin->companies()->syncWithoutDetaching([$assigned->id]);
+
+        $panel = Filament::getPanel('admin');
+
+        expect($admin->getTenants($panel)->modelKeys())->toBe([$assigned->id])
+            ->and($admin->canAccessTenant($assigned))->toBeTrue()
+            ->and($admin->canAccessTenant($foreign))->toBeFalse();
+    });
+
+    test('creates default admin and driver roles scoped to the new company', function () {
+        $company = createCompany();
+
+        setPermissionsTeamId($company->getKey());
+        $adminRole = Role::findByName(UserRole::Admin->value, 'web');
+        $driverRole = Role::findByName(UserRole::Driver->value, 'web');
+        setPermissionsTeamId(null);
+
+        expect((string) $adminRole->company_id)->toBe((string) $company->id)
+            ->and((string) $driverRole->company_id)->toBe((string) $company->id);
+    });
 });

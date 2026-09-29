@@ -1,0 +1,35 @@
+<?php
+
+namespace Tests;
+
+use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use RuntimeException;
+
+abstract class TestCase extends BaseTestCase
+{
+    // Merge this method into the project's existing TestCase — do not
+    // replace the whole class, most projects already extend it with
+    // other things (e.g. createApplication()).
+
+    /**
+     * RefreshDatabase runs migrate:fresh from inside parent::setUp().
+     * setUpTraits() runs BEFORE that, so this is the only safe place to
+     * abort if the environment isn't pointing at a *_testing database —
+     * checking inside setUp() would be too late.
+     */
+    protected function setUpTraits()
+    {
+        // Replace with the project's real connection names.
+        foreach (['pgsql', 'mysql'] as $connection) {
+            $database = (string) config("database.connections.{$connection}.database");
+
+            if (! str_ends_with($database, '_testing')) {
+                throw new RuntimeException(
+                    "Connection '{$connection}' points at '{$database}', which does not end in '_testing'. Aborting to avoid wiping development data."
+                );
+            }
+        }
+
+        return parent::setUpTraits();
+    }
+}

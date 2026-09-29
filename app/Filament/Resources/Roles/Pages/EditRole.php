@@ -29,7 +29,7 @@ class EditRole extends EditRecord
             DeleteAction::make()
                 ->hidden(fn (Role $record): bool => in_array($record->name, UserRole::protectedRoles(), true))
                 ->before(function (DeleteAction $action, Role $record): void {
-                    $usersCount = $record->users()->count();
+                    $usersCount = $record->users()->withoutGlobalScopes()->count();
 
                     if ($usersCount > 0) {
                         Notification::make()
@@ -54,6 +54,9 @@ class EditRole extends EditRecord
             ->flatten()
             ->unique();
 
+        RoleResource::authorizePermissionAssignment($this->permissions, $this->record);
+        $data['guard_name'] = $this->record->guard_name;
+
         if (Utils::isTenancyEnabled() && Arr::has($data, Utils::getTenantModelForeignKey()) && filled($data[Utils::getTenantModelForeignKey()])) {
             return Arr::only($data, ['name', 'display_name', 'guard_name', Utils::getTenantModelForeignKey()]);
         }
@@ -67,7 +70,7 @@ class EditRole extends EditRecord
         $this->permissions->each(function (string $permission) use ($permissionModels): void {
             $permissionModels->push(Utils::getPermissionModel()::firstOrCreate([
                 'name' => $permission,
-                'guard_name' => $this->data['guard_name'],
+                'guard_name' => $this->record->guard_name,
             ]));
         });
 

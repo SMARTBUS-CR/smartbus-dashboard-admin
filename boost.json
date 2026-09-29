@@ -12,7 +12,8 @@
     "nightwatch": false,
     "packages": [
         "filament/filament",
-        "spatie/laravel-permission"
+        "spatie/laravel-permission",
+        "pestphp/pest-plugin-agent"
     ],
     "sail": false,
     "skills": [
@@ -21,6 +22,8 @@
         "testing-best-practices",
         "tailwindcss-development",
         "filament-development",
-        "laravel-permission-development"
+        "laravel-permission-development",
+        "pest-plugin-agent",
+        "laravel-dual-db-testing"
     ]
 }

@@ -16,7 +16,13 @@ class SyncSpatieTeam
      */
     public function handle(Request $request, Closure $next): Response
     {
-        setPermissionsTeamId(Filament::getTenant()?->getKey());
+        $teamId = Filament::getTenant()?->getKey();
+
+        if (getPermissionsTeamId() !== $teamId) {
+            Filament::auth()->user()?->unsetRelation('roles')->unsetRelation('permissions');
+        }
+
+        setPermissionsTeamId($teamId);
 
         return $next($request);
     }

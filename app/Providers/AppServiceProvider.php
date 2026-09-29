@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Auth\ExternalUserProvider;
 use App\Auth\SessionGuard;
+use App\Enums\UserRole;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
@@ -32,7 +33,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Gate::before(fn (User $user) => $user->isSuperAdmin() ? true : null);
+        Gate::before(function (User $user, string $ability, array $arguments): ?bool {
+            $record = $arguments[0] ?? null;
+
+            if ($record instanceof Role && in_array($ability, ['delete', 'forceDelete'], true)) {
+                if (in_array($record->name, UserRole::protectedRoles(), true) || $record->users()->withoutGlobalScopes()->exists()) {
+                    return false;
+                }
+            }
+
+            return $user->isSuperAdmin() ? true : null;
+        });
 
         app(PermissionRegistrar::class)
             ->setPermissionClass(Permission::class)
