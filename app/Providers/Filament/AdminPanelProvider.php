@@ -2,10 +2,10 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Pages\Auth\RequestPasswordReset;
 use App\Filament\Pages\Dashboard;
-use App\Filament\Pages\Tenancy\RegisterCompany;
+use App\Http\Middleware\SyncSpatieTeam;
 use App\Models\Company;
+use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -31,9 +31,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->spa(hasPrefetching: true)
-            ->authGuard('external')
             ->login()
-            ->passwordReset(RequestPasswordReset::class)
             ->colors([
                 'primary' => Color::Indigo,
             ])
@@ -61,7 +59,15 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
-            ->tenant(Company::class, slugAttribute: 'slug')
-            ->tenantRegistration(RegisterCompany::class);
+            ->plugins([
+                FilamentShieldPlugin::make()
+                    ->scopeToTenant(true)
+                    ->tenantRelationshipName('roles')
+                    ->tenantOwnershipRelationshipName('company'),
+            ])
+            ->tenantMiddleware([SyncSpatieTeam::class], isPersistent: true)
+            ->tenant(model: Company::class, slugAttribute: 'slug')
+            ->searchableTenantMenu()
+            ->tenantMenu();
     }
 }

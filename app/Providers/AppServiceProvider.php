@@ -4,13 +4,19 @@ namespace App\Providers;
 
 use App\Auth\ExternalUserProvider;
 use App\Auth\SessionGuard;
+use App\Enums\UserRole;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
-use App\Services\ExternalAuthService;
+use App\Services\AuthService;
+use Filament\Tables\Table;
 use GuzzleHttp\Middleware;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Psr\Http\Message\RequestInterface;
+use Spatie\Permission\PermissionRegistrar;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -27,9 +33,25 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::before(function (User $user, string $ability, array $arguments): ?bool {
+            $record = $arguments[0] ?? null;
+
+            if ($record instanceof Role && in_array($ability, ['delete', 'forceDelete'], true)) {
+                if (in_array($record->name, UserRole::protectedRoles(), true) || $record->users()->withoutGlobalScopes()->exists()) {
+                    return false;
+                }
+            }
+
+            return $user->isSuperAdmin() ? true : null;
+        });
+
+        app(PermissionRegistrar::class)
+            ->setPermissionClass(Permission::class)
+            ->setRoleClass(Role::class);
+
         // Register custom UserProvider for external authentication
         Auth::provider('external_provider', fn ($app, array $config) => new ExternalUserProvider(
-            $app->make(ExternalAuthService::class),
+            $app->make(AuthService::class),
             $config['model'] ?? User::class
         ));
 
@@ -54,5 +76,13 @@ class AppServiceProvider extends ServiceProvider
                 ))
             );
         });
+
+        // Configure default date and time formats for Filament tables
+        Table::configureUsing(fn (Table $table) => $table
+            ->defaultDateDisplayFormat('d M, Y')
+            ->defaultTimeDisplayFormat('h:i A')
+            ->defaultDateTimeDisplayFormat('d M, Y - h:i A')
+        );
+
     }
 }

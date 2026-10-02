@@ -1,37 +1,84 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Policies;
 
 use App\Models\Company;
 use App\Models\User;
+use Illuminate\Auth\Access\HandlesAuthorization;
+use Illuminate\Foundation\Auth\User as AuthUser;
 
 class CompanyPolicy
 {
-    /**
-     * Create a new policy instance.
-     */
-    public function __construct() {}
+    use HandlesAuthorization;
 
-    public function viewAny(User $user): bool
+    public function before(User $user, string $ability): ?bool
     {
-        return $user->hasPermissionTo('companies.view')
-            || $user->hasPermissionTo('companies.manage');
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        return false;
     }
 
-    public function create(User $user): bool
+    public function viewAny(AuthUser $authUser): bool
     {
-        return $user->hasPermissionTo('companies.create')
-            || $user->hasPermissionTo('companies.manage');
+        return false;
     }
 
-    public function update(User $user, Company $company): bool
+    public function view(AuthUser $authUser, Company $company): bool
     {
-        return $user->hasPermissionTo('companies.update')
-            || $user->hasPermissionTo('companies.manage');
+        return false;
     }
 
-    public function delete(User $user, Company $company): bool
+    public function create(AuthUser $authUser): bool
     {
-        return $user->hasPermissionTo('companies.delete');
+        return false;
+    }
+
+    public function update(AuthUser $authUser, Company $company): bool
+    {
+        return false;
+    }
+
+    public function delete(AuthUser $authUser, Company $company): bool
+    {
+        return false;
+    }
+
+    public function deleteAny(AuthUser $authUser): bool
+    {
+        return false;
+    }
+
+    public function restore(AuthUser $authUser, Company $company): bool
+    {
+        return false;
+    }
+
+    public function forceDelete(AuthUser $authUser, Company $company): bool
+    {
+        return false;
+    }
+
+    public function forceDeleteAny(AuthUser $authUser): bool
+    {
+        return false;
+    }
+
+    public function restoreAny(AuthUser $authUser): bool
+    {
+        return false;
+    }
+
+    public function replicate(AuthUser $authUser, Company $company): bool
+    {
+        return false;
+    }
+
+    public function reorder(AuthUser $authUser): bool
+    {
+        return false;
     }
 }

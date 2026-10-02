@@ -1,0 +1,60 @@
+# Illustrative additions to an existing docker-compose.yml / compose.yaml.
+# Inspect the project's real file first and match its image tags, network
+# name, and credential source (usually .env) rather than copying this
+# verbatim. The goal is: the app's normal dev databases are untouched, and
+# two *_testing databases are reachable the same way from the app
+# container and from a developer's shell.
+
+services:
+  # --- existing dev services (do not duplicate if already present) ---
+  # postgres:
+  #   image: postgres:16
+  #   ...
+  # mysql:
+  #   image: mysql:8.4
+  #   ...
+
+  # --- add testing databases ---
+  postgres-testing:
+    image: postgis/postgis:16-3.4 # use plain postgres:<version> if no extension is needed
+    environment:
+      POSTGRES_USER: ${DB_PGSQL_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PGSQL_PASSWORD:-postgres}
+      POSTGRES_DB: app_testing
+    ports:
+      - "5433:5432" # distinct host port from the dev postgres service
+    volumes:
+      - pgsql-testing-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_PGSQL_USERNAME:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mysql-testing:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_MYSQL_PASSWORD:-root}
+      MYSQL_DATABASE: app_users_testing
+    ports:
+      - "3307:3306" # distinct host port from the dev mysql service
+    volumes:
+      - mysql-testing-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_MYSQL_PASSWORD:-root}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgsql-testing-data:
+  mysql-testing-data:
+
+# In .env.testing (or the app container's test-time env), point the
+# connections at these services:
+#   DB_PGSQL_HOST=postgres-testing
+#   DB_PGSQL_PORT=5432
+#   DB_MYSQL_HOST=mysql-testing
+#   DB_MYSQL_PORT=3306
+# (host-side tools connecting from outside Docker use the mapped ports
+# 5433 / 3307 instead.)
