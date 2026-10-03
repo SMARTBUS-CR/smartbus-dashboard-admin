@@ -18,6 +18,8 @@ use Illuminate\Support\ServiceProvider;
 use Psr\Http\Message\RequestInterface;
 use Spatie\Permission\PermissionRegistrar;
 
+use function in_array;
+
 class AppServiceProvider extends ServiceProvider
 {
     /**
@@ -33,6 +35,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Prevent deletion of protected roles or roles that have users assigned to them
         Gate::before(function (User $user, string $ability, array $arguments): ?bool {
             $record = $arguments[0] ?? null;
 
@@ -45,6 +48,7 @@ class AppServiceProvider extends ServiceProvider
             return $user->isSuperAdmin() ? true : null;
         });
 
+        // Configure Spatie Permission package to use custom models
         app(PermissionRegistrar::class)
             ->setPermissionClass(Permission::class)
             ->setRoleClass(Role::class);

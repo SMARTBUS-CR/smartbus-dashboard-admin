@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\Companies\CompanyResource;
 use App\Models\Company;
 use App\Models\User;
 use BezhanSalleh\FilamentShield\Resources\Roles\RoleResource;
-use Filament\Pages\Dashboard;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 
