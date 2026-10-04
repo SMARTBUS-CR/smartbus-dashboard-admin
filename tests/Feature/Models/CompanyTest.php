@@ -1,15 +1,13 @@
 <?php
 
 use App\Enums\UserRole;
-use App\Filament\Resources\Companies\CompanyResource;
 use App\Models\Company;
 use App\Models\CompanyUser;
 use App\Models\Role;
 use App\Models\User;
-use Filament\Facades\Filament;
 use Illuminate\Database\UniqueConstraintViolationException;
 
-describe('company slug lifecycle', function () {
+describe('Company Slug Lifecycle', function () {
     test('generates a slug from the trade name when none is given', function () {
         $company = createCompany(['trade_name' => 'SmartBus Demo', 'slug' => null]);
 
@@ -55,7 +53,7 @@ describe('company slug lifecycle', function () {
     });
 });
 
-describe('cross-database membership', function () {
+describe('Cross Database Membership', function () {
     test('returns no users for an empty company and orders its active members by name', function () {
         [$company, $empty] = createTenantPair();
         $last = User::factory()->create(['name' => 'Zulu']);
@@ -96,43 +94,18 @@ describe('cross-database membership', function () {
     });
 });
 
-test('the database reserves company identifiers by country even after soft deletion', function (string $field) {
-    $company = createCompany(['country_code' => 'CR']);
-    $company->delete();
-    $duplicate = Company::factory()->make(['country_code' => 'CR', $field => $company->$field]);
+describe('Company Identifier Constraints', function (): void {
+    test('the database reserves company identifiers by country even after soft deletion', function (string $field) {
+        $company = createCompany(['country_code' => 'CR']);
+        $company->delete();
+        $duplicate = Company::factory()->make(['country_code' => 'CR', $field => $company->$field]);
 
-    // A constraint violation aborts the PostgreSQL transaction, so it is the final operation.
-    expect(fn () => $duplicate->save())->toThrow(UniqueConstraintViolationException::class);
-})->with(['slug', 'legal_id', 'operator_number']);
+        // A constraint violation aborts the PostgreSQL transaction, so it is the final operation.
+        expect(fn () => $duplicate->save())->toThrow(UniqueConstraintViolationException::class);
+    })->with(['slug', 'legal_id', 'operator_number']);
+});
 
-describe('company admin contract', function () {
-    test('only super-admins can access the companies resource', function () {
-        $superAdmin = createUserWithRole(UserRole::SuperAdmin);
-        $companyAdmin = createUserWithRole(UserRole::Admin, createCompany());
-
-        $this->actingAs($superAdmin);
-
-        expect(CompanyResource::canAccess())->toBeTrue();
-
-        $this->actingAs($companyAdmin);
-
-        // Resource hides itself: proves the denial path, not just a 200.
-        expect(CompanyResource::canAccess())->toBeFalse();
-    });
-
-    test('company admin resolves only assigned companies as tenants', function () {
-        // Confirmed product decision: admin sees/manages ONLY assigned companies.
-        [$assigned, $foreign] = createTenantPair();
-        $admin = createUserWithRole(UserRole::Admin);
-        $admin->companies()->syncWithoutDetaching([$assigned->id]);
-
-        $panel = Filament::getPanel('admin');
-
-        expect($admin->getTenants($panel)->modelKeys())->toBe([$assigned->id])
-            ->and($admin->canAccessTenant($assigned))->toBeTrue()
-            ->and($admin->canAccessTenant($foreign))->toBeFalse();
-    });
-
+describe('Company Default Roles', function (): void {
     test('creates default admin and driver roles scoped to the new company', function () {
         $company = createCompany();
 

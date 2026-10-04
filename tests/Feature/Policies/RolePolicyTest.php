@@ -60,7 +60,7 @@ function shieldUserWith(array $permissions, Company $team): AuthUser
     return $user;
 }
 
-describe('RolePolicy', function () {
+describe('Role Policy', function () {
     test('denies viewing a role that belongs to another tenant', function () {
         [$companyA, $companyB] = createTenantPair();
 

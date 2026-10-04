@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Enums\TokenValidationStatus;
 use App\Traits\ApiLogger;
 use App\Traits\HasHttpRequests;
+use Illuminate\Http\Client\ConnectionException;
 use RuntimeException;
 use Throwable;
 
@@ -284,31 +286,77 @@ class AuthService
      * @param  string  $token  The access token to validate
      * @return bool True if the token is valid, false otherwise
      */
-    public function validateToken(string $token): bool
+    // public function validateToken(string $token): bool
+    // {
+    //     try {
+    //         $response = $this->sendHttpRequest(
+    //             method: 'POST',
+    //             endpoint: '/auth/token/validate',
+    //             token: $token
+    //         );
+
+    //         if (! $response->successful()) {
+    //             throw new RuntimeException(
+    //                 message: 'Token validation request failed: '.$response->body(),
+    //                 code: $response->status(),
+    //             );
+    //         }
+
+    //         return $response->json('meta.valid') === true;
+    //     } catch (Throwable $e) {
+    //         $this->log('error', 'Token validation failed', [
+    //             'exception' => $e->getMessage(),
+    //             'token' => $token,
+    //         ]);
+
+    //         return false;
+    //     }
+    // }
+
+    public function validateToken(string $token): TokenValidationStatus
     {
+        if (trim($token) === '') {
+            return TokenValidationStatus::Invalid;
+        }
+
         try {
             $response = $this->sendHttpRequest(
                 method: 'POST',
                 endpoint: '/auth/token/validate',
-                token: $token
+                token: $token,
             );
-
-            if (! $response->successful()) {
-                throw new RuntimeException(
-                    message: 'Token validation request failed: '.$response->body(),
-                    code: $response->status(),
-                );
-            }
-
-            return $response->json('meta.valid') === true;
-        } catch (Throwable $e) {
-            $this->log('error', 'Token validation failed', [
-                'exception' => $e->getMessage(),
-                'token' => $token,
+        } catch (ConnectionException $ce) {
+            $this->log('warning', 'Token validation service is unreachable.', [
+                'exception' => $ce->getMessage(),
             ]);
 
-            return false;
+            return TokenValidationStatus::Unavailable;
         }
+
+        if ($response->unauthorized()) {
+            return TokenValidationStatus::Invalid;
+        }
+
+        if ($response->forbidden()) {
+            return TokenValidationStatus::Forbidden;
+        }
+
+        if ($response->ok()) {
+            $valid = $response->json('meta.valid');
+            if ($valid === true) {
+                return TokenValidationStatus::Valid;
+            }
+            if ($valid === false) {
+                return TokenValidationStatus::Invalid;
+            }
+        }
+
+        $this->log('warning', 'Unexpected token validation response.', [
+            'status' => $response->status(),
+            'body' => $response->json() ?? $response->body(),
+        ]);
+
+        return TokenValidationStatus::Unavailable;
     }
 
     /**

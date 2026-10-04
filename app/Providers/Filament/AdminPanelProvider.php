@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\Dashboard;
+use App\Http\Middleware\EnsureExternalTokenIsValid;
 use App\Http\Middleware\SyncSpatieTeam;
 use App\Models\Company;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
@@ -58,7 +59,8 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-            ])
+                EnsureExternalTokenIsValid::class,
+            ], isPersistent: true)
             ->plugins([
                 FilamentShieldPlugin::make()
                     ->scopeToTenant(true)

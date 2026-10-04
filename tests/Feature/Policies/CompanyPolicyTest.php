@@ -5,7 +5,7 @@ use App\Models\Company;
 use App\Policies\CompanyPolicy;
 use Illuminate\Foundation\Auth\User as AuthUser;
 
-describe('CompanyPolicy', function () {
+describe('Company Policy', function () {
     test('before() grants every ability to super-admins', function () {
         $superAdmin = createUserWithRole(UserRole::SuperAdmin);
         $policy = new CompanyPolicy;

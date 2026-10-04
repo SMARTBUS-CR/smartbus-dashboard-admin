@@ -6,7 +6,7 @@ use Filament\Facades\Filament;
 use Illuminate\Http\Request;
 use Spatie\Permission\PermissionRegistrar;
 
-describe('tenancy and team scope', function () {
+describe('Tenancy And Team Scope', function () {
     test('switching A to B to A discards previously loaded role permissions', function () {
         [$companyA, $companyB] = createTenantPair();
         $admin = createUserWithRole(UserRole::Admin, $companyA);
