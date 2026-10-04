@@ -54,8 +54,7 @@ class UserForm
                         ->password()
                         ->revealable()
                         ->required(
-                            fn (string $operation, Get $get): bool =>
-                                $operation === 'create' || filled($get('password'))
+                            fn (string $operation, Get $get): bool => $operation === 'create' || filled($get('password'))
                         )
                         ->autocomplete('new-password'),
                 ])

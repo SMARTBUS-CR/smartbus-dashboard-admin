@@ -8,9 +8,9 @@ use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Text;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Filament\Schemas\Components\Text;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -35,9 +35,8 @@ class UsersTable
                     ->label(__('Retirar acceso'))
                     ->color('danger')
                     ->authorize(
-                        fn (User $record): bool =>
-                            Gate::forUser(Filament::auth()->user())
-                                ->allows('removeCompanyAccess', $record)
+                        fn (User $record): bool => Gate::forUser(Filament::auth()->user())
+                            ->allows('removeCompanyAccess', $record)
                     )
                     ->requiresConfirmation()
                     ->modalHeading(__('Retirar acceso a esta empresa'))

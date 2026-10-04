@@ -112,7 +112,7 @@ describe('User Policy', function (): void {
         ['reorder', false],
     ]);
 
-    test('authorizes company access removal only with permission in the current company', function (bool $hasPermission, bool $foreignTarget, bool $expected, ): void {
+    test('authorizes company access removal only with permission in the current company', function (bool $hasPermission, bool $foreignTarget, bool $expected): void {
         [$company, $foreign] = createTenantPair();
 
         $actor = createUserWithRole(UserRole::Admin, $company);
@@ -139,8 +139,8 @@ describe('User Policy', function (): void {
             Gate::forUser($actor)->allows('removeCompanyAccess', $target)
         )->toBe($expected);
     })->with([
-                'missing permission' => [false, false, false],
-                'authorized local target' => [true, false, true],
-                'foreign target with permission' => [true, true, false],
-            ]);
+        'missing permission' => [false, false, false],
+        'authorized local target' => [true, false, true],
+        'foreign target with permission' => [true, true, false],
+    ]);
 });

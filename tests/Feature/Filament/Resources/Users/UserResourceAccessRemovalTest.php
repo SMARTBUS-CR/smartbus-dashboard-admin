@@ -43,9 +43,8 @@ describe('Company Admin Resource Access Removal', function (): void {
             ->assertCanNotSeeTableRecords([$target])
             ->assertCanSeeTableRecords([$backup]);
 
-        expect($membership->refresh()->trashed())->toBeTrue();
-
-        expect($target->refresh()->trashed())->toBeFalse();
+        expect($membership->refresh()->trashed())->toBeTrue()
+            ->and($target->refresh()->trashed())->toBeFalse();
     });
 
     test('shows an error when removing the last administrator', function (): void {
@@ -70,9 +69,8 @@ describe('Company Admin Resource Access Removal', function (): void {
             ->assertNotNotified()
             ->assertCanSeeTableRecords([$target]);
 
-        expect($membership->refresh()->trashed())->toBeFalse();
-
-        expect($target->refresh()->trashed())->toBeFalse();
+        expect($membership->refresh()->trashed())->toBeFalse()
+            ->and($target->refresh()->trashed())->toBeFalse();
     });
 
     test('hides removal from administrators without permission', function (): void {

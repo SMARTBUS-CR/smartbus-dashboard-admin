@@ -519,11 +519,9 @@ describe('Company Access Removal', function (): void {
         app(UserManagementService::class)
             ->removeCompanyAccess($actor, $target);
 
-        expect($membership->refresh()->trashed())->toBeTrue();
-
-        expect($target->refresh()->trashed())->toBeFalse();
-
-        expect($otherMembership->refresh()->trashed())->toBeFalse();
+        expect($membership->refresh()->trashed())->toBeTrue()
+            ->and($target->refresh()->trashed())->toBeFalse()
+            ->and($otherMembership->refresh()->trashed())->toBeFalse();
 
         $this->assertDatabaseMissing('model_has_roles', [
             'model_type' => $target->getMorphClass(),
@@ -540,9 +538,8 @@ describe('Company Access Removal', function (): void {
                 ->orderBy('role_id')
                 ->get()
                 ->toArray()
-        )->toEqual($otherAssignmentsBefore);
-
-        expect(getPermissionsTeamId())->toBe($company->id);
+        )->toEqual($otherAssignmentsBefore)
+            ->and(getPermissionsTeamId())->toBe($company->id);
     });
 
     test('rejects removing the last administrator of a company', function (): void {
@@ -560,11 +557,9 @@ describe('Company Access Removal', function (): void {
         expect(
             fn () => app(UserManagementService::class)
                 ->removeCompanyAccess($actor, $target)
-        )->toThrow(ValidationException::class);
-
-        expect($membership->refresh()->trashed())->toBeFalse();
-
-        expect($target->refresh()->trashed())->toBeFalse();
+        )->toThrow(ValidationException::class)
+            ->and($membership->refresh()->trashed())->toBeFalse()
+            ->and($target->refresh()->trashed())->toBeFalse();
 
         $this->assertDatabaseHas('model_has_roles', [
             'model_type' => $target->getMorphClass(),
@@ -575,7 +570,7 @@ describe('Company Access Removal', function (): void {
         expect(getPermissionsTeamId())->toBe($company->id);
     });
 
-    test('rejects removal when the remaining administrator cannot access the company', function (string $condition, ): void {
+    test('rejects removal when the remaining administrator cannot access the company', function (string $condition): void {
         $company = createCompany();
         $target = createUserWithRole(UserRole::Admin, $company);
         $backup = createUserWithRole(UserRole::Admin, $company);
@@ -604,9 +599,8 @@ describe('Company Access Removal', function (): void {
         expect(
             fn () => app(UserManagementService::class)
                 ->removeCompanyAccess($actor, $target)
-        )->toThrow(ValidationException::class);
-
-        expect($membership->refresh()->trashed())->toBeFalse();
+        )->toThrow(ValidationException::class)
+            ->and($membership->refresh()->trashed())->toBeFalse();
 
         $this->assertDatabaseHas('model_has_roles', [
             'model_type' => $target->getMorphClass(),
@@ -614,10 +608,10 @@ describe('Company Access Removal', function (): void {
             'company_id' => $company->id,
         ], 'mysql');
     })->with([
-                'deleted account',
-                'deleted membership',
-                'unverified email',
-            ]);
+        'deleted account',
+        'deleted membership',
+        'unverified email',
+    ]);
 
     test('rolls back membership removal when a deletion observer fails', function (): void {
         $company = createCompany();
@@ -658,9 +652,8 @@ describe('Company Access Removal', function (): void {
             CompanyUser::setEventDispatcher($originalDispatcher);
         }
 
-        expect($membership->refresh()->trashed())->toBeFalse();
-
-        expect($target->refresh()->trashed())->toBeFalse();
+        expect($membership->refresh()->trashed())->toBeFalse()
+            ->and($target->refresh()->trashed())->toBeFalse();
 
         $this->assertDatabaseHas('model_has_roles', [
             'model_type' => $target->getMorphClass(),
@@ -697,7 +690,7 @@ describe('Company Access Removal', function (): void {
 
         $isolatedDispatcher->listen(
             TransactionCommitted::class,
-            function (TransactionCommitted $event) use (&$failureTriggered, $mysql, ): void {
+            function (TransactionCommitted $event) use (&$failureTriggered, $mysql): void {
                 if ($event->connection !== $mysql || $failureTriggered) {
                     return;
                 }
@@ -719,11 +712,9 @@ describe('Company Access Removal', function (): void {
             $mysql->setEventDispatcher($originalDispatcher);
         }
 
-        expect($failureTriggered)->toBeTrue();
-
-        expect($membership->refresh()->trashed())->toBeTrue();
-
-        expect($target->refresh()->trashed())->toBeFalse();
+        expect($failureTriggered)->toBeTrue()
+            ->and($membership->refresh()->trashed())->toBeTrue()
+            ->and($target->refresh()->trashed())->toBeFalse();
 
         $this->assertDatabaseMissing('model_has_roles', [
             'model_type' => $target->getMorphClass(),

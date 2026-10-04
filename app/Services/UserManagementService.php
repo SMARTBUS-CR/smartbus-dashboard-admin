@@ -374,9 +374,9 @@ class UserManagementService
             if ($membershipId === null) {
                 throw $exception;
             }
-        
+
             $recovered = false;
-        
+
             try {
                 $recovered = $this->completeCompanyAccessRemoval(
                     $company,
@@ -386,11 +386,11 @@ class UserManagementService
             } catch (Throwable $recoveryException) {
                 report($recoveryException);
             }
-        
+
             if (! $recovered) {
                 throw $exception;
             }
-        
+
             report($exception);
         } finally {
             setPermissionsTeamId($previousTeam);
@@ -430,7 +430,7 @@ class UserManagementService
                     ->firstOrFail();
 
                 return $mysql->transaction(
-                    function () use ($mysql, $company, $target, $membershipId, ): bool {
+                    function () use ($mysql, $company, $target, $membershipId): bool {
                         $record = User::withoutGlobalScopes()
                             ->whereKey($target->getKey())
                             ->lockForUpdate()

@@ -73,7 +73,7 @@ describe('Company Admin Resource Table', function (): void {
             ->assertCanSeeTableRecords([$matching])
             ->assertCanNotSeeTableRecords([$other]);
     })->with([
-                'name' => ['Ana Administradora'],
-                'email' => ['ana@example.test'],
-            ]);
+        'name' => ['Ana Administradora'],
+        'email' => ['ana@example.test'],
+    ]);
 });
