@@ -163,7 +163,14 @@ describe('Company Resource', function (): void {
 
     test('searches the configured company columns', function (string $column, string $first, string $second) {
         $matching = createCompany([$column => $first]);
-        $other = createCompany([$column => $second]);
+        $other = createCompany(array_replace([
+            'legal_id' => 'LEGAL-ZULU',
+            'legal_name' => 'Zulu Transit',
+            'operator_number' => 'OP-ZULU',
+            'email' => 'zulu@example.test',
+            'country_code' => 'PA',
+            'phone' => '99999999',
+        ], [$column => $second]));
         actingAsInCompany(createUserWithRole(UserRole::SuperAdmin), $matching);
 
         Livewire::test(ListCompanies::class)->searchTable($first)
