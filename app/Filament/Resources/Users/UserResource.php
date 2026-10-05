@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Users;
 
+use App\Enums\NavigationGroup;
 use App\Enums\UserRole;
 use App\Filament\Resources\Users\Pages\CreateUser;
 use App\Filament\Resources\Users\Pages\EditUser;
@@ -20,12 +21,19 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\DB;
+use UnitEnum;
 
 class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|UnitEnum|null $navigationGroup = NavigationGroup::AccessManagement;
+
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserGroup;
+
+    protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::UserGroup;
+
+    protected static ?int $navigationSort = 10;
 
     protected static bool $isScopedToTenant = false;
 
@@ -55,6 +63,21 @@ class UserResource extends Resource
         ];
     }
 
+    public static function getNavigationLabel(): string
+    {
+        return __('Users');
+    }
+
+    public static function getModelLabel(): string
+    {
+        return __('User');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('Users');
+    }
+
     public static function getRecordRouteBindingEloquentQuery(): Builder
     {
         return parent::getRecordRouteBindingEloquentQuery()
@@ -78,14 +101,18 @@ class UserResource extends Resource
 
         $user = new User;
 
-        $adminIds = DB::connection('mysql')
+        $manageableUserIds = DB::connection('mysql')
             ->table('model_has_roles as assignments')
             ->join('roles', 'roles.id', '=', 'assignments.role_id')
             ->where('assignments.model_type', $user->getMorphClass())
             ->where('assignments.company_id', $tenant->getKey())
             ->where('roles.company_id', $tenant->getKey())
             ->where('roles.guard_name', 'web')
-            ->where('roles.name', UserRole::Admin->value)
+            ->whereNotIn('roles.name', [
+                UserRole::Driver->value,
+                UserRole::Passenger->value,
+                UserRole::SuperAdmin->value,
+            ])
             ->select('assignments.model_uuid');
 
         $superAdminIds = DB::connection('mysql')
@@ -98,7 +125,7 @@ class UserResource extends Resource
 
         return $query
             ->whereIn('users.id', $memberIds)
-            ->whereIn('users.id', $adminIds)
+            ->whereIn('users.id', $manageableUserIds)
             ->whereNotIn('users.id', $superAdminIds);
     }
 }

@@ -11,6 +11,7 @@ use App\Filament\Resources\Roles\Pages\EditRole;
 use App\Filament\Resources\Roles\Pages\ListRoles;
 use App\Filament\Resources\Roles\Pages\ViewRole;
 use App\Models\Role;
+use BackedEnum;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use BezhanSalleh\FilamentShield\Support\Utils;
 use BezhanSalleh\FilamentShield\Traits\HasShieldFormComponents;
@@ -32,8 +33,10 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\FontWeight;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -54,12 +57,32 @@ class RoleResource extends Resource
 
     protected static ?string $model = Role::class;
 
+    protected static ?int $navigationSort = 20;
+
     protected static ?string $recordTitleAttribute = 'display_name';
 
     #[Override]
     public static function getNavigationGroup(): string|UnitEnum|null
     {
-        return NavigationGroup::RolesAndPermissions;
+        return NavigationGroup::AccessManagement;
+    }
+
+    #[Override]
+    public static function getNavigationIcon(): BackedEnum|Htmlable|string|null
+    {
+        return Heroicon::OutlinedKey;
+    }
+
+    #[Override]
+    public static function getActiveNavigationIcon(): BackedEnum|Htmlable|string|null
+    {
+        return Heroicon::Key;
+    }
+
+    #[Override]
+    public static function getNavigationLabel(): string
+    {
+        return __('Access Control');
     }
 
     #[Override]
@@ -77,7 +100,7 @@ class RoleResource extends Resource
                                     ->helperText(__('Name of the role that will be displayed in the application'))
                                     ->required()
                                     ->maxLength(255)
-                                    ->live(onBlur: true)
+                                    ->live(debounce: 500)
                                     ->afterStateUpdated(function (string $operation, ?string $state, Set $set, ?Role $record) {
                                         // Generate automatic slug if it's creation or not a protected role
                                         $isProtected = in_array($record?->name, UserRole::protectedRoles(), true);
@@ -140,10 +163,13 @@ class RoleResource extends Resource
                     ->default(fn (Role $record) => Str::headline($record->display_name))
                     ->searchable(),
                 TextColumn::make('name')
-                    // ->weight(FontWeight::Medium)
                     ->label(__('Identifier'))
                     ->badge()
-                    ->color(Color::Gray)
+                    ->color(function (string $state, Role $record): array {
+                        $color = $record->color ?: '#'.substr(hash('sha256', (string) $record->getKey()), 0, 6);
+
+                        return Color::hex($color);
+                    })
                     ->searchable(),
                 TextColumn::make('team.name')
                     ->default('Global')

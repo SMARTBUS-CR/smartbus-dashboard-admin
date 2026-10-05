@@ -128,11 +128,14 @@ class Company extends Model implements HasCurrentTenantLabel, HasName
         static::created(function (Company $company): void {
             Role::withoutEvents(function () use ($company): void {
                 foreach ([UserRole::Admin, UserRole::Driver] as $role) {
-                    Role::withoutGlobalScopes()->firstOrCreate([
-                        'company_id' => $company->getKey(),
-                        'name' => $role->value,
-                        'guard_name' => 'web',
-                    ]);
+                    Role::withoutGlobalScopes()->firstOrCreate(
+                        [
+                            'company_id' => $company->getKey(),
+                            'name' => $role->value,
+                            'guard_name' => 'web',
+                        ],
+                        ['color' => Role::generateColor()],
+                    );
                 }
             });
 
@@ -147,7 +150,7 @@ class Company extends Model implements HasCurrentTenantLabel, HasName
      */
     public function getCurrentTenantLabel(): string
     {
-        return trans_choice('Active', 1);
+        return __('Current Company');
     }
 
     /**

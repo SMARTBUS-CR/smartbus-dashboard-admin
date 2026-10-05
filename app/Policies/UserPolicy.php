@@ -115,7 +115,7 @@ class UserPolicy
 
         return $tenant instanceof Company
             && ! $tenant->trashed()
-            && $this->isAdminInCompany($target, $tenant);
+            && $this->isManageableMemberInCompany($target, $tenant);
     }
 
     private function isAdminInCompany(User $user, Company $company): bool
@@ -138,6 +138,33 @@ class UserPolicy
             ->where('roles.company_id', $company->getKey())
             ->where('roles.guard_name', 'web')
             ->where('roles.name', UserRole::Admin->value)
+            ->exists();
+    }
+
+    private function isManageableMemberInCompany(User $user, Company $company): bool
+    {
+        $hasMembership = CompanyUser::query()
+            ->where('company_id', $company->getKey())
+            ->where('user_id', $user->getKey())
+            ->exists();
+
+        if (! $hasMembership) {
+            return false;
+        }
+
+        return DB::connection('mysql')
+            ->table('model_has_roles as assignments')
+            ->join('roles', 'roles.id', '=', 'assignments.role_id')
+            ->where('assignments.model_uuid', $user->getKey())
+            ->where('assignments.model_type', $user->getMorphClass())
+            ->where('assignments.company_id', $company->getKey())
+            ->where('roles.company_id', $company->getKey())
+            ->where('roles.guard_name', 'web')
+            ->whereNotIn('roles.name', [
+                UserRole::Driver->value,
+                UserRole::Passenger->value,
+                UserRole::SuperAdmin->value,
+            ])
             ->exists();
     }
 }

@@ -1,17 +1,17 @@
 <?php
 
-namespace App\Filament\Resources\Users\Pages;
+namespace App\Filament\Resources\SuperAdmins\Pages;
 
-use App\Filament\Resources\Users\UserResource;
+use App\Filament\Resources\SuperAdmins\SuperAdminResource;
 use App\Services\UserManagementService;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 
-class CreateUser extends CreateRecord
+class CreateSuperAdmin extends CreateRecord
 {
-    protected static string $resource = UserResource::class;
+    protected static string $resource = SuperAdminResource::class;
 
     protected ?bool $hasDatabaseTransactions = false;
 
@@ -21,13 +21,12 @@ class CreateUser extends CreateRecord
     protected function handleRecordCreation(array $data): Model
     {
         try {
-            return app(UserManagementService::class)->createCompanyUser(
+            return app(UserManagementService::class)->createSuperAdmin(
                 Filament::auth()->user(),
                 $data,
             );
         } catch (ValidationException $exception) {
             $statePath = $this->form->getStatePath();
-
             $errors = [];
 
             foreach ($exception->errors() as $field => $messages) {

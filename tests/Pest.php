@@ -122,3 +122,20 @@ function actingAsInCompany(User $user, Company $company): void
     $user->unsetRelation('roles')->unsetRelation('permissions');
     Filament::bootCurrentPanel();
 }
+
+/**
+ * @param  list<string>  $names
+ * @return list<int>
+ */
+function companyRoleIds(Company $company, array $names = ['admin']): array
+{
+    return array_map(
+        fn (string $name): int => (int) Role::withoutGlobalScopes()
+            ->where('company_id', $company->getKey())
+            ->where('guard_name', 'web')
+            ->where('name', $name)
+            ->sole()
+            ->getKey(),
+        $names,
+    );
+}

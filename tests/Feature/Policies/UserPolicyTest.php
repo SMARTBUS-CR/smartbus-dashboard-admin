@@ -143,4 +143,31 @@ describe('User Policy', function (): void {
         'authorized local target' => [true, false, true],
         'foreign target with permission' => [true, true, false],
     ]);
+
+    test('allows an authorized company admin to manage a member with a custom role', function (string $ability, string $permission): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+        $target = createUserWithRole('dispatcher', $company);
+
+        foreach ([$actor, $target] as $user) {
+            CompanyUser::create([
+                'company_id' => $company->id,
+                'user_id' => $user->id,
+            ]);
+        }
+
+        actingAsInCompany($actor, $company);
+
+        expect(Gate::forUser($actor)->allows($ability, $target))
+            ->toBeFalse();
+
+        grantShield($actor, [$permission], $company);
+
+        expect(Gate::forUser($actor)->allows($ability, $target))
+            ->toBeTrue();
+    })->with([
+        'view' => ['view', 'View:User'],
+        'update' => ['update', 'Update:User'],
+        'remove access' => ['removeCompanyAccess', 'Delete:User'],
+    ]);
 });

@@ -99,4 +99,43 @@ describe('User Resource Tenant Scope', function (): void {
                 ->exists()
         )->toBeFalse();
     });
+
+    test('shows a member with a custom role from the selected company', function (): void {
+        $company = createCompany();
+        $user = createUserWithRole('dispatcher', $company);
+
+        CompanyUser::create([
+            'company_id' => $company->id,
+            'user_id' => $user->id,
+        ]);
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $company,
+        );
+
+        expect(UserResource::getEloquentQuery()->pluck('users.id')->all())
+            ->toBe([$user->id])
+            ->and(UserResource::getRecordRouteBindingEloquentQuery()
+                ->whereKey($user->id)->exists())->toBeTrue();
+    });
+
+    test('excludes a member whose custom role belongs to another company', function (): void {
+        [$company, $foreign] = createTenantPair();
+        $user = createUserWithRole('dispatcher', $foreign);
+
+        CompanyUser::create([
+            'company_id' => $company->id,
+            'user_id' => $user->id,
+        ]);
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $company,
+        );
+
+        expect(UserResource::getEloquentQuery()->exists())->toBeFalse()
+            ->and(UserResource::getRecordRouteBindingEloquentQuery()
+                ->whereKey($user->id)->exists())->toBeFalse();
+    });
 });

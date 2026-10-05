@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
-describe('Company Admin Creation', function (): void {
+describe('Company User Creation', function (): void {
     beforeEach(function (): void {
         $this->mock(UncompromisedVerifier::class)
             ->shouldReceive('verify')
@@ -26,14 +26,14 @@ describe('Company Admin Creation', function (): void {
 
         actingAsInCompany($actor, $company);
 
-        $user = app(UserManagementService::class)->createCompanyAdmin(
+        $user = app(UserManagementService::class)->createCompanyUser(
             $actor,
             [
                 'name' => 'New Administrator',
                 'email' => 'new-admin@example.test',
                 'password' => 'N7v!qL2#rX9@kP4',
                 'password_confirmation' => 'N7v!qL2#rX9@kP4',
-                'role' => 'admin',
+                'roles' => companyRoleIds($company),
             ],
         );
 
@@ -79,12 +79,12 @@ describe('Company Admin Creation', function (): void {
             'email' => 'new-admin@example.test',
             'password' => 'N7v!qL2#rX9@kP4',
             'password_confirmation' => 'N7v!qL2#rX9@kP4',
-            'role' => 'admin',
+            'roles' => companyRoleIds($company),
         ], $overrides);
 
         try {
             app(UserManagementService::class)
-                ->createCompanyAdmin($actor, $data);
+                ->createCompanyUser($actor, $data);
 
             $this->fail('Expected a validation exception.');
         } catch (ValidationException $exception) {
@@ -101,13 +101,15 @@ describe('Company Admin Creation', function (): void {
             ['password_confirmation' => 'different'],
             'password',
         ],
-        'super-admin assignment' => [['role' => 'super-admin'], 'role'],
         'forged company' => [['company_id' => 'another-company'], 'company_id'],
         'forged verification' => [
             ['email_verified_at' => '2026-10-03'],
             'email_verified_at',
         ],
-        'forged roles array' => [['roles' => ['super-admin']], 'roles'],
+        'legacy singular role' => [['role' => 'super-admin'], 'role'],
+        'invalid role identifier' => [['roles' => ['super-admin']], 'roles.0'],
+        'empty roles' => [['roles' => []], 'roles'],
+        'roles must be an array' => [['roles' => 'admin'], 'roles'],
     ]);
 
     test('rejects an email reserved by a soft deleted account', function (): void {
@@ -121,12 +123,12 @@ describe('Company Admin Creation', function (): void {
         actingAsInCompany($actor, $company);
 
         expect(fn () => app(UserManagementService::class)
-            ->createCompanyAdmin($actor, [
+            ->createCompanyUser($actor, [
                 'name' => 'New Administrator',
                 'email' => 'reserved@example.test',
                 'password' => 'N7v!qL2#rX9@kP4',
                 'password_confirmation' => 'N7v!qL2#rX9@kP4',
-                'role' => 'admin',
+                'roles' => companyRoleIds($company),
             ]))
             ->toThrow(ValidationException::class)
             ->and(User::withTrashed()
@@ -145,12 +147,12 @@ describe('Company Admin Creation', function (): void {
         actingAsInCompany($actor, $company);
 
         expect(fn () => app(UserManagementService::class)
-            ->createCompanyAdmin($actor, [
+            ->createCompanyUser($actor, [
                 'name' => 'New Administrator',
                 'email' => 'new-admin@example.test',
                 'password' => 'N7v!qL2#rX9@kP4',
                 'password_confirmation' => 'N7v!qL2#rX9@kP4',
-                'role' => 'admin',
+                'roles' => companyRoleIds($company),
             ]))
             ->toThrow(AuthorizationException::class)
             ->and(User::where('email', 'new-admin@example.test')->exists())->toBeFalse();
@@ -180,12 +182,12 @@ describe('Company Admin Creation', function (): void {
 
         try {
             expect(fn () => app(UserManagementService::class)
-                ->createCompanyAdmin($actor, [
+                ->createCompanyUser($actor, [
                     'name' => 'New Administrator',
                     'email' => 'new-admin@example.test',
                     'password' => 'N7v!qL2#rX9@kP4',
                     'password_confirmation' => 'N7v!qL2#rX9@kP4',
-                    'role' => 'admin',
+                    'roles' => companyRoleIds($company),
                 ]))
                 ->toThrow(RuntimeException::class, 'Simulated membership failure.');
         } finally {
@@ -210,14 +212,14 @@ describe('Company Admin Creation', function (): void {
         grantShield($actor, ['Create:User'], $company);
         actingAsInCompany($actor, $company);
 
-        $user = app(UserManagementService::class)->createCompanyAdmin(
+        $user = app(UserManagementService::class)->createCompanyUser(
             $actor,
             [
                 'name' => 'New Administrator',
                 'email' => 'authorized-admin@example.test',
                 'password' => 'N7v!qL2#rX9@kP4',
                 'password_confirmation' => 'N7v!qL2#rX9@kP4',
-                'role' => 'admin',
+                'roles' => companyRoleIds($company),
             ],
         );
 
@@ -244,14 +246,14 @@ describe('Company Admin Creation', function (): void {
         $userCount = User::count();
 
         try {
-            app(UserManagementService::class)->createCompanyAdmin(
+            app(UserManagementService::class)->createCompanyUser(
                 $actor,
                 [
                     'name' => 'New Administrator',
                     'email' => 'without-company@example.test',
                     'password' => 'N7v!qL2#rX9@kP4',
                     'password_confirmation' => 'N7v!qL2#rX9@kP4',
-                    'role' => 'admin',
+                    'roles' => [],
                 ],
             );
 
@@ -280,14 +282,14 @@ describe('Company Admin Creation', function (): void {
         $userCount = User::count();
 
         try {
-            app(UserManagementService::class)->createCompanyAdmin(
+            app(UserManagementService::class)->createCompanyUser(
                 $actor,
                 [
                     'name' => 'New Administrator',
                     'email' => 'compromised-password@example.test',
                     'password' => 'N7v!qL2#rX9@kP4',
                     'password_confirmation' => 'N7v!qL2#rX9@kP4',
-                    'role' => 'admin',
+                    'roles' => companyRoleIds($company),
                 ],
             );
 
@@ -302,7 +304,7 @@ describe('Company Admin Creation', function (): void {
     });
 });
 
-describe('Company Admin Update', function (): void {
+describe('Company User Update', function (): void {
     beforeEach(function (): void {
         $this->mock(UncompromisedVerifier::class)
             ->shouldReceive('verify')
@@ -343,13 +345,13 @@ describe('Company Admin Update', function (): void {
             ->get()
             ->toArray();
 
-        app(UserManagementService::class)->updateCompanyAdmin(
+        app(UserManagementService::class)->updateCompanyUser(
             $actor,
             $target,
             [
                 'name' => 'Updated Administrator',
                 'email' => 'updated-admin@example.test',
-                'role' => 'admin',
+                'roles' => companyRoleIds($company),
                 'password' => '',
                 'password_confirmation' => '',
             ],
@@ -393,13 +395,13 @@ describe('Company Admin Update', function (): void {
             ]);
         }
 
-        app(UserManagementService::class)->updateCompanyAdmin(
+        app(UserManagementService::class)->updateCompanyUser(
             $actor,
             $target,
             [
                 'name' => $target->name,
                 'email' => $target->email,
-                'role' => 'admin',
+                'roles' => companyRoleIds($company),
                 'password' => 'X9z!mK4#pQ7@vL2',
                 'password_confirmation' => 'X9z!mK4#pQ7@vL2',
             ],
@@ -437,10 +439,10 @@ describe('Company Admin Update', function (): void {
         $originalName = $target->name;
 
         expect(fn () => app(UserManagementService::class)
-            ->updateCompanyAdmin($actor, $target, [
+            ->updateCompanyUser($actor, $target, [
                 'name' => 'Unauthorized Change',
                 'email' => $target->email,
-                'role' => 'admin',
+                'roles' => companyRoleIds($foreign),
             ]))
             ->toThrow(AuthorizationException::class)
             ->and($target->fresh()->name)->toBe($originalName);
@@ -459,12 +461,17 @@ describe('Company Admin Update', function (): void {
         actingAsInCompany($actor, $company);
 
         $originalName = $target->name;
+        $superAdminRole = Role::withoutGlobalScopes()
+            ->whereNull('company_id')
+            ->where('guard_name', 'web')
+            ->where('name', UserRole::SuperAdmin->value)
+            ->sole();
 
         expect(fn () => app(UserManagementService::class)
-            ->updateCompanyAdmin($actor, $target, [
+            ->updateCompanyUser($actor, $target, [
                 'name' => 'Unauthorized Promotion',
                 'email' => $target->email,
-                'role' => 'super-admin',
+                'roles' => [$superAdminRole->id],
             ]))
             ->toThrow(ValidationException::class)
             ->and($target->fresh()->name)->toBe($originalName)

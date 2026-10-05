@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Filament\Resources\Users\Tables;
+namespace App\Filament\Resources\SuperAdmins\Tables;
 
+use App\Filament\Resources\SuperAdmins\SuperAdminResource;
 use App\Models\User;
 use App\Services\UserManagementService;
 use Filament\Actions\Action;
@@ -9,15 +10,13 @@ use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Text;
-use Filament\Support\Colors\Color;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
-class UsersTable
+class SuperAdminsTable
 {
     public static function configure(Table $table): Table
     {
@@ -32,40 +31,26 @@ class UsersTable
                     ->label(__('Email'))
                     ->searchable()
                     ->sortable(),
-
-                TextColumn::make('roles')
-                    ->label(__('Roles'))
-                    ->badge()
-                    ->getStateUsing(fn (User $record): array => $record->roles->modelKeys())
-                    ->formatStateUsing(fn (string $state, User $record): string => $record->roles->find($state)->display_name ?: $record->roles->find($state)->name
-                    )
-                    ->color(function (string $state, User $record): array {
-                        $role = $record->roles->find($state);
-                        $color = $role->color ?: '#'.substr(hash('sha256', (string) $role->getKey()), 0, 6);
-
-                        return Color::hex($color);
-                    })
-                    ->width('1%'),
             ])
             ->recordActions([
                 EditAction::make(),
-                Action::make('removeCompanyAccess')
-                    ->label(__('Remove Access'))
+                Action::make('deactivateSuperAdmin')
+                    ->label(__('Deactivate'))
                     ->icon(Heroicon::OutlinedUserMinus)
                     ->color('danger')
                     ->authorize(
-                        fn (User $record): bool => Gate::forUser(Filament::auth()->user())
-                            ->allows('removeCompanyAccess', $record)
+                        fn (User $record): bool => SuperAdminResource::canEdit($record)
                     )
                     ->requiresConfirmation()
-                    ->modalHeading(__('Remove Access to This Company'))
-                    ->modalSubmitActionLabel(__('Remove Access'))
+                    ->modalHeading(__('Deactivate System Admin'))
+                    ->modalSubmitActionLabel(__('Deactivate'))
                     ->modalDescription(__(
-                        'The user will lose access to this company. Their account and access to other companies will be preserved.'
+                        'This account will lose access to the system and its tokens will be revoked. Its data will be preserved.'
                     ))
                     ->schema([
                         Text::make(function (Text $component, Component $livewire): string {
                             $statePath = $component->getContainer()->getStatePath();
+
                             $errorKey = filled($statePath)
                                 ? "{$statePath}.access"
                                 : 'access';
@@ -77,18 +62,18 @@ class UsersTable
                     ->databaseTransaction(false)
                     ->action(function (User $record, Component $livewire): void {
                         try {
-                            app(UserManagementService::class)->removeCompanyAccess(
+                            app(UserManagementService::class)->deactivateSuperAdmin(
                                 Filament::auth()->user(),
                                 $record,
                             );
                         } catch (ValidationException $exception) {
                             $schemaName = $livewire->getMountedActionSchemaName();
+
                             $schema = $schemaName !== null
                                 ? $livewire->getSchema($schemaName)
                                 : null;
 
                             $statePath = $schema?->getStatePath();
-
                             $errors = [];
 
                             foreach ($exception->errors() as $field => $messages) {
@@ -103,7 +88,7 @@ class UsersTable
                         }
 
                         Notification::make()
-                            ->title(__('Access Removed'))
+                            ->title(__('System Admin Deactivated'))
                             ->success()
                             ->send();
                     }),

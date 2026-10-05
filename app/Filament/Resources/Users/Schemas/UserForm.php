@@ -3,6 +3,9 @@
 namespace App\Filament\Resources\Users\Schemas;
 
 use App\Enums\UserRole;
+use App\Models\Company;
+use App\Models\Role;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
@@ -27,14 +30,14 @@ class UserForm
                         ->required()
                         ->maxLength(100),
 
-                    Select::make('role')
-                        ->label(__('Role'))
-                        ->options([
-                            UserRole::Admin->value => UserRole::Admin->getLabel(),
-                        ])
-                        ->default(UserRole::Admin->value)
+                    Select::make('roles')
+                        ->label(__('Roles'))
+                        ->multiple()
+                        ->searchable()
+                        ->options(fn (): array => self::getRoleOptions())
+                        ->default([])
                         ->required()
-                        ->in([UserRole::Admin->value]),
+                        ->minItems(1),
                 ])
                 ->columns(2)
                 ->columnSpanFull(),
@@ -42,7 +45,7 @@ class UserForm
             Section::make(__('Access Credentials'))
                 ->schema([
                     TextInput::make('password')
-                        ->label('Contraseña')
+                        ->label(__('Password'))
                         ->password()
                         ->revealable()
                         ->required(fn (string $operation): bool => $operation === 'create')
@@ -50,7 +53,7 @@ class UserForm
                         ->autocomplete('new-password'),
 
                     TextInput::make('password_confirmation')
-                        ->label('Confirmar contraseña')
+                        ->label(__('Confirm Password'))
                         ->password()
                         ->revealable()
                         ->required(
@@ -61,5 +64,34 @@ class UserForm
                 ->columns(2)
                 ->columnSpanFull(),
         ]);
+    }
+
+    /**
+     * @return array<int|string, string>
+     */
+    private static function getRoleOptions(): array
+    {
+        $company = Filament::getTenant();
+
+        if (! $company instanceof Company || $company->trashed()) {
+            return [];
+        }
+
+        return Role::withoutGlobalScopes()
+            ->where('company_id', $company->getKey())
+            ->where('guard_name', 'web')
+            ->whereNotIn('name', [
+                UserRole::SuperAdmin->value,
+                UserRole::Driver->value,
+                UserRole::Passenger->value,
+            ])
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (Role $role): array => [
+                $role->getKey() => filled($role->display_name)
+                    ? $role->display_name
+                    : $role->name,
+            ])
+            ->all();
     }
 }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
     'label' => [
-        'super-admin' => 'Super Administrador',
+        'super-admin' => 'Administrador del sistema',
         'admin' => 'Administrador de la Empresa',
         'driver' => 'Conductor',
         'passenger' => 'Pasajero',

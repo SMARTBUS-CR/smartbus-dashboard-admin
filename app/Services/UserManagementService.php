@@ -25,7 +25,218 @@ class UserManagementService
     /**
      * @param  array<string, mixed>  $data
      */
-    public function createCompanyAdmin(User $actor, array $data): User
+    public function createSuperAdmin(User $actor, array $data): User
+    {
+        $persistedActor = User::query()->find($actor->getKey());
+
+        $isGlobalSuperAdmin = $persistedActor !== null
+            && DB::connection('mysql')
+                ->table('model_has_roles as assignments')
+                ->join('roles', 'roles.id', '=', 'assignments.role_id')
+                ->where('assignments.model_type', $persistedActor->getMorphClass())
+                ->where('assignments.model_uuid', $persistedActor->getKey())
+                ->whereNull('assignments.company_id')
+                ->whereNull('roles.company_id')
+                ->where('roles.guard_name', 'web')
+                ->where('roles.name', UserRole::SuperAdmin->value)
+                ->exists();
+
+        if (! $isGlobalSuperAdmin) {
+            throw new AuthorizationException(
+                __('Only a global system admin may create system admin accounts.')
+            );
+        }
+
+        $validated = Validator::make($data, [
+            'name' => ['required', 'string', 'max:100'],
+            'email' => [
+                'required',
+                'email',
+                'max:100',
+                Rule::unique('mysql.users', 'email'),
+            ],
+            'password' => [
+                'required',
+                'confirmed',
+                Password::min(8)
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols()
+                    ->uncompromised(),
+            ],
+            'company_id' => ['missing'],
+            'email_verified_at' => ['missing'],
+            'role' => ['missing'],
+            'roles' => ['missing'],
+            'guard_name' => ['missing'],
+            'id' => ['missing'],
+        ])->validate();
+
+        $previousTeam = getPermissionsTeamId();
+
+        try {
+            setPermissionsTeamId(null);
+
+            return DB::connection('mysql')->transaction(
+                function () use ($validated): User {
+                    $role = Role::withoutGlobalScopes()
+                        ->whereNull('company_id')
+                        ->where('guard_name', 'web')
+                        ->where('name', UserRole::SuperAdmin->value)
+                        ->lockForUpdate()
+                        ->sole();
+
+                    $user = new User([
+                        'name' => $validated['name'],
+                        'email' => $validated['email'],
+                        'password' => $validated['password'],
+                    ]);
+
+                    if (! $user->save()) {
+                        throw new RuntimeException(
+                            'Super-admin creation was cancelled.'
+                        );
+                    }
+
+                    if (! $user->markEmailAsVerified()) {
+                        throw new RuntimeException(
+                            'Email approval was cancelled.'
+                        );
+                    }
+
+                    $user->assignRole($role);
+
+                    return $user->unsetRelation('roles')
+                        ->unsetRelation('permissions');
+                }
+            );
+        } finally {
+            setPermissionsTeamId($previousTeam);
+
+            $actor->unsetRelation('roles')
+                ->unsetRelation('permissions');
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function updateSuperAdmin(
+        User $actor,
+        User $target,
+        array $data,
+    ): User {
+        $persistedActor = User::query()->find($actor->getKey());
+        $persistedTarget = User::query()->find($target->getKey());
+
+        if (
+            ! $persistedActor
+            || ! $this->hasGlobalSuperAdminRole($persistedActor)
+            || ! $persistedTarget
+            || ! $this->hasGlobalSuperAdminRole($persistedTarget)
+        ) {
+            throw new AuthorizationException(
+                __('Only global system admins may manage global system admin accounts.')
+            );
+        }
+
+        if (
+            array_key_exists('password', $data)
+            && ($data['password'] === null || $data['password'] === '')
+        ) {
+            unset($data['password'], $data['password_confirmation']);
+        }
+
+        $validated = Validator::make($data, [
+            'name' => ['required', 'string', 'max:100'],
+            'email' => [
+                'required',
+                'email',
+                'max:100',
+                Rule::unique('mysql.users', 'email')
+                    ->ignore(
+                        $persistedTarget->getKey(),
+                        $persistedTarget->getKeyName(),
+                    ),
+            ],
+            'password' => [
+                'sometimes',
+                'required',
+                'confirmed',
+                Password::min(8)
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols()
+                    ->uncompromised(),
+            ],
+            'company_id' => ['missing'],
+            'email_verified_at' => ['missing'],
+            'role' => ['missing'],
+            'roles' => ['missing'],
+            'guard_name' => ['missing'],
+            'id' => ['missing'],
+        ])->validate();
+
+        $previousTeam = getPermissionsTeamId();
+
+        try {
+            setPermissionsTeamId(null);
+
+            return DB::connection('mysql')->transaction(
+                function () use ($persistedTarget, $validated): User {
+                    $record = User::query()
+                        ->whereKey($persistedTarget->getKey())
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+                    if (! $this->hasGlobalSuperAdminRole($record)) {
+                        throw new AuthorizationException(
+                            __('The target must remain a global system admin.')
+                        );
+                    }
+
+                    $record->fill([
+                        'name' => $validated['name'],
+                        'email' => $validated['email'],
+                    ]);
+
+                    if ($record->isDirty('email')) {
+                        $record->email_verified_at = now();
+                    }
+
+                    if (array_key_exists('password', $validated)) {
+                        $record->password = $validated['password'];
+                    }
+
+                    if (! $record->save()) {
+                        throw new RuntimeException(
+                            'Super-admin update was cancelled.'
+                        );
+                    }
+
+                    if (array_key_exists('password', $validated)) {
+                        DB::connection('mysql')
+                            ->table('personal_access_tokens')
+                            ->where('tokenable_type', $record->getMorphClass())
+                            ->where('tokenable_id', $record->getKey())
+                            ->delete();
+                    }
+
+                    return $record;
+                }
+            );
+        } finally {
+            setPermissionsTeamId($previousTeam);
+
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+            $target->unsetRelation('roles')->unsetRelation('permissions');
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function createCompanyUser(User $actor, array $data): User
     {
         $company = Filament::getTenant();
 
@@ -59,28 +270,53 @@ class UserManagementService
                         ->symbols()
                         ->uncompromised(),
                 ],
-                'role' => [
-                    'required',
-                    Rule::in([UserRole::Admin->value]),
-                ],
                 'company_id' => ['missing'],
                 'email_verified_at' => ['missing'],
-                'roles' => ['missing'],
+                'role' => ['missing'],
+                'roles' => ['required', 'array', 'list', 'min:1'],
+                'roles.*' => [
+                    'bail',
+                    'required',
+                    'integer',
+                    'distinct',
+                    Rule::exists('mysql.roles', 'id')->where(
+                        fn ($query) => $query
+                            ->where('company_id', $company->getKey())
+                            ->where('guard_name', 'web')
+                            ->whereNotIn('name', [
+                                UserRole::Driver->value,
+                                UserRole::Passenger->value,
+                                UserRole::SuperAdmin->value,
+                            ])
+                    ),
+                ],
                 'guard_name' => ['missing'],
                 'id' => ['missing'],
             ])->validate();
-
-            $role = Role::withoutGlobalScopes()
-                ->where('company_id', $company->getKey())
-                ->where('name', UserRole::Admin->value)
-                ->where('guard_name', 'web')
-                ->sole();
 
             $userId = (string) str()->uuid();
 
             try {
                 return DB::connection('mysql')->transaction(
-                    function () use ($validated, $company, $role, $userId): User {
+                    function () use ($validated, $company, $userId): User {
+                        $roles = Role::withoutGlobalScopes()
+                            ->whereIn('id', $validated['roles'])
+                            ->where('company_id', $company->getKey())
+                            ->where('guard_name', 'web')
+                            ->whereNotIn('name', [
+                                UserRole::Driver->value,
+                                UserRole::Passenger->value,
+                                UserRole::SuperAdmin->value,
+                            ])
+                            ->lockForUpdate()
+                            ->get();
+
+                        if ($roles->count() !== count($validated['roles'])) {
+                            throw ValidationException::withMessages([
+                                'roles' => __('One or more selected roles are no longer available.'),
+                            ]);
+                        }
+
                         $user = new User([
                             'name' => $validated['name'],
                             'email' => $validated['email'],
@@ -97,7 +333,7 @@ class UserManagementService
                             throw new RuntimeException('Email approval was cancelled.');
                         }
 
-                        $user->assignRole($role);
+                        $user->assignRole(...$roles->all());
 
                         DB::connection('pgsql')->transaction(
                             function () use ($company, $user): void {
@@ -138,7 +374,7 @@ class UserManagementService
     /**
      * @param  array<string, mixed>  $data
      */
-    public function updateCompanyAdmin(
+    public function updateCompanyUser(
         User $actor,
         User $target,
         array $data,
@@ -153,7 +389,7 @@ class UserManagementService
 
         if ($target->isSuperAdmin()) {
             throw new AuthorizationException(
-                __('Super-admin accounts must be managed globally.')
+                __('System admin accounts must be managed globally.')
             );
         }
 
@@ -190,63 +426,220 @@ class UserManagementService
                         ->symbols()
                         ->uncompromised(),
                 ],
-                'role' => [
-                    'required',
-                    Rule::in([UserRole::Admin->value]),
-                ],
                 'company_id' => ['missing'],
                 'email_verified_at' => ['missing'],
-                'roles' => ['missing'],
+                'role' => ['missing'],
+                'roles' => ['required', 'array', 'list', 'min:1'],
+                'roles.*' => [
+                    'bail',
+                    'required',
+                    'integer',
+                    'distinct',
+                    Rule::exists('mysql.roles', 'id')->where(
+                        fn ($query) => $query
+                            ->where('company_id', $company->getKey())
+                            ->where('guard_name', 'web')
+                            ->whereNotIn('name', [
+                                UserRole::Driver->value,
+                                UserRole::Passenger->value,
+                                UserRole::SuperAdmin->value,
+                            ])
+                    ),
+                ],
                 'guard_name' => ['missing'],
                 'id' => ['missing'],
             ])->validate();
 
-            return DB::connection('mysql')->transaction(
-                function () use ($actor, $target, $validated): User {
-                    $record = User::withoutGlobalScopes()
-                        ->whereKey($target->getKey())
+            return DB::connection('pgsql')->transaction(
+                function () use ($company, $actor, $target, $validated): User {
+                    Company::query()
+                        ->whereKey($company->getKey())
                         ->lockForUpdate()
                         ->firstOrFail();
 
-                    if ($record->isSuperAdmin()) {
-                        throw new AuthorizationException(
-                            __('Super-admin accounts must be managed globally.')
-                        );
-                    }
+                    return DB::connection('mysql')->transaction(
+                        function () use ($company, $actor, $target, $validated): User {
+                            $record = User::query()
+                                ->whereKey($target->getKey())
+                                ->lockForUpdate()
+                                ->firstOrFail();
 
-                    Gate::forUser($actor)->authorize('update', $record);
+                            if ($record->isSuperAdmin()) {
+                                throw new AuthorizationException(
+                                    __('System admin accounts must be managed globally.')
+                                );
+                            }
 
-                    $record->fill([
-                        'name' => $validated['name'],
-                        'email' => $validated['email'],
-                    ]);
+                            Gate::forUser($actor)->authorize('update', $record);
 
-                    if ($record->isDirty('email')) {
-                        $record->email_verified_at = now();
-                    }
+                            $roles = Role::withoutGlobalScopes()
+                                ->whereIn('id', $validated['roles'])
+                                ->where('company_id', $company->getKey())
+                                ->where('guard_name', 'web')
+                                ->whereNotIn('name', [
+                                    UserRole::Driver->value,
+                                    UserRole::Passenger->value,
+                                    UserRole::SuperAdmin->value,
+                                ])
+                                ->lockForUpdate()
+                                ->get();
 
-                    if (array_key_exists('password', $validated)) {
-                        $record->password = $validated['password'];
-                    }
+                            if ($roles->count() !== count($validated['roles'])) {
+                                throw ValidationException::withMessages([
+                                    'roles' => __(
+                                        'One or more selected roles are no longer available.'
+                                    ),
+                                ]);
+                            }
 
-                    if (! $record->save()) {
-                        throw new RuntimeException('User update was cancelled.');
-                    }
+                            $wasAdmin = $record->roles()
+                                ->where('roles.company_id', $company->getKey())
+                                ->where('roles.guard_name', 'web')
+                                ->where('roles.name', UserRole::Admin->value)
+                                ->exists();
 
-                    if (array_key_exists('password', $validated)) {
-                        DB::connection('mysql')
-                            ->table('personal_access_tokens')
-                            ->where('tokenable_type', $record->getMorphClass())
-                            ->where('tokenable_id', $record->getKey())
-                            ->delete();
-                    }
+                            $willBeAdmin = $roles->contains(
+                                'name',
+                                UserRole::Admin->value,
+                            );
 
-                    return $record;
+                            if (
+                                $wasAdmin
+                                && ! $willBeAdmin
+                                && ! $this->hasOtherActiveCompanyAdmin($company, $record)
+                            ) {
+                                throw ValidationException::withMessages([
+                                    'roles' => __(
+                                        'The company must retain at least one active administrator with a verified email.'
+                                    ),
+                                ]);
+                            }
+
+                            $record->fill([
+                                'name' => $validated['name'],
+                                'email' => $validated['email'],
+                            ]);
+
+                            if ($record->isDirty('email')) {
+                                $record->email_verified_at = now();
+                            }
+
+                            if (array_key_exists('password', $validated)) {
+                                $record->password = $validated['password'];
+                            }
+
+                            if (! $record->save()) {
+                                throw new RuntimeException('User update was cancelled.');
+                            }
+
+                            $record->syncRoles(...$roles->all());
+
+                            if (array_key_exists('password', $validated)) {
+                                DB::connection('mysql')
+                                    ->table('personal_access_tokens')
+                                    ->where('tokenable_type', $record->getMorphClass())
+                                    ->where('tokenable_id', $record->getKey())
+                                    ->delete();
+                            }
+
+                            return $record;
+                        }
+                    );
                 }
             );
         } finally {
             setPermissionsTeamId($previousTeam);
             $actor->unsetRelation('roles')->unsetRelation('permissions');
+            $target->unsetRelation('roles')->unsetRelation('permissions');
+        }
+    }
+
+    public function deactivateSuperAdmin(User $actor, User $target): void
+    {
+        $previousTeam = getPermissionsTeamId();
+
+        try {
+            setPermissionsTeamId(null);
+
+            DB::connection('mysql')->transaction(
+                function () use ($actor, $target): void {
+                    $role = Role::withoutGlobalScopes()
+                        ->whereNull('company_id')
+                        ->where('guard_name', 'web')
+                        ->where('name', UserRole::SuperAdmin->value)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (! $role) {
+                        throw new AuthorizationException(
+                            __('A global system admin role is required.')
+                        );
+                    }
+
+                    $user = new User;
+
+                    $globalUserIds = DB::connection('mysql')
+                        ->table('model_has_roles')
+                        ->where('role_id', $role->getKey())
+                        ->where('model_type', $user->getMorphClass())
+                        ->whereNull('company_id')
+                        ->select('model_uuid');
+
+                    $administrators = User::query()
+                        ->whereIn('id', $globalUserIds)
+                        ->orderBy('id')
+                        ->lockForUpdate()
+                        ->get();
+
+                    $persistedActor = $administrators->firstWhere(
+                        'id',
+                        $actor->getKey(),
+                    );
+
+                    $persistedTarget = $administrators->firstWhere(
+                        'id',
+                        $target->getKey(),
+                    );
+
+                    if (! $persistedActor || ! $persistedTarget) {
+                        throw new AuthorizationException(
+                            __('Only active global system admins may manage global system admin accounts.')
+                        );
+                    }
+
+                    $hasAnotherVerifiedAdministrator = $administrators
+                        ->contains(
+                            fn (User $administrator): bool => $administrator->getKey() !== $persistedTarget->getKey()
+                                && $administrator->hasVerifiedEmail()
+                        );
+
+                    if (! $hasAnotherVerifiedAdministrator) {
+                        throw ValidationException::withMessages([
+                            'access' => __('The system must retain at least one active global system admin with a verified email.'),
+                        ]);
+                    }
+
+                    if (! $persistedTarget->delete()) {
+                        throw new RuntimeException(
+                            'Super-admin deactivation was cancelled.'
+                        );
+                    }
+
+                    DB::connection('mysql')
+                        ->table('personal_access_tokens')
+                        ->where(
+                            'tokenable_type',
+                            $persistedTarget->getMorphClass(),
+                        )
+                        ->where('tokenable_id', $persistedTarget->getKey())
+                        ->delete();
+                }
+            );
+        } finally {
+            setPermissionsTeamId($previousTeam);
+
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+            $target->unsetRelation('roles')->unsetRelation('permissions');
         }
     }
 
@@ -294,53 +687,10 @@ class UserManagementService
                                 ->lockForUpdate()
                                 ->firstOrFail();
 
-                            $memberIds = CompanyUser::query()
-                                ->where('company_id', $company->getKey())
-                                ->pluck('user_id');
-
-                            $adminIds = DB::connection('mysql')
-                                ->table('model_has_roles as assignments')
-                                ->join(
-                                    'roles',
-                                    'roles.id',
-                                    '=',
-                                    'assignments.role_id',
-                                )
-                                ->where(
-                                    'assignments.model_type',
-                                    $record->getMorphClass(),
-                                )
-                                ->where(
-                                    'assignments.company_id',
-                                    $company->getKey(),
-                                )
-                                ->where('roles.company_id', $company->getKey())
-                                ->where('roles.guard_name', 'web')
-                                ->where('roles.name', UserRole::Admin->value)
-                                ->select('assignments.model_uuid');
-
-                            $superAdminIds = DB::connection('mysql')
-                                ->table('model_has_roles as assignments')
-                                ->join(
-                                    'roles',
-                                    'roles.id',
-                                    '=',
-                                    'assignments.role_id',
-                                )
-                                ->where(
-                                    'assignments.model_type',
-                                    $record->getMorphClass(),
-                                )
-                                ->where('roles.name', UserRole::SuperAdmin->value)
-                                ->select('assignments.model_uuid');
-
-                            $hasRemainingAdmin = User::query()
-                                ->whereIn('users.id', $memberIds)
-                                ->whereIn('users.id', $adminIds)
-                                ->whereNotIn('users.id', $superAdminIds)
-                                ->where('users.id', '!=', $record->getKey())
-                                ->whereNotNull('users.email_verified_at')
-                                ->exists();
+                            $hasRemainingAdmin = $this->hasOtherActiveCompanyAdmin(
+                                $company,
+                                $record,
+                            );
 
                             if (! $hasRemainingAdmin) {
                                 throw ValidationException::withMessages([
@@ -474,5 +824,53 @@ class UserManagementService
                 );
             }
         );
+    }
+
+    private function hasOtherActiveCompanyAdmin(
+        Company $company,
+        User $record,
+    ): bool {
+        $memberIds = CompanyUser::query()
+            ->where('company_id', $company->getKey())
+            ->pluck('user_id');
+
+        $adminIds = DB::connection('mysql')
+            ->table('model_has_roles as assignments')
+            ->join('roles', 'roles.id', '=', 'assignments.role_id')
+            ->where('assignments.model_type', $record->getMorphClass())
+            ->where('assignments.company_id', $company->getKey())
+            ->where('roles.company_id', $company->getKey())
+            ->where('roles.guard_name', 'web')
+            ->where('roles.name', UserRole::Admin->value)
+            ->select('assignments.model_uuid');
+
+        $superAdminIds = DB::connection('mysql')
+            ->table('model_has_roles as assignments')
+            ->join('roles', 'roles.id', '=', 'assignments.role_id')
+            ->where('assignments.model_type', $record->getMorphClass())
+            ->where('roles.name', UserRole::SuperAdmin->value)
+            ->select('assignments.model_uuid');
+
+        return User::query()
+            ->whereIn('users.id', $memberIds)
+            ->whereIn('users.id', $adminIds)
+            ->whereNotIn('users.id', $superAdminIds)
+            ->where('users.id', '!=', $record->getKey())
+            ->whereNotNull('users.email_verified_at')
+            ->exists();
+    }
+
+    private function hasGlobalSuperAdminRole(User $user): bool
+    {
+        return DB::connection('mysql')
+            ->table('model_has_roles as assignments')
+            ->join('roles', 'roles.id', '=', 'assignments.role_id')
+            ->where('assignments.model_type', $user->getMorphClass())
+            ->where('assignments.model_uuid', $user->getKey())
+            ->whereNull('assignments.company_id')
+            ->whereNull('roles.company_id')
+            ->where('roles.guard_name', 'web')
+            ->where('roles.name', UserRole::SuperAdmin->value)
+            ->exists();
     }
 }

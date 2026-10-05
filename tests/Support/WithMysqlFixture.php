@@ -40,6 +40,7 @@ trait WithMysqlFixture
             $table->uuid('company_id')->nullable()->index();
             $table->string('name');
             $table->string('display_name')->nullable();
+            $table->string('color', 7)->nullable()->unique();
             $table->string('guard_name');
             $table->timestamps();
             $table->unique(['company_id', 'name', 'guard_name'], 'roles_company_id_name_guard_name_unique');

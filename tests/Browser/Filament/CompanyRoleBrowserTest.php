@@ -4,6 +4,8 @@ use App\Enums\UserRole;
 use App\Filament\Resources\Companies\CompanyResource;
 use App\Filament\Resources\Roles\RoleResource;
 use App\Models\Role;
+use Pest\Browser\Support\Selector;
+use Tests\Support\BrowserSession;
 
 describe('Company And Role Browser Flows', function (): void {
     beforeEach(function () {
@@ -11,35 +13,28 @@ describe('Company And Role Browser Flows', function (): void {
         app()->setLocale('en');
     });
 
-    test('generates the role identifier on blur and saves the selected permission in the browser', function () {
+    test('updates the role identifier on blur and submits the selected permission', function () {
         $company = createCompany();
-        $this->actingAs(createUserWithRole(UserRole::SuperAdmin));
+        BrowserSession::start(createUserWithRole(UserRole::SuperAdmin));
 
         visit(parse_url(RoleResource::getUrl('create', tenant: $company), PHP_URL_PATH))
-            ->wait(1)
+            ->assertVisible('input[id="form.display_name"]')
             ->type('input[id="form.display_name"]', 'Traffic Dispatcher')
             ->keys('input[id="form.display_name"]', ['Tab'])
-            // Wait for the Livewire component to update the 'System Identifier' field
             ->assertValue('input[id="form.name"]', 'traffic-dispatcher')
-
-            // Mark the checkbox using the exact selector from Filament Shield
             ->check('input[value="View:Role"]')
-            ->wait(1) // Wait for the checkbox state to be registered
-
-            // Click the submit button to create the role
-            ->click('.fi-ac button[type="submit"]')
-
-            // Wait for the notification to appear and assert its text
-            ->waitForText('Created')
+            ->assertChecked('input[value="View:Role"]')
+            ->click(Selector::getByRoleSelector('button', ['name' => 'Create', 'exact' => true]))
+            ->assertSee('Created')
             ->assertNoJavaScriptErrors();
 
-        // Change to a normal query since the role saved in the DB by Shield often uses snake_case or the exact string of the Name
         $role = Role::withoutGlobalScopes()
             ->where('company_id', $company->id)
             ->where('name', 'traffic-dispatcher')
             ->firstOrFail();
 
         expect($role->permissions()->pluck('name')->all())->toContain('View:Role');
+        BrowserSession::assertTokenWasValidated();
     });
 
     test('switches company through the tenant menu and shows only its roles', function () {
@@ -49,48 +44,48 @@ describe('Company And Role Browser Flows', function (): void {
         Role::create(['name' => 'northern-dispatcher', 'display_name' => 'Northern Dispatcher', 'guard_name' => 'web', 'company_id' => $companyA->id]);
         Role::create(['name' => 'southern-dispatcher', 'display_name' => 'Southern Dispatcher', 'guard_name' => 'web', 'company_id' => $companyB->id]);
 
-        $this->actingAs(createUserWithRole(UserRole::SuperAdmin));
+        BrowserSession::start(createUserWithRole(UserRole::SuperAdmin));
 
-        // Visit the Roles page for Company A and assert that only its role is visible
-        visit(parse_url(RoleResource::getUrl('index', tenant: $companyA), PHP_URL_PATH))
+        $page = visit(parse_url(RoleResource::getUrl('index', tenant: $companyA), PHP_URL_PATH))
             ->assertSee('Northern Dispatcher')
             ->assertDontSee('Southern Dispatcher')
 
-            // Open the tenant menu and wait for the company name to appear
             ->click('.fi-tenant-menu-trigger')
-            ->waitForText('Southern Transport')
-
-            // Force the click by specifically targeting the link that redirects to Company B's slug
-            ->click("a[href*='/{$companyB->slug}']")
-
-            ->wait(2) // Waits for asynchronous Livewire updates to complete
+            ->assertSee('Southern Transport')
+            ->click('Southern Transport')
             ->assertPathIs("/admin/{$companyB->slug}")
             ->assertNoJavaScriptErrors();
+        BrowserSession::assertTokenWasValidated();
 
-        // Visit the Roles page for Company B and assert that only its role is visible
-        visit(parse_url(RoleResource::getUrl('index', tenant: $companyB), PHP_URL_PATH))
-            ->waitForText('Southern Dispatcher')
+        $rolesPath = parse_url(RoleResource::getUrl('index', tenant: $companyB), PHP_URL_PATH);
 
+        $page->click('a[href$="'.$rolesPath.'"]')
             ->assertSee('Southern Dispatcher')
             ->assertDontSee('Northern Dispatcher')
             ->assertNoJavaScriptErrors();
     });
 
-    test('requires confirmation before deleting a company through its modal', function () {
+    test('cancels company deletion and deletes only after confirming the modal', function () {
         $tenant = createCompany();
         $company = createCompany(['legal_name' => 'Company To Delete']);
-        $this->actingAs(createUserWithRole(UserRole::SuperAdmin));
+        BrowserSession::start(createUserWithRole(UserRole::SuperAdmin));
 
         $page = visit(parse_url(CompanyResource::getUrl('edit', ['record' => $company], tenant: $tenant), PHP_URL_PATH))
             ->click('Delete')->assertSee('Are you sure');
 
         $this->assertNotSoftDeleted($company);
 
-        $page->click('.fi-modal-footer .fi-color-danger')
+        $page->click('[aria-modal="true"] button:has-text("Cancel")');
+
+        $this->assertNotSoftDeleted($company);
+
+        $page->click('Delete')->assertSee('Are you sure')
+            ->click('[aria-modal="true"] button:has-text("Delete")')
             ->assertSee('Deleted')->assertNoJavaScriptErrors();
 
         $this->assertSoftDeleted($company);
         $this->assertNotSoftDeleted($tenant);
+        BrowserSession::assertTokenWasValidated();
     });
 
 });

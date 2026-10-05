@@ -64,8 +64,13 @@ class AdminPanelProvider extends PanelProvider
             ->plugins([
                 FilamentShieldPlugin::make()
                     ->scopeToTenant(true)
+                    ->localizePermissionLabels()
                     ->tenantRelationshipName('roles')
-                    ->tenantOwnershipRelationshipName('company'),
+                    ->tenantOwnershipRelationshipName('company')
+                    ->globallySearchable(true)
+                    ->globalSearchResultsLimit(50)
+                    ->forceGlobalSearchCaseInsensitive(true)
+                    ->splitGlobalSearchTerms(false),
             ])
             ->tenantMiddleware([SyncSpatieTeam::class], isPersistent: true)
             ->tenant(model: Company::class, slugAttribute: 'slug')

@@ -4,6 +4,7 @@ use App\Enums\UserRole;
 use App\Filament\Resources\Users\Pages\EditUser;
 use App\Models\Company;
 use App\Models\CompanyUser;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Contracts\Validation\UncompromisedVerifier;
 use Illuminate\Support\Facades\Hash;
@@ -28,7 +29,7 @@ function createManagedAdmin(Company $company, array $attributes = []): User
     return $admin;
 }
 
-describe('Company Admin Resource Update', function (): void {
+describe('Company User Resource Update', function (): void {
     beforeEach(function (): void {
         $this->mock(UncompromisedVerifier::class)
             ->shouldReceive('verify')
@@ -44,13 +45,22 @@ describe('Company Admin Resource Update', function (): void {
             'email' => 'original@example.com',
         ]);
 
+        $dispatcher = Role::create([
+            'name' => 'dispatcher',
+            'display_name' => 'Dispatcher',
+            'guard_name' => 'web',
+            'company_id' => $company->id,
+        ]);
+
+        $target->assignRole($dispatcher);
+
         Livewire::test(EditUser::class, [
             'record' => $target->getRouteKey(),
         ])
             ->assertSchemaStateSet([
                 'name' => 'Administrador Original',
                 'email' => 'original@example.com',
-                'role' => UserRole::Admin->value,
+                'roles' => companyRoleIds($company, ['admin', 'dispatcher']),
                 'password' => null,
                 'password_confirmation' => null,
             ]);
@@ -69,7 +79,7 @@ describe('Company Admin Resource Update', function (): void {
             ->fillForm([
                 'name' => 'Administrador Actualizado',
                 'email' => 'actualizado@example.com',
-                'role' => UserRole::Admin->value,
+                'roles' => companyRoleIds($company),
                 'password' => '',
                 'password_confirmation' => '',
             ])
@@ -98,7 +108,7 @@ describe('Company Admin Resource Update', function (): void {
             ->fillForm([
                 'name' => $target->name,
                 'email' => $target->email,
-                'role' => UserRole::Admin->value,
+                'roles' => companyRoleIds($company),
                 'password' => 'N7v!qL2#rX9@kP4',
                 'password_confirmation' => 'N7v!qL2#rX9@kP4',
             ])
@@ -130,7 +140,7 @@ describe('Company Admin Resource Update', function (): void {
             ->fillForm([
                 'name' => $target->name,
                 'email' => 'reserved@example.test',
-                'role' => UserRole::Admin->value,
+                'roles' => companyRoleIds($company),
                 'password' => '',
                 'password_confirmation' => '',
             ])
@@ -159,7 +169,7 @@ describe('Company Admin Resource Update', function (): void {
             ->fillForm([
                 'name' => 'Nombre Rechazado',
                 'email' => 'rechazado@example.test',
-                'role' => UserRole::Admin->value,
+                'roles' => companyRoleIds($company),
                 'password' => 'N7v!qL2#rX9@kP4',
                 'password_confirmation' => 'X9z!mK4#pQ7@vL2',
             ])
@@ -193,7 +203,7 @@ describe('Company Admin Resource Update', function (): void {
             ->fillForm([
                 'name' => 'Nombre Rechazado',
                 'email' => 'rechazado@example.test',
-                'role' => UserRole::Admin->value,
+                'roles' => companyRoleIds($company),
                 'password' => 'N7v!qL2#rX9@kP4',
                 'password_confirmation' => 'N7v!qL2#rX9@kP4',
             ])
