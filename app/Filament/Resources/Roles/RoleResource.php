@@ -98,6 +98,10 @@ class RoleResource extends Resource
                                     ->label(__('Name'))
                                     ->placeholder(__('i.e.: Administrator, Dispatcher, Supervisor'))
                                     ->helperText(__('Name of the role that will be displayed in the application'))
+                                    ->formatStateUsing(function (string $state, Role $record): string {
+                                        $roleEnum = UserRole::tryFrom($record->name);
+                                        return $roleEnum?->getLabel() ?? $record->display_name ?: $record->name ?: '';
+                                    })
                                     ->required()
                                     ->maxLength(255)
                                     ->live(debounce: 500)
@@ -161,6 +165,10 @@ class RoleResource extends Resource
                     ->label(__('Name'))
                     ->weight(FontWeight::Medium)
                     ->default(fn (Role $record) => Str::headline($record->display_name))
+                    ->formatStateUsing(function (string $state, Role $record): string {
+                        $roleEnum = UserRole::tryFrom($record->name);
+                        return $roleEnum?->getLabel() ?? $record->display_name ?: $record->name ?: '';
+                    })
                     ->searchable(),
                 TextColumn::make('name')
                     ->label(__('Identifier'))
@@ -253,7 +261,7 @@ class RoleResource extends Resource
         return [
             'index' => ListRoles::route('/'),
             'create' => CreateRole::route('/create'),
-            'view' => ViewRole::route('/{record}'),
+            // 'view' => ViewRole::route('/{record}'),
             'edit' => EditRole::route('/{record}/edit'),
         ];
     }

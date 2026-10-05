@@ -89,7 +89,8 @@ class UserForm
             ->get()
             ->mapWithKeys(fn (Role $role): array => [
                 $role->getKey() => filled($role->display_name)
-                    ? $role->display_name
+                    ? UserRole::tryFrom($role->name)?->getLabel() 
+                    ?: $role->display_name 
                     : $role->name,
             ])
             ->all();

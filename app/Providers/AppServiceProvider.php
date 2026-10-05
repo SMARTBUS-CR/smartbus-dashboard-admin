@@ -9,6 +9,8 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\AuthService;
+use BezhanSalleh\LanguageSwitch\Enums\TriggerStyle;
+use BezhanSalleh\LanguageSwitch\LanguageSwitch;
 use Filament\Tables\Table;
 use GuzzleHttp\Middleware;
 use Illuminate\Http\Client\Factory as HttpFactory;
@@ -92,5 +94,16 @@ class AppServiceProvider extends ServiceProvider
             ->defaultDateTimeDisplayFormat('d M, Y - h:i A')
         );
 
+        // Configure LanguageSwitch package for language switching functionality
+        LanguageSwitch::configureUsing(function (LanguageSwitch $switch) {
+            $switch
+                ->locales(['es', 'en'])
+                ->flags([
+                    'es' => 'https://flagcdn.com/es.svg',
+                    'en' => 'https://flagcdn.com/us.svg',
+                ])
+                ->trigger(style: TriggerStyle::Flag)
+                ->nativeLabel();
+        });
     }
 }

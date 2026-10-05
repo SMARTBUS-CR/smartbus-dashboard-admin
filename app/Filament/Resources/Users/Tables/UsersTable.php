@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Users\Tables;
 
+use App\Enums\UserRole;
 use App\Models\User;
 use App\Services\UserManagementService;
 use Filament\Actions\Action;
@@ -37,8 +38,11 @@ class UsersTable
                     ->label(__('Roles'))
                     ->badge()
                     ->getStateUsing(fn (User $record): array => $record->roles->modelKeys())
-                    ->formatStateUsing(fn (string $state, User $record): string => $record->roles->find($state)->display_name ?: $record->roles->find($state)->name
-                    )
+                    ->formatStateUsing(function (string $state, User $record): string {
+                        $role = $record->roles->find($state);
+                        $roleEnum = UserRole::tryFrom($role?->name);
+                        return $roleEnum?->getLabel() ?? $role?->display_name ?: $role?->name ?: '';
+                    })
                     ->color(function (string $state, User $record): array {
                         $role = $record->roles->find($state);
                         $color = $role->color ?: '#'.substr(hash('sha256', (string) $role->getKey()), 0, 6);
