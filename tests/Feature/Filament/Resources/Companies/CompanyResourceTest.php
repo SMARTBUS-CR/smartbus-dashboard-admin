@@ -124,7 +124,7 @@ describe('Company Resource', function (): void {
         $this->assertDatabaseHas(Company::class, $data);
     });
 
-    test('soft deletes restores and permanently deletes through the edit page', function () {
+    test('soft deletes and restores without exposing permanent deletion', function () {
         $tenant = createCompany();
         $company = createCompany();
         actingAsInCompany(createUserWithRole(UserRole::SuperAdmin), $tenant);
@@ -134,8 +134,8 @@ describe('Company Resource', function (): void {
         Livewire::test(EditCompany::class, ['record' => $company->id])->callAction('restore');
         $this->assertNotSoftDeleted($company);
         Livewire::test(EditCompany::class, ['record' => $company->id])->callAction('delete');
-        Livewire::test(EditCompany::class, ['record' => $company->id])->callAction('forceDelete');
-        $this->assertModelMissing($company);
+        Livewire::test(EditCompany::class, ['record' => $company->id])->assertActionDoesNotExist('forceDelete');
+        $this->assertSoftDeleted($company);
         $this->assertModelExists($tenant);
     });
 
@@ -155,10 +155,9 @@ describe('Company Resource', function (): void {
             $this->assertNotSoftDeleted($company);
             $company->delete();
         }
-        Livewire::test(ListCompanies::class)->filterTable('trashed', false)->selectTableRecords($selected->modelKeys())
-            ->callAction(TestAction::make('forceDelete')->table()->bulk());
+        Livewire::test(ListCompanies::class)->assertActionDoesNotExist(TestAction::make('forceDelete')->table()->bulk());
         foreach ($selected as $company) {
-            $this->assertModelMissing($company);
+            $this->assertSoftDeleted($company);
         }
         $this->assertNotSoftDeleted($tenant);
     });

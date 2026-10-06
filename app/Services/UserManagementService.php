@@ -7,10 +7,12 @@ namespace App\Services;
 use App\Enums\UserRole;
 use App\Models\Company;
 use App\Models\CompanyUser;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
@@ -298,7 +300,7 @@ class UserManagementService
 
             try {
                 return DB::connection('mysql')->transaction(
-                    function () use ($validated, $company, $userId): User {
+                    function () use ($validated, $company, $userId, $actor): User {
                         $roles = Role::withoutGlobalScopes()
                             ->whereIn('id', $validated['roles'])
                             ->where('company_id', $company->getKey())
@@ -316,6 +318,8 @@ class UserManagementService
                                 'roles' => __('One or more selected roles are no longer available.'),
                             ]);
                         }
+
+                        $this->authorizeCompanyRoleAssignment($actor, $roles);
 
                         $user = new User([
                             'name' => $validated['name'],
@@ -491,6 +495,8 @@ class UserManagementService
                                     ),
                                 ]);
                             }
+
+                            $this->authorizeCompanyRoleAssignment($actor, $roles);
 
                             $wasAdmin = $record->roles()
                                 ->where('roles.company_id', $company->getKey())
@@ -872,5 +878,24 @@ class UserManagementService
             ->where('roles.guard_name', 'web')
             ->where('roles.name', UserRole::SuperAdmin->value)
             ->exists();
+    }
+
+    public function canAssignCompanyRole(User $actor, Role $role): bool
+    {
+        if ($actor->isSuperAdmin() || $actor->roles()->where('roles.company_id', $role->company_id)
+            ->where('roles.guard_name', 'web')->where('roles.name', UserRole::Admin->value)->exists()) {
+            return true;
+        }
+
+        return $role->name !== UserRole::Admin->value
+            && $role->permissions->every(fn (Permission $permission): bool => $actor->can($permission->name));
+    }
+
+    /** @param Collection<int, Role> $roles */
+    private function authorizeCompanyRoleAssignment(User $actor, Collection $roles): void
+    {
+        if (! $roles->every(fn (Role $role): bool => $this->canAssignCompanyRole($actor, $role))) {
+            throw new AuthorizationException(__('You cannot assign administrator access or permissions you do not hold.'));
+        }
     }
 }

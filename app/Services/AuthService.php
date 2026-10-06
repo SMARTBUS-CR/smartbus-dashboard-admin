@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\TokenValidationStatus;
+use App\Exceptions\AuthenticationServiceException;
 use App\Traits\ApiLogger;
 use App\Traits\HasHttpRequests;
 use Illuminate\Http\Client\ConnectionException;
@@ -44,23 +45,29 @@ class AuthService
             );
 
             if (! $response->successful()) {
-                throw new RuntimeException(
-                    message: 'Authentication request failed: '.$response->body(),
-                    code: $response->status(),
-                );
+                if (in_array($response->status(), [401, 422], true)) {
+                    return null;
+                }
+
+                $message = match (true) {
+                    $response->status() === 403 && $response->json('errors.0.code') === 'email_not_verified' => 'Verify your email address before signing in.',
+                    $response->status() === 403 => 'Access was denied by the authentication service.',
+                    default => 'The authentication service is unavailable. Please try again shortly.',
+                };
+
+                throw new AuthenticationServiceException($message);
             }
 
             $json = $response->json() ?? [];
             $token = $json['meta']['access_token'] ?? null;
             $userData = $json['data'] ?? null;
 
-            if (! $token || ! $userData) {
+            if (! is_string($token) || trim($token) === '' || ! is_array($userData) || empty($userData['id'])) {
                 $this->log('error', 'Authentication response missing token or user data', [
-                    'response' => $json,
                     'email' => $email,
                 ]);
 
-                return null;
+                throw new AuthenticationServiceException;
             }
 
             return [
@@ -75,14 +82,17 @@ class AuthService
                     'permissions' => $this->extractPermissions($json),
                 ],
             ];
+        } catch (AuthenticationServiceException $e) {
+            $this->log('error', 'Authentication service rejected the request', ['email' => $email]);
+            throw $e;
         } catch (Throwable $e) {
             $this->log('error', 'Authentication request failed', [
-                'exception' => $e->getMessage(),
+                'exception_type' => $e::class,
                 'status' => $e instanceof RuntimeException ? $e->getCode() : null,
                 'email' => $email,
             ]);
 
-            return null;
+            throw new AuthenticationServiceException;
         }
     }
 
@@ -104,7 +114,7 @@ class AuthService
 
             if (! $response->successful()) {
                 throw new RuntimeException(
-                    message: 'User info request failed: '.$response->body(),
+                    message: 'User info request failed: '.$response->status(),
                     code: $response->status(),
                 );
             }
@@ -114,8 +124,7 @@ class AuthService
 
             if (! $userData) {
                 $this->log('error', 'User info response missing user data', [
-                    'response' => $json,
-                    'token' => $token,
+                    'response_type' => get_debug_type($json),
                 ]);
 
                 return null;
@@ -130,9 +139,8 @@ class AuthService
             ];
         } catch (Throwable $e) {
             $this->log('error', 'User info request failed', [
-                'exception' => $e->getMessage(),
+                'exception_type' => $e::class,
                 'status' => $e instanceof RuntimeException ? $e->getCode() : null,
-                'token' => $token,
             ]);
 
             return null;
@@ -156,7 +164,7 @@ class AuthService
 
             if (! $response->successful()) {
                 throw new RuntimeException(
-                    message: 'Logout request failed: '.$response->body(),
+                    message: 'Logout request failed: '.$response->status(),
                     code: $response->status(),
                 );
             }
@@ -164,9 +172,8 @@ class AuthService
             return true;
         } catch (Throwable $e) {
             $this->log('error', 'Logout request failed', [
-                'exception' => $e->getMessage(),
+                'exception_type' => $e::class,
                 'status' => $e instanceof RuntimeException ? $e->getCode() : null,
-                'token' => $token,
             ]);
 
             return false;
@@ -191,7 +198,6 @@ class AuthService
             $this->log('debug', 'Password reset request sent', [
                 'email' => $email,
                 'status' => $response->status(),
-                'response' => $response->json() ?? $response->body(),
             ]);
 
             $payload = $response->json() ?? [];
@@ -211,7 +217,7 @@ class AuthService
             ];
         } catch (Throwable $e) {
             $this->log('error', 'Password reset request failed', [
-                'exception' => $e->getMessage(),
+                'exception_type' => $e::class,
                 'email' => $email,
             ]);
 
@@ -248,7 +254,6 @@ class AuthService
             $this->log('debug', 'Password reset request sent', [
                 'email' => $email,
                 'status' => $response->status(),
-                'response' => $response->json() ?? $response->body(),
             ]);
 
             $payload = $response->json() ?? [];
@@ -268,7 +273,7 @@ class AuthService
             ];
         } catch (Throwable $e) {
             $this->log('error', 'Password reset request failed', [
-                'exception' => $e->getMessage(),
+                'exception_type' => $e::class,
                 'email' => $email,
             ]);
 
@@ -284,35 +289,8 @@ class AuthService
      * Validate an existing access token with API Gateway /auth/token/validate.
      *
      * @param  string  $token  The access token to validate
-     * @return bool True if the token is valid, false otherwise
+     * @return TokenValidationStatus The classified validation outcome
      */
-    // public function validateToken(string $token): bool
-    // {
-    //     try {
-    //         $response = $this->sendHttpRequest(
-    //             method: 'POST',
-    //             endpoint: '/auth/token/validate',
-    //             token: $token
-    //         );
-
-    //         if (! $response->successful()) {
-    //             throw new RuntimeException(
-    //                 message: 'Token validation request failed: '.$response->body(),
-    //                 code: $response->status(),
-    //             );
-    //         }
-
-    //         return $response->json('meta.valid') === true;
-    //     } catch (Throwable $e) {
-    //         $this->log('error', 'Token validation failed', [
-    //             'exception' => $e->getMessage(),
-    //             'token' => $token,
-    //         ]);
-
-    //         return false;
-    //     }
-    // }
-
     public function validateToken(string $token): TokenValidationStatus
     {
         if (trim($token) === '') {
@@ -327,7 +305,7 @@ class AuthService
             );
         } catch (ConnectionException $ce) {
             $this->log('warning', 'Token validation service is unreachable.', [
-                'exception' => $ce->getMessage(),
+                'exception_type' => $ce::class,
             ]);
 
             return TokenValidationStatus::Unavailable;
@@ -353,7 +331,6 @@ class AuthService
 
         $this->log('warning', 'Unexpected token validation response.', [
             'status' => $response->status(),
-            'body' => $response->json() ?? $response->body(),
         ]);
 
         return TokenValidationStatus::Unavailable;

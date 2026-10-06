@@ -322,6 +322,12 @@
     "System admins can manage all companies and are not assigned to any company.": "Los administradores del sistema pueden gestionar todas las compañías y no están asociados a ninguna.",
     "The phone number may belong to a different country than the company.": "El número de teléfono puede pertenecer a un país distinto al de la compañía.",
     "Used to interpret and display company dates and times.": "Se utiliza para interpretar y mostrar las fechas y horas de la compañía.",
+    "Permanent company deletion is disabled. Archive the company instead.": "La eliminación definitiva de compañías está deshabilitada. Archiva la compañía en su lugar.",
+    "You cannot assign administrator access or permissions you do not hold.": "No puedes asignar acceso de administrador ni permisos que no posees.",
+    "Verify your email address before signing in.": "Verifica tu dirección de correo electrónico antes de iniciar sesión.",
+    "Your account has been deactivated. Contact a system admin for assistance.": "Tu cuenta ha sido desactivada. Contacta a un administrador del sistema para recibir ayuda.",
+    "Sign In Failed": "No se pudo iniciar sesión",
+    "The authentication service is unavailable. Please try again shortly.": "El servicio de autenticación no está disponible. Inténtalo de nuevo en unos momentos.",
     "Company Permissions": "Permisos de la compañía",
     "Selected permissions determine which actions users with this role can perform in the current company.": "Los permisos seleccionados determinan qué acciones pueden realizar los usuarios con este rol en la compañía actual."
 }

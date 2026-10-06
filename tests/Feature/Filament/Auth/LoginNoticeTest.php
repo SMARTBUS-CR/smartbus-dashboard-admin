@@ -31,6 +31,10 @@ describe('Login Session Notices', function (): void {
             'token_missing',
             'Your session could not be verified. Please sign in again.',
         ],
+        'deactivated account' => [
+            'account_deactivated',
+            'Your account has been deactivated. Contact a system admin for assistance.',
+        ],
         'unknown reason' => [
             'unexpected_reason',
             'Your session ended unexpectedly. Please sign in again.',

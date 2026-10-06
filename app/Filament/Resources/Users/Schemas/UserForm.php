@@ -6,6 +6,7 @@ use App\Enums\LucideIcon;
 use App\Enums\UserRole;
 use App\Models\Company;
 use App\Models\Role;
+use App\Services\UserManagementService;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -116,6 +117,7 @@ class UserForm
             ])
             ->orderBy('name')
             ->get()
+            ->filter(fn (Role $role): bool => app(UserManagementService::class)->canAssignCompanyRole(Filament::auth()->user(), $role))
             ->mapWithKeys(fn (Role $role): array => [
                 $role->getKey() => filled($role->display_name)
                     ? UserRole::tryFrom($role->name)?->getLabel()

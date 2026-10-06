@@ -2,11 +2,32 @@
 
 use App\Enums\UserRole;
 use App\Models\CompanyUser;
+use App\Models\Permission;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Gate;
 
 describe('User Policy', function (): void {
+    test('limits delegated managers to accounts without higher privileges', function (string $targetRole, bool $directPermission, bool $allowed): void {
+        $company = createCompany();
+        $actor = createUserWithRole('user-manager', $company);
+        $target = createUserWithRole($targetRole, $company);
+        foreach ([$actor, $target] as $user) {
+            CompanyUser::create(['company_id' => $company->id, 'user_id' => $user->id]);
+        }
+        grantShield($actor, ['Update:User'], $company);
+        actingAsInCompany($actor, $company);
+        if ($directPermission) {
+            $target->givePermissionTo(Permission::findOrCreate('Delete:Role', 'web'));
+        }
+
+        expect(Gate::forUser($actor)->allows('update', $target))->toBe($allowed);
+    })->with([
+        'administrator' => ['admin', false, false],
+        'higher direct permission' => ['dispatcher', true, false],
+        'ordinary company account' => ['dispatcher', false, true],
+    ]);
+
     test('requires the corresponding permission for company administration', function (string $ability, string $permission, bool $requiresRecord): void {
         $company = createCompany();
         $actor = createUserWithRole(UserRole::Admin, $company);

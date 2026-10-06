@@ -7,7 +7,6 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\FontFamily;
@@ -60,14 +59,16 @@ class CompaniesTable
 
                 PhoneColumn::make('phone')
                     ->label(__('Phone'))
-                    ->displayFormat(PhoneInputNumberType::NATIONAL)
+                    ->displayFormat(PhoneInputNumberType::INTERNATIONAL)
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
 
                 TextColumn::make('created_at')
                     ->label(__('Created At'))
-                    ->dateTimeTooltip()
+                    ->dateTime('Y-m-d H:i:s')
+                    ->timezone(fn (Company $record): string => $record->timezone)
+                    ->dateTimeTooltip('Y-m-d H:i:s T', fn (Company $record): string => $record->timezone)
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
@@ -81,7 +82,6 @@ class CompaniesTable
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
-                    ForceDeleteBulkAction::make(),
                     RestoreBulkAction::make(),
                 ]),
             ]);

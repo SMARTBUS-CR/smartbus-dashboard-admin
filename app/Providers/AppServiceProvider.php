@@ -5,12 +5,15 @@ namespace App\Providers;
 use App\Auth\ExternalUserProvider;
 use App\Auth\SessionGuard;
 use App\Enums\UserRole;
+use App\Models\Company;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\AuthService;
 use BezhanSalleh\LanguageSwitch\Enums\TriggerStyle;
 use BezhanSalleh\LanguageSwitch\LanguageSwitch;
+use Filament\Facades\Filament;
+use Filament\Support\Facades\FilamentTimezone;
 use Filament\Tables\Table;
 use GuzzleHttp\Middleware;
 use Illuminate\Http\Client\Factory as HttpFactory;
@@ -40,6 +43,10 @@ class AppServiceProvider extends ServiceProvider
         // Prevent deletion of protected roles or roles that have users assigned to them
         Gate::before(function (User $user, string $ability, array $arguments): ?bool {
             $record = $arguments[0] ?? null;
+
+            if (($record instanceof Company || $record === Company::class) && in_array($ability, ['forceDelete', 'forceDeleteAny'], true)) {
+                return false;
+            }
 
             if ($record instanceof User || $record === User::class) {
                 return null;
@@ -86,6 +93,8 @@ class AppServiceProvider extends ServiceProvider
                 ))
             );
         });
+
+        FilamentTimezone::set(fn (): string => Filament::getTenant()?->timezone ?? config('app.timezone'));
 
         // Configure default date and time formats for Filament tables
         Table::configureUsing(fn (Table $table) => $table
