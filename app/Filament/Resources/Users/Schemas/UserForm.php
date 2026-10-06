@@ -2,15 +2,21 @@
 
 namespace App\Filament\Resources\Users\Schemas;
 
+use App\Enums\LucideIcon;
 use App\Enums\UserRole;
 use App\Models\Company;
 use App\Models\Role;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Callout;
+use Filament\Schemas\Components\Icon;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Support\Colors\Color;
+use Filament\Support\Enums\IconSize;
+use Filament\Support\Icons\Heroicon;
 
 class UserForm
 {
@@ -18,23 +24,28 @@ class UserForm
     {
         return $schema->components([
             Section::make(__('Account Information'))
+                ->icon(Heroicon::OutlinedUserCircle)
+                ->description(__('The account information of the user.'))
                 ->schema([
                     TextInput::make('name')
                         ->label(__('Name'))
+                        ->prefixIcon(LucideIcon::UserRound)
                         ->required()
                         ->maxLength(100),
 
                     TextInput::make('email')
                         ->label(__('Email'))
+                        ->prefixIcon(LucideIcon::Mail)
                         ->email()
                         ->required()
                         ->maxLength(100),
 
                     Select::make('roles')
                         ->label(__('Roles'))
+                        ->prefixIcon(LucideIcon::UserKey)
                         ->multiple()
                         ->searchable()
-                        ->options(fn (): array => self::getRoleOptions())
+                        ->options(self::getRoleOptions(...))
                         ->default([])
                         ->required()
                         ->minItems(1),
@@ -43,9 +54,23 @@ class UserForm
                 ->columnSpanFull(),
 
             Section::make(__('Access Credentials'))
+                ->icon(Heroicon::OutlinedKey)
+                ->description(__('The access credentials of the user.'))
                 ->schema([
+                    Callout::make(__('Leave both password fields blank to keep the current password.'))
+                        ->info()
+                        ->visible(fn (string $operation): bool => $operation === 'edit')
+                        ->columnSpanFull(),
+
                     TextInput::make('password')
                         ->label(__('Password'))
+                        ->prefixIcon(Heroicon::OutlinedLockClosed)
+                        ->belowContent([
+                            Icon::make(Heroicon::OutlinedInformationCircle)
+                                ->color(Color::Gray)
+                                ->size(IconSize::Small),
+                            __('Minimum 8 characters. Includes uppercase, numbers, and symbols.'),
+                        ])
                         ->password()
                         ->revealable()
                         ->required(fn (string $operation): bool => $operation === 'create')
@@ -54,6 +79,7 @@ class UserForm
 
                     TextInput::make('password_confirmation')
                         ->label(__('Confirm Password'))
+                        ->prefixIcon(Heroicon::LockClosed)
                         ->password()
                         ->revealable()
                         ->required(
@@ -89,8 +115,8 @@ class UserForm
             ->get()
             ->mapWithKeys(fn (Role $role): array => [
                 $role->getKey() => filled($role->display_name)
-                    ? UserRole::tryFrom($role->name)?->getLabel() 
-                    ?: $role->display_name 
+                    ? UserRole::tryFrom($role->name)?->getLabel()
+                    ?: $role->display_name
                     : $role->name,
             ])
             ->all();

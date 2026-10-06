@@ -273,7 +273,9 @@
     "This role is assigned to :count user(s). You must reassign or remove the users before deleting this role.": "Este rol está asignado a :count usuario(s). Debe reasignar o eliminar los usuarios antes de eliminar este rol.",
     "Legal ID": "Identificación legal",
     "Account Information": "Información de la cuenta",
+    "The account information of the user.": "La información de la cuenta del usuario.",
     "Access Credentials": "Credenciales de acceso",
+    "The access credentials of the user.": "Las credenciales de acceso del usuario.",
     "Password": "Contraseña",
     "Confirm Password": "Confirmar contraseña",
     "Only global system admins may access this resource.": "Solo los administradores del sistema globales pueden acceder a este recurso.",
@@ -301,5 +303,7 @@
     "Current Company": "Empresa actual",
     "Active Companies": "Empresas activas",
     "Inactive Companies": "Empresas inactivas",
-    "All Companies": "Todas las empresas"
+    "All Companies": "Todas las empresas",
+    "Leave both password fields blank to keep the current password.": "Deja ambos campos de contraseña en blanco para conservar la contraseña actual.",
+    "Minimum 8 characters. Includes uppercase, numbers, and symbols.": "Mínimo 8 caracteres. Incluye mayúsculas, números y símbolos."
 }

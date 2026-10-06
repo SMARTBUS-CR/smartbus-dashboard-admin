@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Roles;
 
+use App\Enums\LucideIcon;
 use App\Enums\NavigationGroup;
 use App\Enums\UserRole;
 use App\Filament\Resources\Roles\Pages\CreateRole;
 use App\Filament\Resources\Roles\Pages\EditRole;
 use App\Filament\Resources\Roles\Pages\ListRoles;
-use App\Filament\Resources\Roles\Pages\ViewRole;
 use App\Models\Role;
 use BackedEnum;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
@@ -96,12 +96,9 @@ class RoleResource extends Resource
                             ->schema([
                                 TextInput::make('display_name')
                                     ->label(__('Name'))
+                                    ->prefixIcon(LucideIcon::UserKey)
                                     ->placeholder(__('i.e.: Administrator, Dispatcher, Supervisor'))
                                     ->helperText(__('Name of the role that will be displayed in the application'))
-                                    ->formatStateUsing(function (string $state, Role $record): string {
-                                        $roleEnum = UserRole::tryFrom($record->name);
-                                        return $roleEnum?->getLabel() ?? $record->display_name ?: $record->name ?: '';
-                                    })
                                     ->required()
                                     ->maxLength(255)
                                     ->live(debounce: 500)
@@ -115,6 +112,7 @@ class RoleResource extends Resource
                                     }),
                                 TextInput::make('name')
                                     ->label(__('System Identifier'))
+                                    ->prefixIcon(LucideIcon::Code2)
                                     ->helperText(__('Unique identifier of the role for permission control'))
                                     ->disabled()
                                     ->readOnly()
@@ -165,10 +163,6 @@ class RoleResource extends Resource
                     ->label(__('Name'))
                     ->weight(FontWeight::Medium)
                     ->default(fn (Role $record) => Str::headline($record->display_name))
-                    ->formatStateUsing(function (string $state, Role $record): string {
-                        $roleEnum = UserRole::tryFrom($record->name);
-                        return $roleEnum?->getLabel() ?? $record->display_name ?: $record->name ?: '';
-                    })
                     ->searchable(),
                 TextColumn::make('name')
                     ->label(__('Identifier'))
@@ -261,7 +255,6 @@ class RoleResource extends Resource
         return [
             'index' => ListRoles::route('/'),
             'create' => CreateRole::route('/create'),
-            // 'view' => ViewRole::route('/{record}'),
             'edit' => EditRole::route('/{record}/edit'),
         ];
     }

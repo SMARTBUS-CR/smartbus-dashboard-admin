@@ -103,6 +103,7 @@ class AppServiceProvider extends ServiceProvider
                     'en' => 'https://flagcdn.com/us.svg',
                 ])
                 ->trigger(style: TriggerStyle::Flag)
+                ->userPreferredLocale(fn () => auth()->user()?->locale)
                 ->nativeLabel();
         });
     }
