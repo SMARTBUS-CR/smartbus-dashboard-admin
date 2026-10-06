@@ -56,6 +56,7 @@ describe('External Token Validation', function (): void {
         $this->withSession(['external_auth_token' => 'test-token'])
             ->post('/_tests/protected-action')
             ->assertRedirect(Filament::getLoginUrl())
+            ->assertSessionHas('auth_notice', 'session_ended')
             ->assertSessionMissing('external_auth_token')
             ->assertSessionMissing('protected_action_executed');
 
@@ -77,6 +78,7 @@ describe('External Token Validation', function (): void {
 
         $this->post('/_tests/protected-action')
             ->assertRedirect(Filament::getLoginUrl())
+            ->assertSessionHas('auth_notice', 'token_missing')
             ->assertSessionMissing('protected_action_executed');
 
         $this->assertGuest('web');

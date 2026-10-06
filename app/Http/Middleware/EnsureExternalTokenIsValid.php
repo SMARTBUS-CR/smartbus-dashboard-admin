@@ -24,12 +24,19 @@ class EnsureExternalTokenIsValid
     {
         $token = $request->session()->get('external_auth_token');
 
-        $status = is_string($token) && trim($token) !== ''
+        $hasToken = is_string($token) && trim($token) !== '';
+
+        $status = $hasToken
             ? $this->authService->validateToken($token)
             : TokenValidationStatus::Invalid;
 
         if ($status === TokenValidationStatus::Invalid) {
             Filament::auth()->logout();
+
+            $request->session()->put(
+                'auth_notice',
+                $hasToken ? 'session_ended' : 'token_missing',
+            );
 
             return redirect()->to(Filament::getLoginUrl());
         }

@@ -61,9 +61,12 @@ class SuperAdminsTable
                     ])
                     ->databaseTransaction(false)
                     ->action(function (User $record, Component $livewire): void {
+                        $actor = Filament::auth()->user();
+                        $isOwnAccount = $record->getKey() === $actor->getKey();
+
                         try {
                             app(UserManagementService::class)->deactivateSuperAdmin(
-                                Filament::auth()->user(),
+                                $actor,
                                 $record,
                             );
                         } catch (ValidationException $exception) {
@@ -85,6 +88,14 @@ class SuperAdminsTable
                             }
 
                             throw ValidationException::withMessages($errors);
+                        }
+
+                        if ($isOwnAccount) {
+                            Filament::auth()->logout();
+                            session()->put('auth_notice', 'account_deactivated');
+                            $livewire->redirect(Filament::getLoginUrl());
+
+                            return;
                         }
 
                         Notification::make()

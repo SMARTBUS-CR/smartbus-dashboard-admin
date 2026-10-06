@@ -275,7 +275,6 @@ describe('Role Resource', function (): void {
         grantShield($admin, ['ViewAny:Role', 'View:Role', 'Update:Role', 'Delete:Role'], $company);
         actingAsInCompany($admin, $company);
 
-        $this->get(RoleResource::getUrl('view', ['record' => $role], tenant: $company))->assertNotFound();
         $this->get(RoleResource::getUrl('edit', ['record' => $role], tenant: $company))->assertNotFound();
         $this->assertModelExists($role);
     });

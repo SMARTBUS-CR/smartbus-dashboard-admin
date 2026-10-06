@@ -112,7 +112,7 @@ class ExternalUserProvider implements UserProvider
 
         $this->log('debug', 'External authentication successful for user: '.$email, [
             'user_id' => $user->getAuthIdentifier(),
-            'external_auth_data' => $authData,
+            'token_type' => $authData['token_type'] ?? null,
         ]);
 
         $externalUser = $authData['user'] ?? null;

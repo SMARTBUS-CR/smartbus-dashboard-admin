@@ -12,6 +12,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Connection;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -63,13 +64,18 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants,
      */
     public function isSuperAdmin(): bool
     {
-        return once(fn () => $this->getConnection()
+        return ! $this->trashed() && $this->getConnection()
             ->table('model_has_roles as mhr')
             ->join('roles as r', 'r.id', '=', 'mhr.role_id')
+            ->join('users', 'users.id', '=', 'mhr.model_uuid')
+            ->whereNull('users.deleted_at')
             ->where('mhr.model_uuid', $this->getKey())
             ->where('mhr.model_type', $this->getMorphClass())
             ->where('r.name', UserRole::SuperAdmin->value)
-            ->exists());
+            ->where('r.guard_name', 'web')
+            ->whereNull('r.company_id')
+            ->whereNull('mhr.company_id')
+            ->exists();
     }
 
     /**
@@ -79,13 +85,17 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants,
      */
     public function isCompanyAdmin(): bool
     {
-        return once(fn () => $this->getConnection()
+        return ! $this->trashed() && $this->getConnection()
             ->table('model_has_roles as mhr')
             ->join('roles as r', 'r.id', '=', 'mhr.role_id')
+            ->join('users', 'users.id', '=', 'mhr.model_uuid')
+            ->whereNull('users.deleted_at')
             ->where('mhr.model_uuid', $this->getKey())
             ->where('mhr.model_type', $this->getMorphClass())
             ->where('r.name', UserRole::Admin->value)
-            ->exists());
+            ->where('r.guard_name', 'web')
+            ->whereColumn('r.company_id', 'mhr.company_id')
+            ->exists();
     }
 
     /**
@@ -97,7 +107,7 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants,
             return true;
         }
 
-        return $this->isCompanyAdmin() && $this->companies()->exists();
+        return ! $this->trashed() && $this->dashboardCompanies()->exists();
     }
 
     /**
@@ -114,17 +124,11 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants,
      */
     public function canAccessTenant(Model $tenant): bool
     {
-        if (self::isSuperAdmin()) {
+        if ($this->isSuperAdmin()) {
             return true;
         }
 
-        if (self::isCompanyAdmin()) {
-            return $this->companies()
-                ->where('companies.id', $tenant->getKey())
-                ->exists();
-        }
-
-        return false;
+        return $tenant instanceof Company && $this->hasCompanyDashboardAccess($tenant);
     }
 
     /**
@@ -138,8 +142,39 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants,
             return Company::all();
         }
 
-        return $this->isCompanyAdmin()
-            ? $this->companies
-            : collect();
+        return $this->trashed() ? collect() : $this->dashboardCompanies()->get();
+    }
+
+    public function hasCompanyDashboardAccess(Company $company): bool
+    {
+        return ! $this->trashed() && ! $company->trashed()
+            && $this->dashboardCompanies()->whereKey($company->getKey())->exists();
+    }
+
+    /** @return Builder<Company> */
+    protected function dashboardCompanies(): Builder
+    {
+        $assignments = $this->getConnection()->table('model_has_roles as assignments')
+            ->join('roles', 'roles.id', '=', 'assignments.role_id')
+            ->join('users', 'users.id', '=', 'assignments.model_uuid')
+            ->whereNull('users.deleted_at')
+            ->where('assignments.model_uuid', $this->getKey())
+            ->where('assignments.model_type', $this->getMorphClass())
+            ->where('roles.guard_name', 'web')
+            ->whereColumn('roles.company_id', 'assignments.company_id');
+
+        $excludedCompanyIds = (clone $assignments)
+            ->whereIn('roles.name', [UserRole::Driver->value, UserRole::Passenger->value])
+            ->select('roles.company_id');
+
+        $roleCompanyIds = $assignments
+            ->whereNotIn('roles.company_id', $excludedCompanyIds)
+            ->whereNotIn('roles.name', [UserRole::SuperAdmin->value, UserRole::Driver->value, UserRole::Passenger->value])
+            ->distinct()->pluck('roles.company_id');
+
+        $memberCompanyIds = CompanyUser::query()->where('user_id', $this->getKey())
+            ->whereIn('company_id', $roleCompanyIds)->pluck('company_id');
+
+        return Company::query()->whereIn('id', $memberCompanyIds)->orderBy('legal_name');
     }
 }

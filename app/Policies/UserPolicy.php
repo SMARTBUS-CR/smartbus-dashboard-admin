@@ -7,7 +7,10 @@ namespace App\Policies;
 use App\Enums\UserRole;
 use App\Models\Company;
 use App\Models\CompanyUser;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
+use App\Services\UserManagementService;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 
@@ -98,7 +101,7 @@ class UserPolicy
 
         return $tenant instanceof Company
             && ! $tenant->trashed()
-            && $this->isAdminInCompany($actor, $tenant);
+            && $actor->hasCompanyDashboardAccess($tenant);
     }
 
     private function canManageTarget(User $actor, User $target): bool
@@ -113,9 +116,14 @@ class UserPolicy
 
         $tenant = Filament::getTenant();
 
-        return $tenant instanceof Company
-            && ! $tenant->trashed()
-            && $this->isManageableMemberInCompany($target, $tenant);
+        if (! $tenant instanceof Company || $tenant->trashed() || ! $this->isManageableMemberInCompany($target, $tenant)) {
+            return false;
+        }
+
+        return $actor->isSuperAdmin() || $this->isAdminInCompany($actor, $tenant)
+            || ($target->roles()->where('roles.company_id', $tenant->getKey())->get()
+                ->every(fn (Role $role): bool => app(UserManagementService::class)->canAssignCompanyRole($actor, $role))
+                && $target->getAllPermissions()->every(fn (Permission $permission): bool => $actor->can($permission->name)));
     }
 
     private function isAdminInCompany(User $user, Company $company): bool

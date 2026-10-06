@@ -120,6 +120,7 @@ return [
         'symbols' => 'La :attribute debe contener al menos un símbolo.',
         'uncompromised' => 'La :attribute proporcionada se ha visto comprometida en una filtración de datos (data leak). Elija una :attribute diferente.',
     ],
+    'phone' => 'El campo :attribute debe ser un número de teléfono válido.',
     'present' => 'El campo :attribute debe estar presente.',
     'present_if' => 'El campo :attribute debe estar presente cuando :other es :value.',
     'present_unless' => 'El campo :attribute debe estar presente a menos que :other sea :value.',

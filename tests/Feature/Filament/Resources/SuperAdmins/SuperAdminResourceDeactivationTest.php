@@ -5,9 +5,24 @@ use App\Filament\Resources\SuperAdmins\Pages\ListSuperAdmins;
 use App\Models\CompanyUser;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
+use Filament\Facades\Filament;
 use Livewire\Livewire;
 
 describe('Global SuperAdmin Resource Deactivation', function (): void {
+    test('ends the session and explains deactivation when the actor deactivates their own account', function (): void {
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+        $remaining = createUserWithRole(UserRole::SuperAdmin);
+        actingAsInCompany($actor, createCompany());
+
+        Livewire::test(ListSuperAdmins::class)->callAction(TestAction::make('deactivateSuperAdmin')->table($actor))
+            ->assertRedirect(Filament::getLoginUrl());
+
+        $this->assertGuest('web');
+        $this->assertSoftDeleted($actor);
+        $this->assertNotSoftDeleted($remaining);
+        expect(session('auth_notice'))->toBe('account_deactivated');
+    });
+
     test('requires confirmation before deactivating an account', function (): void {
         $actor = createUserWithRole(UserRole::SuperAdmin);
         $target = createUserWithRole(UserRole::SuperAdmin);

@@ -37,8 +37,7 @@ class UsersTable
                     ->label(__('Roles'))
                     ->badge()
                     ->getStateUsing(fn (User $record): array => $record->roles->modelKeys())
-                    ->formatStateUsing(fn (string $state, User $record): string => $record->roles->find($state)->display_name ?: $record->roles->find($state)->name
-                    )
+                    ->formatStateUsing(fn (string $state, User $record): string => $record->roles->find($state)->display_name ?: $record->roles->find($state)->name)
                     ->color(function (string $state, User $record): array {
                         $role = $record->roles->find($state);
                         $color = $role->color ?: '#'.substr(hash('sha256', (string) $role->getKey()), 0, 6);

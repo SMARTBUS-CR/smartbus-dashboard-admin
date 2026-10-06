@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Roles;
 
+use App\Enums\LucideIcon;
 use App\Enums\NavigationGroup;
 use App\Enums\UserRole;
 use App\Filament\Resources\Roles\Pages\CreateRole;
 use App\Filament\Resources\Roles\Pages\EditRole;
 use App\Filament\Resources\Roles\Pages\ListRoles;
-use App\Filament\Resources\Roles\Pages\ViewRole;
 use App\Models\Role;
 use BackedEnum;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
@@ -26,6 +26,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Panel;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
@@ -96,6 +97,7 @@ class RoleResource extends Resource
                             ->schema([
                                 TextInput::make('display_name')
                                     ->label(__('Name'))
+                                    ->prefixIcon(LucideIcon::UserKey)
                                     ->placeholder(__('i.e.: Administrator, Dispatcher, Supervisor'))
                                     ->helperText(__('Name of the role that will be displayed in the application'))
                                     ->required()
@@ -111,6 +113,7 @@ class RoleResource extends Resource
                                     }),
                                 TextInput::make('name')
                                     ->label(__('System Identifier'))
+                                    ->prefixIcon(LucideIcon::Code2)
                                     ->helperText(__('Unique identifier of the role for permission control'))
                                     ->disabled()
                                     ->readOnly()
@@ -148,6 +151,14 @@ class RoleResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->columnSpanFull(),
+
+                Callout::make(__('Company Permissions'))
+                    ->description(__(
+                        'Selected permissions determine which actions users with this role can perform in the current company.'
+                    ))
+                    ->info()
+                    ->columnSpanFull(),
+
                 static::getShieldFormComponents(),
             ]);
     }
@@ -253,7 +264,6 @@ class RoleResource extends Resource
         return [
             'index' => ListRoles::route('/'),
             'create' => CreateRole::route('/create'),
-            'view' => ViewRole::route('/{record}'),
             'edit' => EditRole::route('/{record}/edit'),
         ];
     }

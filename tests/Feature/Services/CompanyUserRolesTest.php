@@ -5,11 +5,32 @@ use App\Models\CompanyUser;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\UserManagementService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Validation\UncompromisedVerifier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 describe('Company User Role Assignment', function (): void {
+    test('prevents delegated user managers from granting administrator access', function (): void {
+        $this->mock(UncompromisedVerifier::class)->shouldReceive('verify')->andReturnTrue();
+        $company = createCompany();
+        $actor = User::factory()->create();
+        setPermissionsTeamId($company->id);
+        $role = Role::create(['name' => 'user-manager', 'guard_name' => 'web', 'company_id' => $company->id]);
+        $actor->assignRole($role);
+        CompanyUser::create(['company_id' => $company->id, 'user_id' => $actor->id]);
+        grantShield($actor, ['Create:User'], $company);
+        actingAsInCompany($actor, $company);
+        $adminRole = Role::withoutGlobalScopes()->where('company_id', $company->id)->where('name', 'admin')->sole();
+
+        expect(fn () => app(UserManagementService::class)->createCompanyUser($actor, [
+            'name' => 'Unauthorized Admin', 'email' => 'escalation@example.test',
+            'password' => 'N7v!qL2#rX9@kP4', 'password_confirmation' => 'N7v!qL2#rX9@kP4',
+            'roles' => [$adminRole->id],
+        ]))->toThrow(AuthorizationException::class);
+        expect(User::count())->toBe(1);
+    });
+
     beforeEach(function (): void {
         $this->mock(UncompromisedVerifier::class)
             ->shouldReceive('verify')

@@ -13,10 +13,26 @@ use Livewire\Livewire;
 
 function companyFormData(array $overrides = []): array
 {
-    return array_replace(Company::factory()->make()->only([
-        'legal_name', 'trade_name', 'legal_id', 'operator_number', 'phone',
-        'email', 'address', 'country_code', 'timezone',
-    ]), ['status' => 'active'], $overrides);
+    $country = strtoupper($overrides['country_code'] ?? 'CR');
+
+    return array_replace(
+        Company::factory()
+            ->forCountry($country)
+            ->make()
+            ->only([
+                'legal_name',
+                'trade_name',
+                'legal_id',
+                'operator_number',
+                'phone',
+                'email',
+                'address',
+                'country_code',
+                'timezone',
+            ]),
+        ['status' => 'active'],
+        $overrides,
+    );
 }
 
 describe('Company Resource', function (): void {
@@ -108,7 +124,7 @@ describe('Company Resource', function (): void {
         $this->assertDatabaseHas(Company::class, $data);
     });
 
-    test('soft deletes restores and permanently deletes through the edit page', function () {
+    test('soft deletes and restores without exposing permanent deletion', function () {
         $tenant = createCompany();
         $company = createCompany();
         actingAsInCompany(createUserWithRole(UserRole::SuperAdmin), $tenant);
@@ -118,8 +134,8 @@ describe('Company Resource', function (): void {
         Livewire::test(EditCompany::class, ['record' => $company->id])->callAction('restore');
         $this->assertNotSoftDeleted($company);
         Livewire::test(EditCompany::class, ['record' => $company->id])->callAction('delete');
-        Livewire::test(EditCompany::class, ['record' => $company->id])->callAction('forceDelete');
-        $this->assertModelMissing($company);
+        Livewire::test(EditCompany::class, ['record' => $company->id])->assertActionDoesNotExist('forceDelete');
+        $this->assertSoftDeleted($company);
         $this->assertModelExists($tenant);
     });
 
@@ -139,10 +155,9 @@ describe('Company Resource', function (): void {
             $this->assertNotSoftDeleted($company);
             $company->delete();
         }
-        Livewire::test(ListCompanies::class)->filterTable('trashed', false)->selectTableRecords($selected->modelKeys())
-            ->callAction(TestAction::make('forceDelete')->table()->bulk());
+        Livewire::test(ListCompanies::class)->assertActionDoesNotExist(TestAction::make('forceDelete')->table()->bulk());
         foreach ($selected as $company) {
-            $this->assertModelMissing($company);
+            $this->assertSoftDeleted($company);
         }
         $this->assertNotSoftDeleted($tenant);
     });
@@ -229,5 +244,229 @@ describe('Company Resource', function (): void {
         $company = createCompany();
 
         $this->get(CompanyResource::getUrl('index', tenant: $company))->assertRedirect(Filament::getPanel('admin')->getLoginUrl());
+    });
+
+    test('rejects invalid phone numbers when creating a company', function (string $phone): void {
+        $tenant = createCompany();
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $tenant,
+        );
+
+        $companiesBefore = Company::count();
+
+        Livewire::test(CreateCompany::class)
+            ->fillForm(companyFormData(['phone' => $phone]))
+            ->call('create')
+            ->assertHasFormErrors(['phone']);
+
+        expect(Company::count())->toBe($companiesBefore);
+    })->with([
+        'text instead of a number' => ['not-a-phone-number'],
+        'incomplete international number' => ['+506123'],
+    ]);
+
+    test('rejects an invalid phone number without changing the company', function (): void {
+        $company = createCompany(['phone' => '+50688888888']);
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $company,
+        );
+
+        Livewire::test(EditCompany::class, [
+            'record' => $company->getRouteKey(),
+        ])
+            ->fillForm(['phone' => 'not-a-phone-number'])
+            ->call('save')
+            ->assertHasFormErrors(['phone']);
+
+        expect($company->fresh()->phone)->toBe('+50688888888');
+    });
+
+    test('creates a company with a valid international phone number', function (): void {
+        $tenant = createCompany();
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $tenant,
+        );
+
+        $data = companyFormData(['phone' => '+50688888888']);
+
+        Livewire::test(CreateCompany::class)
+            ->fillForm($data)
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas(Company::class, [
+            'email' => $data['email'],
+            'phone' => '+50688888888',
+        ]);
+    });
+
+    test('normalizes a formatted phone number when creating a company', function (): void {
+        $tenant = createCompany();
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $tenant,
+        );
+
+        $data = companyFormData(['phone' => '+506 8888 8888']);
+
+        Livewire::test(CreateCompany::class)
+            ->fillForm($data)
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas(Company::class, [
+            'email' => $data['email'],
+            'phone' => '+50688888888',
+        ]);
+    });
+
+    test('accepts a foreign phone number for a Costa Rican company', function (): void {
+        $tenant = createCompany();
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $tenant,
+        );
+
+        $data = companyFormData([
+            'country_code' => 'CR',
+            'phone' => '+442079460018',
+        ]);
+
+        Livewire::test(CreateCompany::class)
+            ->fillForm($data)
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas(Company::class, [
+            'email' => $data['email'],
+            'country_code' => 'CR',
+            'phone' => '+442079460018',
+        ]);
+    });
+
+    test('preserves a foreign phone number when editing other company fields', function (): void {
+        $company = createCompany([
+            'country_code' => 'CR',
+            'timezone' => 'America/Costa_Rica',
+            'phone' => '+442079460018',
+        ]);
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $company,
+        );
+
+        Livewire::test(EditCompany::class, [
+            'record' => $company->getRouteKey(),
+        ])
+            ->assertSchemaStateSet([
+                'phone' => '+442079460018',
+            ])
+            ->fillForm(['legal_name' => 'Updated Company Name'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas(Company::class, [
+            'id' => $company->id,
+            'legal_name' => 'Updated Company Name',
+            'country_code' => 'CR',
+            'phone' => '+442079460018',
+        ]);
+    });
+
+    test('sets the timezone when the selected country changes', function (string $country, string $timezone): void {
+        $tenant = createCompany();
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $tenant,
+        );
+
+        Livewire::test(CreateCompany::class)
+            ->fillForm(['country_code' => $country])
+            ->assertSchemaStateSet([
+                'country_code' => $country,
+                'timezone' => $timezone,
+            ]);
+    })->with([
+        'Belize' => ['BZ', 'America/Belize'],
+        'Costa Rica' => ['CR', 'America/Costa_Rica'],
+        'El Salvador' => ['SV', 'America/El_Salvador'],
+        'Guatemala' => ['GT', 'America/Guatemala'],
+        'Honduras' => ['HN', 'America/Tegucigalpa'],
+        'Nicaragua' => ['NI', 'America/Managua'],
+        'Panama' => ['PA', 'America/Panama'],
+    ]);
+
+    test('rejects a country outside the supported region', function (): void {
+        $tenant = createCompany();
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $tenant,
+        );
+
+        $companiesBefore = Company::count();
+
+        Livewire::test(CreateCompany::class)
+            ->fillForm(companyFormData([
+                'country_code' => 'US',
+                'timezone' => 'America/New_York',
+            ]))
+            ->call('create')
+            ->assertHasFormErrors(['country_code']);
+
+        expect(Company::count())->toBe($companiesBefore);
+    });
+
+    test('rejects a timezone that does not belong to the selected country', function (): void {
+        $tenant = createCompany();
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $tenant,
+        );
+
+        $companiesBefore = Company::count();
+
+        Livewire::test(CreateCompany::class)
+            ->fillForm(companyFormData([
+                'country_code' => 'CR',
+                'timezone' => 'America/Panama',
+            ]))
+            ->call('create')
+            ->assertHasFormErrors(['timezone']);
+
+        expect(Company::count())->toBe($companiesBefore);
+    });
+
+    test('preserves the country and timezone when opening an existing company', function (): void {
+        $company = createCompany([
+            'country_code' => 'PA',
+            'timezone' => 'America/Panama',
+        ]);
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $company,
+        );
+
+        Livewire::test(EditCompany::class, [
+            'record' => $company->getRouteKey(),
+        ])
+            ->assertSchemaStateSet([
+                'country_code' => 'PA',
+                'timezone' => 'America/Panama',
+            ]);
+
+        expect($company->fresh()->timezone)->toBe('America/Panama');
     });
 });
