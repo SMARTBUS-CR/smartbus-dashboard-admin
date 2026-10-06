@@ -3,6 +3,7 @@
 use App\Enums\UserRole;
 use App\Filament\Resources\Companies\CompanyResource;
 use App\Filament\Resources\Roles\RoleResource;
+use App\Models\Company;
 use App\Models\Role;
 use Pest\Browser\Support\Selector;
 use Tests\Support\BrowserSession;
@@ -88,4 +89,52 @@ describe('Company And Role Browser Flows', function (): void {
         BrowserSession::assertTokenWasValidated();
     });
 
+    test('saves a national phone number using the selected country', function (): void {
+        $company = createCompany([
+            'country_code' => 'CR',
+            'phone' => '+50688888888',
+        ]);
+
+        BrowserSession::start(
+            createUserWithRole(UserRole::SuperAdmin),
+        );
+
+        $path = parse_url(
+            CompanyResource::getUrl(
+                'edit',
+                ['record' => $company],
+                tenant: $company,
+            ),
+            PHP_URL_PATH,
+        );
+
+        visit($path)
+            ->assertVisible('input[id="form.phone"]')
+            ->click('.fi-fo-phone-input .iti__selected-country')
+            ->assertVisible(
+                '.iti__country-list [data-country-code="gb"]',
+            )
+            ->click(
+                '.iti__country-list [data-country-code="gb"]',
+            )
+            ->type('input[id="form.phone"]', '020 7946 0018')
+            ->keys('input[id="form.phone"]', ['Tab'])
+            ->click(Selector::getByRoleSelector('button', [
+                'name' => 'Save changes',
+                'exact' => true,
+            ]))
+            ->assertSee('Saved')
+            ->assertNoJavaScriptErrors();
+
+        $this->assertDatabaseHas(
+            Company::class,
+            [
+                'id' => $company->id,
+                'country_code' => 'CR',
+                'phone' => '+442079460018',
+            ],
+        );
+
+        BrowserSession::assertTokenWasValidated();
+    });
 });

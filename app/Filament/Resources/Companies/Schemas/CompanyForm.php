@@ -12,6 +12,8 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Validation\Rules\Unique;
+use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
+use Ysfkaya\FilamentPhoneInput\PhoneInputNumberType;
 
 class CompanyForm
 {
@@ -57,12 +59,17 @@ class CompanyForm
                     ->icon(Heroicon::OutlinedEnvelopeOpen)
                     ->collapsible()
                     ->schema([
-                        TextInput::make('phone')
+                        PhoneInput::make('phone')
                             ->label(__('Phone'))
-                            ->prefixIcon(Heroicon::OutlinedPhone)
-                            ->tel()
                             ->required()
-                            ->maxLength(50),
+                            ->rules(['string', 'max:50'])
+                            ->initialCountry('cr')
+                            ->defaultCountry('CR')
+                            ->disableLookup()
+                            ->countryOrder(['cr', 'gt', 'sv', 'hn', 'ni', 'pa', 'bz'])
+                            ->validateFor(country: 'INTERNATIONAL')
+                            ->inputNumberFormat(PhoneInputNumberType::E164)
+                            ->displayNumberFormat(PhoneInputNumberType::INTERNATIONAL),
 
                         TextInput::make('email')
                             ->label(__('Email'))

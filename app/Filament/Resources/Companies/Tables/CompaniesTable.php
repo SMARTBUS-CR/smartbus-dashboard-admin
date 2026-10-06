@@ -15,6 +15,8 @@ use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Ysfkaya\FilamentPhoneInput\PhoneInputNumberType;
+use Ysfkaya\FilamentPhoneInput\Tables\PhoneColumn;
 
 class CompaniesTable
 {
@@ -56,8 +58,9 @@ class CompaniesTable
                     ->searchable()
                     ->sortable(),
 
-                TextColumn::make('phone')
+                PhoneColumn::make('phone')
                     ->label(__('Phone'))
+                    ->displayFormat(PhoneInputNumberType::NATIONAL)
                     ->searchable()
                     ->sortable()
                     ->toggleable(),

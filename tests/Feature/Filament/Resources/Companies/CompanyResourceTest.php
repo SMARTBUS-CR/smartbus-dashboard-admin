@@ -230,4 +230,139 @@ describe('Company Resource', function (): void {
 
         $this->get(CompanyResource::getUrl('index', tenant: $company))->assertRedirect(Filament::getPanel('admin')->getLoginUrl());
     });
+
+    test('rejects invalid phone numbers when creating a company', function (string $phone): void {
+        $tenant = createCompany();
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $tenant,
+        );
+
+        $companiesBefore = Company::count();
+
+        Livewire::test(CreateCompany::class)
+            ->fillForm(companyFormData(['phone' => $phone]))
+            ->call('create')
+            ->assertHasFormErrors(['phone']);
+
+        expect(Company::count())->toBe($companiesBefore);
+    })->with([
+        'text instead of a number' => ['not-a-phone-number'],
+        'incomplete international number' => ['+506123'],
+    ]);
+
+    test('rejects an invalid phone number without changing the company', function (): void {
+        $company = createCompany(['phone' => '+50688888888']);
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $company,
+        );
+
+        Livewire::test(EditCompany::class, [
+            'record' => $company->getRouteKey(),
+        ])
+            ->fillForm(['phone' => 'not-a-phone-number'])
+            ->call('save')
+            ->assertHasFormErrors(['phone']);
+
+        expect($company->fresh()->phone)->toBe('+50688888888');
+    });
+
+    test('creates a company with a valid international phone number', function (): void {
+        $tenant = createCompany();
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $tenant,
+        );
+
+        $data = companyFormData(['phone' => '+50688888888']);
+
+        Livewire::test(CreateCompany::class)
+            ->fillForm($data)
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas(Company::class, [
+            'email' => $data['email'],
+            'phone' => '+50688888888',
+        ]);
+    });
+
+    test('normalizes a formatted phone number when creating a company', function (): void {
+        $tenant = createCompany();
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $tenant,
+        );
+
+        $data = companyFormData(['phone' => '+506 8888 8888']);
+
+        Livewire::test(CreateCompany::class)
+            ->fillForm($data)
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas(Company::class, [
+            'email' => $data['email'],
+            'phone' => '+50688888888',
+        ]);
+    });
+
+    test('accepts a foreign phone number for a Costa Rican company', function (): void {
+        $tenant = createCompany();
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $tenant,
+        );
+
+        $data = companyFormData([
+            'country_code' => 'CR',
+            'phone' => '+442079460018',
+        ]);
+
+        Livewire::test(CreateCompany::class)
+            ->fillForm($data)
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas(Company::class, [
+            'email' => $data['email'],
+            'country_code' => 'CR',
+            'phone' => '+442079460018',
+        ]);
+    });
+
+    test('preserves a foreign phone number when editing other company fields', function (): void {
+        $company = createCompany([
+            'country_code' => 'CR',
+            'phone' => '+442079460018',
+        ]);
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $company,
+        );
+
+        Livewire::test(EditCompany::class, [
+            'record' => $company->getRouteKey(),
+        ])
+            ->assertSchemaStateSet([
+                'phone' => '+442079460018',
+            ])
+            ->fillForm(['legal_name' => 'Updated Company Name'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas(Company::class, [
+            'id' => $company->id,
+            'legal_name' => 'Updated Company Name',
+            'country_code' => 'CR',
+            'phone' => '+442079460018',
+        ]);
+    });
 });
