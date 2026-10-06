@@ -40,6 +40,7 @@ trait WithMysqlFixture
             $table->uuid('company_id')->nullable()->index();
             $table->string('name');
             $table->string('display_name')->nullable();
+            $table->string('color', 7)->nullable()->unique();
             $table->string('guard_name');
             $table->timestamps();
             $table->unique(['company_id', 'name', 'guard_name'], 'roles_company_id_name_guard_name_unique');
@@ -78,12 +79,23 @@ trait WithMysqlFixture
             $table->foreign('permission_id')->references('id')->on('permissions')->cascadeOnDelete();
             $table->foreign('role_id')->references('id')->on('roles')->cascadeOnDelete();
         });
+
+        Schema::connection('mysql')->create('personal_access_tokens', function (Blueprint $table) {
+            $table->id();
+            $table->uuidMorphs('tokenable');
+            $table->text('name');
+            $table->string('token', 64)->unique();
+            $table->text('abilities')->nullable();
+            $table->timestamp('last_used_at')->nullable();
+            $table->timestamp('expires_at')->nullable()->index();
+            $table->timestamps();
+        });
     }
 
     protected function tearDownWithMysqlFixture(): void
     {
         $this->ensureTestingDatabases();
-        foreach (['role_has_permissions', 'model_has_permissions', 'model_has_roles', 'permissions', 'roles', 'users'] as $table) {
+        foreach (['role_has_permissions', 'model_has_permissions', 'model_has_roles', 'permissions', 'roles', 'personal_access_tokens', 'users'] as $table) {
             Schema::connection('mysql')->dropIfExists($table);
         }
     }

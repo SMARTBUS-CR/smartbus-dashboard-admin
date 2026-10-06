@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 return [
     'label' => [
-        'super-admin' => 'Super Administrator',
-        'admin' => 'Company Administrator',
+        'super-admin' => 'System Admin',
+        'admin' => 'Administrator',
         'driver' => 'Driver',
         'passenger' => 'Passenger',
     ],

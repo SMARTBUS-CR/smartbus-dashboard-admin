@@ -57,7 +57,7 @@ class RunCodeStyle extends Command implements PromptsForMissingInput
         }
 
         $this->newLine();
-        $this->info('¡Code style check completed successfully!');
+        $this->info('Code style check completed successfully!');
 
         return $this::SUCCESS;
     }

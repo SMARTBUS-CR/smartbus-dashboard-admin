@@ -14,8 +14,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Spatie\Permission\PermissionRegistrar;
+use Throwable;
 
 #[Connection('pgsql')]
 class Company extends Model implements HasCurrentTenantLabel, HasName
@@ -52,6 +55,31 @@ class Company extends Model implements HasCurrentTenantLabel, HasName
         return [
             'status' => CompanyStatus::class,
         ];
+    }
+
+    /** Keep company insertion and default role provisioning together on failures. */
+    protected function performInsert(Builder $query): bool
+    {
+        try {
+            return $this->getConnection()->transaction(fn (): bool => DB::connection('mysql')->transaction(fn (): bool => parent::performInsert($query))
+            );
+        } catch (Throwable $exception) {
+            // Compensate a committed MySQL write if the PostgreSQL commit fails.
+            if ($this->getKey() !== null && ! static::withTrashed()->whereKey($this->getKey())->exists()) {
+                Role::withoutGlobalScopes()->where('company_id', $this->getKey())->delete();
+            }
+            $this->exists = false;
+            $this->wasRecentlyCreated = false;
+
+            throw $exception;
+        }
+    }
+
+    public function forceDelete(): bool
+    {
+        throw ValidationException::withMessages([
+            'company' => __('Permanent company deletion is disabled. Archive the company instead.'),
+        ]);
     }
 
     /**
@@ -128,11 +156,17 @@ class Company extends Model implements HasCurrentTenantLabel, HasName
         static::created(function (Company $company): void {
             Role::withoutEvents(function () use ($company): void {
                 foreach ([UserRole::Admin, UserRole::Driver] as $role) {
-                    Role::withoutGlobalScopes()->firstOrCreate([
-                        'company_id' => $company->getKey(),
-                        'name' => $role->value,
-                        'guard_name' => 'web',
-                    ]);
+                    $role = Role::withoutGlobalScopes()->firstOrCreate(
+                        [
+                            'company_id' => $company->getKey(),
+                            'name' => $role->value,
+                            'guard_name' => 'web',
+                        ],
+                        ['color' => Role::generateColor()],
+                    );
+                    if (! $role->exists) {
+                        throw new \RuntimeException('Default company role creation was cancelled.');
+                    }
                 }
             });
 
@@ -147,7 +181,7 @@ class Company extends Model implements HasCurrentTenantLabel, HasName
      */
     public function getCurrentTenantLabel(): string
     {
-        return trans_choice('Active', 1);
+        return __('Current Company');
     }
 
     /**
