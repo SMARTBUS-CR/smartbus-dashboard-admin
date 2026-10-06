@@ -26,6 +26,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Panel;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
@@ -150,6 +151,14 @@ class RoleResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->columnSpanFull(),
+
+                Callout::make(__('Company Permissions'))
+                    ->description(__(
+                        'Selected permissions determine which actions users with this role can perform in the current company.'
+                    ))
+                    ->info()
+                    ->columnSpanFull(),
+
                 static::getShieldFormComponents(),
             ]);
     }

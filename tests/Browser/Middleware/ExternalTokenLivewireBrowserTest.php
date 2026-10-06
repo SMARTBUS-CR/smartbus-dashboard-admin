@@ -36,6 +36,8 @@ describe('External Token Validation In The Browser', function (): void {
         $page->click(Selector::getByRoleSelector('button', ['name' => 'Save changes', 'exact' => true]))
             ->assertPathIs(parse_url(Filament::getPanel('admin')->getLoginUrl(), PHP_URL_PATH))
             ->assertSee('Sign in')
+            ->assertSee('Session Ended')
+            ->assertSee('Your session is no longer valid. Please sign in again.')
             ->assertNoJavaScriptErrors();
 
         expect($company->fresh()->legal_name)->toBe($originalName);

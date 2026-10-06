@@ -13,10 +13,26 @@ use Livewire\Livewire;
 
 function companyFormData(array $overrides = []): array
 {
-    return array_replace(Company::factory()->make()->only([
-        'legal_name', 'trade_name', 'legal_id', 'operator_number', 'phone',
-        'email', 'address', 'country_code', 'timezone',
-    ]), ['status' => 'active'], $overrides);
+    $country = strtoupper($overrides['country_code'] ?? 'CR');
+
+    return array_replace(
+        Company::factory()
+            ->forCountry($country)
+            ->make()
+            ->only([
+                'legal_name',
+                'trade_name',
+                'legal_id',
+                'operator_number',
+                'phone',
+                'email',
+                'address',
+                'country_code',
+                'timezone',
+            ]),
+        ['status' => 'active'],
+        $overrides,
+    );
 }
 
 describe('Company Resource', function (): void {
@@ -340,6 +356,7 @@ describe('Company Resource', function (): void {
     test('preserves a foreign phone number when editing other company fields', function (): void {
         $company = createCompany([
             'country_code' => 'CR',
+            'timezone' => 'America/Costa_Rica',
             'phone' => '+442079460018',
         ]);
 
@@ -364,5 +381,93 @@ describe('Company Resource', function (): void {
             'country_code' => 'CR',
             'phone' => '+442079460018',
         ]);
+    });
+
+    test('sets the timezone when the selected country changes', function (string $country, string $timezone): void {
+        $tenant = createCompany();
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $tenant,
+        );
+
+        Livewire::test(CreateCompany::class)
+            ->fillForm(['country_code' => $country])
+            ->assertSchemaStateSet([
+                'country_code' => $country,
+                'timezone' => $timezone,
+            ]);
+    })->with([
+        'Belize' => ['BZ', 'America/Belize'],
+        'Costa Rica' => ['CR', 'America/Costa_Rica'],
+        'El Salvador' => ['SV', 'America/El_Salvador'],
+        'Guatemala' => ['GT', 'America/Guatemala'],
+        'Honduras' => ['HN', 'America/Tegucigalpa'],
+        'Nicaragua' => ['NI', 'America/Managua'],
+        'Panama' => ['PA', 'America/Panama'],
+    ]);
+
+    test('rejects a country outside the supported region', function (): void {
+        $tenant = createCompany();
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $tenant,
+        );
+
+        $companiesBefore = Company::count();
+
+        Livewire::test(CreateCompany::class)
+            ->fillForm(companyFormData([
+                'country_code' => 'US',
+                'timezone' => 'America/New_York',
+            ]))
+            ->call('create')
+            ->assertHasFormErrors(['country_code']);
+
+        expect(Company::count())->toBe($companiesBefore);
+    });
+
+    test('rejects a timezone that does not belong to the selected country', function (): void {
+        $tenant = createCompany();
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $tenant,
+        );
+
+        $companiesBefore = Company::count();
+
+        Livewire::test(CreateCompany::class)
+            ->fillForm(companyFormData([
+                'country_code' => 'CR',
+                'timezone' => 'America/Panama',
+            ]))
+            ->call('create')
+            ->assertHasFormErrors(['timezone']);
+
+        expect(Company::count())->toBe($companiesBefore);
+    });
+
+    test('preserves the country and timezone when opening an existing company', function (): void {
+        $company = createCompany([
+            'country_code' => 'PA',
+            'timezone' => 'America/Panama',
+        ]);
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $company,
+        );
+
+        Livewire::test(EditCompany::class, [
+            'record' => $company->getRouteKey(),
+        ])
+            ->assertSchemaStateSet([
+                'country_code' => 'PA',
+                'timezone' => 'America/Panama',
+            ]);
+
+        expect($company->fresh()->timezone)->toBe('America/Panama');
     });
 });

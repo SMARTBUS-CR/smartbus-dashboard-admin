@@ -20,6 +20,7 @@ class CompanyFactory extends Factory
      * @var array<string, string>
      */
     private const TIMEZONES_BY_COUNTRY = [
+        'BZ' => 'America/Belize',
         'CR' => 'America/Costa_Rica',
         'GT' => 'America/Guatemala',
         'SV' => 'America/El_Salvador',

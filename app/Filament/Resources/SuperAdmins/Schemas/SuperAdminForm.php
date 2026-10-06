@@ -18,6 +18,13 @@ class SuperAdminForm
     public static function configure(Schema $schema): Schema
     {
         return $schema->components([
+            Callout::make(__('Global Access'))
+                ->description(__(
+                    'System admins can manage all companies and are not assigned to any company.'
+                ))
+                ->info()
+                ->columnSpanFull(),
+
             Section::make(__('Account Information'))
                 ->icon(Heroicon::OutlinedUserCircle)
                 ->description(__('The account information of the user.'))

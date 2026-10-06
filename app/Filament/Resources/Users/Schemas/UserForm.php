@@ -43,6 +43,9 @@ class UserForm
                     Select::make('roles')
                         ->label(__('Roles'))
                         ->prefixIcon(LucideIcon::UserKey)
+                        ->helperText(__(
+                            'Roles apply only to the currently selected company.'
+                        ))
                         ->multiple()
                         ->searchable()
                         ->options(self::getRoleOptions(...))
