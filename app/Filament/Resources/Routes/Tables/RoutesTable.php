@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Routes\Tables;
 
 use App\Filament\Resources\Routes\RouteResource;
 use App\Models\Route;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\RestoreAction;
@@ -11,6 +12,9 @@ use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Filament\Support\Colors\Color;
+use Filament\Support\Enums\FontFamily;
+use Filament\Support\Icons\Heroicon;
 
 class RoutesTable
 {
@@ -20,6 +24,9 @@ class RoutesTable
             ->columns([
                 TextColumn::make('code')
                     ->label(__('Code'))
+                    ->fontFamily(FontFamily::Mono)
+                    ->color(Color::Gray)
+                    ->badge()
                     ->searchable()
                     ->sortable(),
 
@@ -46,23 +53,29 @@ class RoutesTable
 
                 EditAction::make()
                     ->color('primary'),
-                DeleteAction::make()
-                    ->label(__('Archive'))
-                    ->color('warning')
-                    ->requiresConfirmation()
-                    ->modalHeading(__('Archive Route'))
-                    ->modalDescription(__(
-                        'Archiving this route hides it from the current list and preserves its configuration.'
-                    ))
-                    ->modalSubmitActionLabel(__('Archive'))
-                    ->successNotificationTitle(__('Route Archived')),
-                RestoreAction::make()
-                    ->label(__('Restore'))
-                    ->color('success')
-                    ->requiresConfirmation()
-                    ->modalHeading(__('Restore Route'))
-                    ->modalSubmitActionLabel(__('Restore'))
-                    ->successNotificationTitle(__('Route Restored')),
+
+                ActionGroup::make([
+                    DeleteAction::make()
+                        ->label(__('Archive'))
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->modalHeading(__('Archive Route'))
+                        ->modalDescription(__(
+                            'Archiving this route hides it from the current list and preserves its configuration.'
+                        ))
+                        ->modalSubmitActionLabel(__('Archive'))
+                        ->successNotificationTitle(__('Route Archived')),
+                    RestoreAction::make()
+                        ->label(__('Restore'))
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading(__('Restore Route'))
+                        ->modalSubmitActionLabel(__('Restore'))
+                        ->successNotificationTitle(__('Route Restored')),
+                ])
+                    ->label(__('More Actions'))
+                    ->icon(Heroicon::OutlinedEllipsisVertical)
+                    ->color('gray'),
             ])
             ->recordUrl(function (Route $record): ?string {
                 if (RouteResource::canEdit($record)) {

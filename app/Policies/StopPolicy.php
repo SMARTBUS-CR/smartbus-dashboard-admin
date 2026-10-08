@@ -44,6 +44,28 @@ class StopPolicy
             && $user->can('Update:Stop');
     }
 
+    public function delete(User $user, Stop $stop): bool
+    {
+        $company = Filament::getTenant();
+
+        return $this->canAccessCompany($user)
+            && ! $stop->trashed()
+            && $stop->company_id !== null
+            && (string) $stop->company_id === (string) $company->getKey()
+            && $user->can('Delete:Stop');
+    }
+
+    public function restore(User $user, Stop $stop): bool
+    {
+        $company = Filament::getTenant();
+
+        return $this->canAccessCompany($user)
+            && $stop->trashed()
+            && $stop->company_id !== null
+            && (string) $stop->company_id === (string) $company->getKey()
+            && $user->can('Restore:Stop');
+    }
+
     private function canAccessCompany(User $user): bool
     {
         $company = Filament::getTenant();

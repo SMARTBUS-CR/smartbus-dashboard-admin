@@ -31,6 +31,20 @@ class Stop extends Model
 
     protected static function booted(): void
     {
+        static::deleting(function (Stop $stop): void {
+            $isUsedByPattern = RoutePatternStop::query()
+                ->where('stop_id', $stop->getKey())
+                ->exists();
+
+            if ($isUsedByPattern) {
+                throw ValidationException::withMessages([
+                    'stop' => __(
+                        'This stop is used by a route pattern. Remove it from all patterns before archiving it.',
+                    ),
+                ]);
+            }
+        });
+        
         static::updating(function (Stop $stop): void {
             if (! $stop->isDirty('company_id') || $stop->company_id === null) {
                 return;

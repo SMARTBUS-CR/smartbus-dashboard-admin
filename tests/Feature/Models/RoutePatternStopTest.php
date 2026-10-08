@@ -279,10 +279,11 @@ describe('Route Pattern Stop Archived References', function (): void {
 
         $occurrence->load('pattern.route', 'stop');
 
+        // Simulate legacy data containing an archived stop still referenced by a pattern.
         match ($reference) {
             'route' => $route->delete(),
             'pattern' => $pattern->delete(),
-            'stop' => $stop->delete(),
+            'stop' => $stop->deleteQuietly(),
         };
 
         expect(fn () => $occurrence->update([

@@ -16,172 +16,191 @@ use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 
 class StopForm
 {
-    public static function configure(Schema $schema): Schema
+    public static function configure(Schema $schema, bool $compact = false): Schema
     {
-        return $schema->components([
-            Section::make(__('Stop Information'))
-                ->schema([
-                    Toggle::make('is_shared')
-                        ->label(__('Shared Stop'))
-                        ->helperText(__(
-                            'Shared stops can be used by multiple companies. Only system admins can manage them.',
-                        ))
-                        ->default(false)
-                        ->visible(
-                            fn (string $operation): bool => $operation === 'create'
-                                && (Filament::auth()->user()?->isSuperAdmin() ?? false),
-                        )
-                        ->dehydrated(
-                            fn (string $operation): bool => $operation === 'create'
-                                && (Filament::auth()->user()?->isSuperAdmin() ?? false),
-                        )
-                        ->rules(['boolean']),
+        $informationFields = [
+            Toggle::make('is_shared')
+                ->label(__('Shared Stop'))
+                ->helperText(__(
+                    'Shared stops can be used by multiple companies. Only system admins can manage them.',
+                ))
+                ->default(false)
+                ->visible(
+                    fn (string $operation): bool => $operation === 'create'
+                        && (Filament::auth()->user()?->isSuperAdmin() ?? false),
+                )
+                ->dehydrated(
+                    fn (string $operation): bool => $operation === 'create'
+                        && (Filament::auth()->user()?->isSuperAdmin() ?? false),
+                )
+                ->rules(['boolean']),
 
-                    TextInput::make('name')
-                        ->label(__('Stop Name'))
-                        ->required()
-                        ->maxLength(255),
+            TextInput::make('name')
+                ->label(__('Stop Name'))
+                ->prefixIcon(LucideIcon::BusFront)
+                ->required()
+                ->maxLength(255),
 
-                    Textarea::make('description')
-                        ->label(__('Description'))
-                        ->rows(3),
-                ])
-                ->columnSpanFull(),
+            Textarea::make('description')
+                ->label(__('Description'))
+                ->rows(3),
+        ];
 
-            Section::make(__('Location'))
-                ->description(__('Search for a place or select the boarding point on the map.'))
-                ->schema([
-                    LocationSearchInput::make('location_search')
-                        ->label(__('Search Location'))
-                        ->extraAttributes(['data-testid' => 'location-search'])
-                        ->helperText(__(
-                            'Search for a place, select a result, then adjust the boarding point on the map.',
-                        ))
-                        ->live()
-                        ->dehydrated(false)
-                        ->coordinateLabelUsing(
-                            fn (?Stop $record): string => $record?->name
-                                ?? __('Selected Location'),
-                        )
-                        ->afterStateHydrated(function (LocationSearchInput $component, ?Stop $record): void {
-                            if (
-                                ! $record
-                                || $record->latitude === null
-                                || $record->longitude === null
-                            ) {
-                                $component->state(null);
+        return $schema
+            ->columns(1)
+            ->components([
+                ...($compact
+                    ? $informationFields
+                    : [
+                        Section::make(__('Stop Information'))
+                            ->description(__('The name and details of the boarding stop.'))
+                            ->icon(LucideIcon::BusFront)
+                            ->schema($informationFields)
+                            ->columnSpanFull(),
+                    ]),
 
-                                return;
-                            }
+                Section::make(__('Location'))
+                    ->description(__('Search for a place or select the boarding point on the map.'))
+                    ->icon(Heroicon::OutlinedMapPin)
+                    ->schema([
+                        LocationSearchInput::make('location_search')
+                            ->label(__('Search Location'))
+                            ->prefixIcon(Heroicon::OutlinedMagnifyingGlass)
+                            ->extraAttributes(['data-testid' => 'location-search'])
+                            ->helperText(__(
+                                'Search for a place, select a result, then adjust the boarding point on the map.',
+                            ))
+                            ->live()
+                            ->dehydrated(false)
+                            ->coordinateLabelUsing(
+                                fn (?Stop $record): string => $record?->name
+                                    ?? __('Selected Location'),
+                            )
+                            ->afterStateHydrated(function (LocationSearchInput $component, ?Stop $record): void {
+                                if (
+                                    ! $record
+                                    || $record->latitude === null
+                                    || $record->longitude === null
+                                ) {
+                                    $component->state(null);
 
-                            $component->state(new Coordinate(
-                                (float) $record->latitude,
-                                (float) $record->longitude,
-                            ));
-                        })
-                        ->afterStateUpdated(function (Set $set, mixed $state): void {
-                            $coordinate = match (true) {
-                                $state instanceof GeoSearchResult => $state->coordinate,
-                                $state instanceof Coordinate => $state,
-                                default => null,
-                            };
+                                    return;
+                                }
 
-                            if ($coordinate === null) {
-                                return;
-                            }
+                                $component->state(new Coordinate(
+                                    (float) $record->latitude,
+                                    (float) $record->longitude,
+                                ));
+                            })
+                            ->afterStateUpdated(function (Set $set, mixed $state): void {
+                                $coordinate = match (true) {
+                                    $state instanceof GeoSearchResult => $state->coordinate,
+                                    $state instanceof Coordinate => $state,
+                                    default => null,
+                                };
 
-                            $set('latitude', sprintf('%.7f', $coordinate->lat));
-                            $set('longitude', sprintf('%.7f', $coordinate->lng));
-                            $set('location', $coordinate->toArray());
-                        })
-                        ->columnSpanFull(),
+                                if ($coordinate === null) {
+                                    return;
+                                }
 
-                    MapPicker::make('location')
-                        ->label(__('Boarding Point'))
-                        ->helperText(__('Search for a place or select the boarding point on the map.'))
-                        ->height(400)
-                        ->center([9.9281, -84.0907])
-                        ->zoom(13)
-                        ->defaultPickMarker(
-                            fn (): LucideMarker => LucideMarker::make()
-                                ->lucideIcon(LucideIcon::BusFront),
-                        )
-                        ->autoCenter(false)
-                        ->zoomControl()
-                        ->scaleControl()
-                        ->fullscreenControl()
-                        ->live()
-                        ->dehydrated(false)
-                        ->afterStateHydrated(function (MapPicker $component, ?Stop $record): void {
-                            if (
-                                ! $record
-                                || $record->latitude === null
-                                || $record->longitude === null
-                            ) {
-                                $component->state(null);
+                                $set('latitude', sprintf('%.7f', $coordinate->lat));
+                                $set('longitude', sprintf('%.7f', $coordinate->lng));
+                                $set('location', $coordinate->toArray());
+                            })
+                            ->columnSpanFull(),
 
-                                return;
-                            }
+                        MapPicker::make('location')
+                            ->label(__('Boarding Point'))
+                            ->helperText(__('Search for a place or select the boarding point on the map.'))
+                            ->height(400)
+                            ->center([9.9281, -84.0907])
+                            ->zoom(13)
+                            ->defaultPickMarker(
+                                fn (): LucideMarker => LucideMarker::make()
+                                    ->lucideIcon(LucideIcon::BusFront),
+                            )
+                            ->autoCenter(false)
+                            ->zoomControl()
+                            ->scaleControl()
+                            ->fullscreenControl()
+                            ->live()
+                            ->dehydrated(false)
+                            ->afterStateHydrated(function (MapPicker $component, ?Stop $record): void {
+                                if (
+                                    ! $record
+                                    || $record->latitude === null
+                                    || $record->longitude === null
+                                ) {
+                                    $component->state(null);
 
-                            $component->state([
-                                'lat' => (float) $record->latitude,
-                                'lng' => (float) $record->longitude,
-                            ]);
-                        })
-                        ->afterStateUpdated(function (Set $set, mixed $state): void {
-                            if (! $state instanceof Coordinate) {
-                                return;
-                            }
+                                    return;
+                                }
 
-                            $set('latitude', sprintf('%.7f', $state->lat));
-                            $set('longitude', sprintf('%.7f', $state->lng));
-                        })
-                        ->columnSpanFull(),
+                                $component->state([
+                                    'lat' => (float) $record->latitude,
+                                    'lng' => (float) $record->longitude,
+                                ]);
+                            })
+                            ->afterStateUpdated(function (Set $set, mixed $state): void {
+                                if (! $state instanceof Coordinate) {
+                                    return;
+                                }
 
-                    Section::make(__('Advanced Coordinates'))
-                        ->description(__(
-                            'Optional manual adjustment. You can select the location using search or the map.',
-                        ))
-                        ->schema([
-                            TextInput::make('latitude')
-                                ->label(__('Latitude'))
-                                ->numeric()
-                                ->required()
-                                ->live(onBlur: true)
-                                ->afterStateUpdated(
-                                    fn (TextInput $component, Set $set) => self::syncMapLocation($component, $set),
-                                )
-                                ->rules([
-                                    'bail',
-                                    'numeric',
-                                    'between:-90,90',
-                                ]),
+                                $set('latitude', sprintf('%.7f', $state->lat));
+                                $set('longitude', sprintf('%.7f', $state->lng));
+                            })
+                            ->columnSpanFull(),
 
-                            TextInput::make('longitude')
-                                ->label(__('Longitude'))
-                                ->numeric()
-                                ->required()
-                                ->live(onBlur: true)
-                                ->afterStateUpdated(
-                                    fn (TextInput $component, Set $set) => self::syncMapLocation($component, $set),
-                                )
-                                ->rules([
-                                    'bail',
-                                    'numeric',
-                                    'between:-180,180',
-                                ]),
-                        ])
-                        ->columns(2)
-                        ->collapsible()
-                        ->collapsed()
-                        ->columnSpanFull(),
-                ])
-                ->columns(2)
-                ->columnSpanFull(),
-        ]);
+                        Section::make(__('Advanced Coordinates'))
+                            ->description(__(
+                                'Optional manual adjustment. You can select the location using search or the map.',
+                            ))
+                            ->icon(Heroicon::OutlinedCodeBracket)
+                            ->schema([
+                                TextInput::make('latitude')
+                                    ->label(__('Latitude'))
+                                    ->prefixIcon(Heroicon::OutlinedArrowsUpDown)
+                                    ->numeric()
+                                    ->required()
+                                    ->live(onBlur: true)
+                                    ->afterStateUpdated(
+                                        fn (TextInput $component, Set $set) => self::syncMapLocation($component, $set),
+                                    )
+                                    ->rules([
+                                        'bail',
+                                        'numeric',
+                                        'between:-90,90',
+                                    ]),
+
+                                TextInput::make('longitude')
+                                    ->label(__('Longitude'))
+                                    ->prefixIcon(Heroicon::OutlinedArrowsRightLeft)
+                                    ->numeric()
+                                    ->required()
+                                    ->live(onBlur: true)
+                                    ->afterStateUpdated(
+                                        fn (TextInput $component, Set $set) => self::syncMapLocation($component, $set),
+                                    )
+                                    ->rules([
+                                        'bail',
+                                        'numeric',
+                                        'between:-180,180',
+                                    ]),
+                            ])
+                            ->columns($compact ? 1 : 2)
+                            ->collapsible()
+                            ->collapsed()
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2)
+                    ->collapsible($compact)
+                    ->collapsed($compact)
+                    ->columnSpanFull(),
+            ]);
     }
 
     private static function syncMapLocation(

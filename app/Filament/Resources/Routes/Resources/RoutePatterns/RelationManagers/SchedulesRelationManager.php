@@ -2,7 +2,13 @@
 
 namespace App\Filament\Resources\Routes\Resources\RoutePatterns\RelationManagers;
 
+use Filament\Actions\ActionGroup;
+use Filament\Support\Enums\Alignment;
+use Filament\Support\Enums\Width;
+use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Carbon;
 use App\Filament\Resources\Routes\Resources\RoutePatterns\RoutePatternResource;
+use App\Filament\Support\TableSectionHeader;
 use App\Models\Company;
 use App\Models\RoutePattern;
 use App\Models\RouteSchedule;
@@ -25,12 +31,15 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\HtmlString;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class SchedulesRelationManager extends RelationManager
 {
     protected static string $relationship = 'schedules';
+
+    protected static string|\BackedEnum|null $icon = Heroicon::OutlinedCalendarDays;
 
     public static function getTitle(
         Model $ownerRecord,
@@ -88,60 +97,64 @@ class SchedulesRelationManager extends RelationManager
 
     public function form(Schema $schema): Schema
     {
-        return $schema->components([
-            Select::make('day_of_week')
-                ->label(__('Day'))
-                ->options([
-                    1 => __('Monday'),
-                    2 => __('Tuesday'),
-                    3 => __('Wednesday'),
-                    4 => __('Thursday'),
-                    5 => __('Friday'),
-                    6 => __('Saturday'),
-                    0 => __('Sunday'),
-                ])
-                ->required(),
+        return $schema
+            ->columns(1)
+            ->components([
+                Select::make('day_of_week')
+                    ->label(__('Day'))
+                    ->prefixIcon(Heroicon::OutlinedCalendarDays)
+                    ->options([
+                        1 => __('Monday'),
+                        2 => __('Tuesday'),
+                        3 => __('Wednesday'),
+                        4 => __('Thursday'),
+                        5 => __('Friday'),
+                        6 => __('Saturday'),
+                        0 => __('Sunday'),
+                    ])
+                    ->required(),
 
-            TimePicker::make('departure_time')
-                ->label(__('Departure Time'))
-                ->seconds(false)
-                ->format('H:i:s')
-                ->timezone(config('app.timezone'))
-                ->required()
-                ->rules(['date_format:H:i,H:i:s']),
+                TimePicker::make('departure_time')
+                    ->label(__('Departure Time'))
+                    ->prefixIcon(Heroicon::OutlinedClock)
+                    ->seconds(false)
+                    ->format('H:i:s')
+                    ->timezone(config('app.timezone'))
+                    ->required()
+                    ->rules(['date_format:H:i,H:i:s']),
 
-            DatePicker::make('valid_from')
-                ->label(__('Valid From'))
-                ->helperText(__('Leave blank if there is no start date.'))
-                ->live()
-                ->rules(['nullable', 'date']),
+                DatePicker::make('valid_from')
+                    ->label(__('Valid From'))
+                    ->prefixIcon(Heroicon::OutlinedCalendarDays)
+                    ->helperText(__('Leave blank if there is no start date.'))
+                    ->live()
+                    ->rules(['nullable', 'date']),
 
-            DatePicker::make('valid_until')
-                ->label(__('Valid Until'))
-                ->helperText(__('Leave blank if there is no end date.'))
-                ->rules(['nullable', 'date'])
-                ->afterOrEqual(
-                    fn (Get $get): string => filled($get('valid_from'))
-                        ? 'valid_from'
-                        : '',
-                ),
-        ]);
+                DatePicker::make('valid_until')
+                    ->label(__('Valid Until'))
+                    ->prefixIcon(Heroicon::OutlinedCalendarDays)
+                    ->helperText(__('Leave blank if there is no end date.'))
+                    ->rules(['nullable', 'date'])
+                    ->afterOrEqual(
+                        fn (Get $get): string => filled($get('valid_from'))
+                            ? 'valid_from'
+                            : '',
+                    ),
+            ]);
     }
 
     public function table(Table $table): Table
     {
         return $table
-            ->description(fn (): string => __(
-                'Departure times use the company timezone: :timezone.',
-                [
-                    'timezone' => $this->getOwnerRecord()
-                        ->route()
-                        ->withTrashed()
-                        ->firstOrFail()
-                        ->company
-                        ->timezone,
-                ],
+            ->heading(TableSectionHeader::heading(
+                __('Schedules'),
+                Heroicon::OutlinedCalendarDays,
             ))
+            ->description(
+                fn (): ?HtmlString => TableSectionHeader::description(
+                    $this->departureTimezoneDescription(),
+                ),
+            )
             ->modifyQueryUsing(
                 fn (Builder $query): Builder => $query
                     ->orderBy('day_of_week')
@@ -164,6 +177,17 @@ class SchedulesRelationManager extends RelationManager
 
                 TextColumn::make('departure_time')
                     ->label(__('Departure Time'))
+                    ->tooltip(fn (): string => __(
+                        'Company timezone: :timezone',
+                        [
+                            'timezone' => $this->getOwnerRecord()
+                                ->route()
+                                ->withTrashed()
+                                ->firstOrFail()
+                                ->company
+                                ->timezone,
+                        ],
+                    ))
                     ->formatStateUsing(
                         fn (string $state): string => substr($state, 0, 5),
                     ),
@@ -185,6 +209,10 @@ class SchedulesRelationManager extends RelationManager
                     ->modalDescription(__(
                         'This departure repeats every week on the selected day during its validity period.',
                     ))
+                    ->modalIcon(Heroicon::OutlinedCalendarDays)
+                    ->modalIconColor('success')
+                    ->modalAlignment(Alignment::Start)
+                    ->modalWidth(Width::Large)
                     ->modalSubmitActionLabel(__('Add Departure'))
                     ->authorize(fn (): bool => $this->canManageSchedules())
                     ->using(
@@ -195,6 +223,13 @@ class SchedulesRelationManager extends RelationManager
             ->recordActions([
                 EditAction::make()
                     ->label(__('Edit Departure'))
+                    ->modalDescription(__(
+                        'This departure repeats every week on the selected day during its validity period.',
+                    ))
+                    ->modalIcon(Heroicon::OutlinedPencilSquare)
+                    ->modalIconColor('primary')
+                    ->modalAlignment(Alignment::Start)
+                    ->modalWidth(Width::Large)
                     ->modalHeading(__('Edit Departure'))
                     ->modalSubmitActionLabel(__('Save Changes'))
                     ->authorize(fn (): bool => $this->canManageSchedules())
@@ -202,105 +237,131 @@ class SchedulesRelationManager extends RelationManager
                         fn (RouteSchedule $record, array $data): RouteSchedule => $this->updateSchedule($record, $data),
                     )
                     ->successNotificationTitle(__('Departure Updated')),
-                Action::make('viewSuspensions')
-                    ->label(__('View Suspensions'))
-                    ->modalHeading(__('Suspensions'))
-                    ->modalDescription(__(
-                        'This departure will not operate on the listed dates.',
-                    ))
-                    ->modalSubmitAction(false)
-                    ->modalCancelActionLabel(__('Close'))
-                    ->authorize(fn (): bool => static::canViewForRecord(
-                        $this->getOwnerRecord(),
-                        $this->getPageClass(),
-                    ))
-                    ->schema(fn (RouteSchedule $record): array => [
-                        TextEntry::make('suspended_dates')
-                            ->label(__('Suspended Dates'))
-                            ->state(
-                                fn (): array => $record->exceptions()
-                                    ->orderBy('service_date')
-                                    ->get()
-                                    ->map(
-                                        fn (RouteScheduleException $exception): string =>
-                                            $exception->service_date
-                                                ->locale(app()->getLocale())
-                                                ->isoFormat('LL'),
-                                    )
-                                    ->all(),
-                            )
-                            ->listWithLineBreaks()
-                            ->placeholder(__('No Suspensions')),
-                    ]),
-                Action::make('suspend')
-                    ->label(__('Suspend Departure'))
-                    ->modalHeading(__('Suspend Departure'))
-                    ->modalDescription(__(
-                        'Only the selected date will be suspended. The weekly schedule will remain unchanged.',
-                    ))
-                    ->modalSubmitActionLabel(__('Suspend Departure'))
-                    ->color('warning')
-                    ->authorize(fn (): bool => $this->canManageSchedules())
-                    ->schema(fn (RouteSchedule $record): array => [
-                        DatePicker::make('service_date')
-                            ->label(__('Suspension Date'))
-                            ->helperText(__(
-                                'Choose a date when this departure is scheduled to operate.',
-                            ))
-                            ->required()
-                            ->rules([
-                                'date',
-                                Rule::unique(RouteScheduleException::class, 'service_date')
-                                    ->where('route_schedule_id', $record->getKey()),
-                            ]),
-                    ])
-                    ->action(function (RouteSchedule $record, array $data): void {
-                        $this->createSuspension($record, $data);
+                
+                ActionGroup::make([
+                    Action::make('viewSuspensions')
+                        ->label(__('View Suspensions'))
+                        ->color('info')
+                        ->icon(Heroicon::OutlinedEye)
+                        ->modalHeading(__('Suspensions'))
+                        ->modalDescription(__(
+                            'This departure will not operate on the listed dates.',
+                        ))
+                        ->modalIcon(Heroicon::OutlinedEye)
+                        ->modalIconColor('info')
+                        ->modalAlignment(Alignment::Start)
+                        ->modalWidth(Width::Large)
+                        ->modalSubmitAction(false)
+                        ->modalCancelActionLabel(__('Close'))
+                        ->authorize(fn (): bool => static::canViewForRecord(
+                            $this->getOwnerRecord(),
+                            $this->getPageClass(),
+                        ))
+                        ->schema(fn (RouteSchedule $record): array => [
+                            TextEntry::make('suspended_dates')
+                                ->label(__('Suspended Dates'))
+                                ->state(
+                                    fn (): array => $record->exceptions()
+                                        ->orderBy('service_date')
+                                        ->get()
+                                        ->map(
+                                            fn (RouteScheduleException $exception): string =>
+                                                $exception->service_date
+                                                    ->locale(app()->getLocale())
+                                                    ->isoFormat('LL'),
+                                        )
+                                        ->all(),
+                                )
+                                ->listWithLineBreaks()
+                                ->placeholder(__('No Suspensions')),
+                        ]),
+                    Action::make('suspend')
+                        ->label(__('Suspend Departure'))
+                        ->color('warning')
+                        ->icon(Heroicon::OutlinedPauseCircle)
+                        ->modalHeading(__('Suspend Departure'))
+                        ->modalDescription(__(
+                            'Only the selected date will be suspended. The weekly schedule will remain unchanged.',
+                        ))
+                        ->modalIcon(Heroicon::OutlinedPauseCircle)
+                        ->modalIconColor('warning')
+                        ->modalAlignment(Alignment::Start)
+                        ->modalWidth(Width::Large)
+                        ->modalSubmitActionLabel(__('Suspend Departure'))
+                        ->color('warning')
+                        ->authorize(fn (): bool => $this->canManageSchedules())
+                        ->schema(fn (RouteSchedule $record): array => [
+                            DatePicker::make('service_date')
+                                ->label(__('Suspension Date'))
+                                ->prefixIcon(Heroicon::OutlinedCalendarDays)
+                                ->helperText(__(
+                                    'Choose a date when this departure is scheduled to operate.',
+                                ))
+                                ->required()
+                                ->rules([
+                                    'date',
+                                    Rule::unique(RouteScheduleException::class, 'service_date')
+                                        ->where('route_schedule_id', $record->getKey()),
+                                ]),
+                        ])
+                        ->action(function (RouteSchedule $record, array $data): void {
+                            $this->createSuspension($record, $data);
 
-                        Notification::make()
-                            ->success()
-                            ->title(__('Departure Suspended'))
-                            ->send();
-                    }),
-                Action::make('resume')
-                    ->label(__('Resume Departure'))
-                    ->modalHeading(__('Resume Departure'))
-                    ->modalDescription(__(
-                        'Remove the suspension for the selected date. Other suspensions will remain unchanged.',
-                    ))
-                    ->modalSubmitActionLabel(__('Resume Departure'))
-                    ->color('success')
-                    ->authorize(fn (): bool => $this->canManageSchedules())
-                    ->disabled(
-                        fn (RouteSchedule $record): bool => ! $record->exceptions()->exists(),
-                    )
-                    ->schema(fn (RouteSchedule $record): array => [
-                        Select::make('exception_id')
-                            ->label(__('Suspended Date'))
-                            ->options(
-                                fn (): array => $record->exceptions()
-                                    ->orderBy('service_date')
-                                    ->get()
-                                    ->mapWithKeys(
-                                        fn (RouteScheduleException $exception): array => [
-                                            $exception->getKey() => $exception->service_date
-                                                ->locale(app()->getLocale())
-                                                ->isoFormat('LL'),
-                                        ],
-                                    )
-                                    ->all(),
-                            )
-                            ->searchable()
-                            ->required(),
-                    ])
-                    ->action(function (RouteSchedule $record, array $data): void {
-                        $this->resumeDeparture($record, $data);
+                            Notification::make()
+                                ->success()
+                                ->title(__('Departure Suspended'))
+                                ->send();
+                        }),
+                    Action::make('resume')
+                        ->label(__('Resume Departure'))
+                        ->color('success')
+                        ->icon(Heroicon::OutlinedPlayCircle)
+                        ->modalHeading(__('Resume Departure'))
+                        ->modalDescription(__(
+                            'Remove the suspension for the selected date. Other suspensions will remain unchanged.',
+                        ))
+                        ->modalIcon(Heroicon::OutlinedPlayCircle)
+                        ->modalIconColor('success')
+                        ->modalAlignment(Alignment::Start)
+                        ->modalWidth(Width::Large)
+                        ->modalSubmitActionLabel(__('Resume Departure'))
+                        ->color('success')
+                        ->authorize(fn (): bool => $this->canManageSchedules())
+                        ->disabled(
+                            fn (RouteSchedule $record): bool => ! $record->exceptions()->exists(),
+                        )
+                        ->schema(fn (RouteSchedule $record): array => [
+                            Select::make('exception_id')
+                                ->label(__('Suspended Date'))
+                                ->prefixIcon(Heroicon::OutlinedCalendarDays)
+                                ->options(
+                                    fn (): array => $record->exceptions()
+                                        ->orderBy('service_date')
+                                        ->get()
+                                        ->mapWithKeys(
+                                            fn (RouteScheduleException $exception): array => [
+                                                $exception->getKey() => $exception->service_date
+                                                    ->locale(app()->getLocale())
+                                                    ->isoFormat('LL'),
+                                            ],
+                                        )
+                                        ->all(),
+                                )
+                                ->searchable()
+                                ->required(),
+                        ])
+                        ->action(function (RouteSchedule $record, array $data): void {
+                            $this->resumeDeparture($record, $data);
 
-                        Notification::make()
-                            ->success()
-                            ->title(__('Departure Resumed'))
-                            ->send();
-                    }),
+                            Notification::make()
+                                ->success()
+                                ->title(__('Departure Resumed'))
+                                ->send();
+                        }),
+                ])
+                    ->label(__('More Actions'))
+                    ->icon(Heroicon::OutlinedEllipsisVertical)
+                    ->color('gray'),
             ])
             ->toolbarActions([])
             ->emptyStateHeading(__('No Schedules Configured'))
@@ -516,5 +577,29 @@ class SchedulesRelationManager extends RelationManager
                 ),
             ]);
         }
+    }
+
+    private function departureTimezoneDescription(): string
+    {
+        $timezone = $this->getOwnerRecord()
+            ->route()
+            ->withTrashed()
+            ->firstOrFail()
+            ->company
+            ->timezone;
+
+        $location = (string) str($timezone)
+            ->afterLast('/')
+            ->replace('_', ' ');
+
+        $offset = Carbon::now($timezone)->format('P');
+
+        return __(
+            'Departure times use :location local time (UTC:offset).',
+            [
+                'location' => __($location),
+                'offset' => $offset,
+            ],
+        );
     }
 }

@@ -216,7 +216,8 @@ describe('Route Pattern Stop Reordering', function (): void {
             'minutes_from_start' => 10,
         ]);
 
-        $secondStop->delete();
+        // Simulate legacy data containing an archived stop still referenced by a pattern.
+        $secondStop->deleteQuietly();
 
         expect(fn () => app(RoutePatternStopService::class)->reorder(
             $pattern,

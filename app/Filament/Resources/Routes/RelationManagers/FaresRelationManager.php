@@ -2,6 +2,10 @@
 
 namespace App\Filament\Resources\Routes\RelationManagers;
 
+use App\Filament\Support\TableSectionHeader;
+use Filament\Support\Enums\Alignment;
+use Filament\Support\Enums\Width;
+use Filament\Support\Icons\Heroicon;
 use App\Filament\Resources\Routes\RouteResource;
 use App\Models\Company;
 use App\Models\Route;
@@ -17,6 +21,8 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Filament\Support\Colors\Color;
+use Filament\Support\Enums\FontFamily;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +31,8 @@ use Illuminate\Validation\ValidationException;
 class FaresRelationManager extends RelationManager
 {
     protected static string $relationship = 'fares';
+
+    protected static string|\BackedEnum|null $icon = Heroicon::OutlinedBanknotes;
 
     public static function getTitle(
         Model $ownerRecord,
@@ -74,59 +82,72 @@ class FaresRelationManager extends RelationManager
 
     public function form(Schema $schema): Schema
     {
-        return $schema->components([
-            TextInput::make('amount')
-                ->label(__('Amount'))
-                ->helperText(__('Use zero only when travel is free.'))
-                ->numeric()
-                ->required()
-                ->rules([
-                    'bail',
-                    'numeric',
-                    'decimal:0,2',
-                    'min:0',
-                    'max:9999999999.99',
-                ]),
+        return $schema
+            ->columns(1)
+            ->components([
+                TextInput::make('amount')
+                    ->label(__('Amount'))
+                    ->prefixIcon(Heroicon::OutlinedBanknotes)
+                    ->helperText(__('Use zero only when travel is free.'))
+                    ->numeric()
+                    ->required()
+                    ->rules([
+                        'bail',
+                        'numeric',
+                        'decimal:0,2',
+                        'min:0',
+                        'max:9999999999.99',
+                    ]),
 
-            Select::make('currency')
-                ->label(__('Currency'))
-                ->options(array_combine(
-                    RouteFare::SUPPORTED_CURRENCIES,
-                    RouteFare::SUPPORTED_CURRENCIES,
-                ))
-                ->required(),
+                Select::make('currency')
+                    ->label(__('Currency'))
+                    ->prefixIcon(Heroicon::OutlinedCurrencyDollar)
+                    ->options(array_combine(
+                        RouteFare::SUPPORTED_CURRENCIES,
+                        RouteFare::SUPPORTED_CURRENCIES,
+                    ))
+                    ->required(),
 
-            DatePicker::make('valid_from')
-                ->label(__('Valid From'))
-                ->helperText(__('Leave blank if there is no start date.'))
-                ->live()
-                ->rules(['nullable', 'date']),
+                DatePicker::make('valid_from')
+                    ->label(__('Valid From'))
+                    ->prefixIcon(Heroicon::OutlinedCalendarDays)
+                    ->helperText(__('Leave blank if there is no start date.'))
+                    ->live()
+                    ->rules(['nullable', 'date']),
 
-            DatePicker::make('valid_until')
-                ->label(__('Valid Until'))
-                ->helperText(__('Leave blank to keep this fare valid indefinitely.'))
-                ->rules(['nullable', 'date'])
-                ->afterOrEqual(
-                    fn (Get $get): string => filled($get('valid_from'))
-                        ? 'valid_from'
-                        : '',
-                ),
-        ]);
+                DatePicker::make('valid_until')
+                    ->label(__('Valid Until'))
+                    ->prefixIcon(Heroicon::OutlinedCalendarDays)
+                    ->helperText(__('Leave blank to keep this fare valid indefinitely.'))
+                    ->rules(['nullable', 'date'])
+                    ->afterOrEqual(
+                        fn (Get $get): string => filled($get('valid_from'))
+                            ? 'valid_from'
+                            : '',
+                    ),
+            ]);
     }
 
     public function table(Table $table): Table
     {
         return $table
-            ->description(__(
-                'A missing fare does not mean the trip is free. Configure a zero amount only when travel is free.',
+            ->heading(TableSectionHeader::heading(
+                __('Fares'),
+                Heroicon::OutlinedBanknotes,
             ))
+            ->description(TableSectionHeader::description(__(
+                'A missing fare does not mean the trip is free. Configure a zero amount only when travel is free.',
+            )))
             ->columns([
                 TextColumn::make('amount')
                     ->label(__('Amount'))
                     ->numeric(decimalPlaces: 2),
 
                 TextColumn::make('currency')
-                    ->label(__('Currency')),
+                    ->label(__('Currency'))
+                    ->fontFamily(FontFamily::Mono)
+                    ->color(Color::Gray)
+                    ->badge(),
 
                 TextColumn::make('valid_from')
                     ->label(__('Valid From'))
@@ -143,6 +164,10 @@ class FaresRelationManager extends RelationManager
                 CreateAction::make()
                     ->label(__('Add Fare'))
                     ->modalHeading(__('Add Fare'))
+                    ->modalIcon(Heroicon::OutlinedBanknotes)
+                    ->modalIconColor('success')
+                    ->modalAlignment(Alignment::Start)
+                    ->modalWidth(Width::Large)
                     ->modalDescription(__(
                         'Only one fare per currency can apply on a given date.',
                     ))
@@ -157,6 +182,13 @@ class FaresRelationManager extends RelationManager
                 EditAction::make()
                     ->label(__('Edit Fare'))
                     ->modalHeading(__('Edit Fare'))
+                    ->modalDescription(__(
+                        'Only one fare per currency can apply on a given date.',
+                    ))
+                    ->modalIcon(Heroicon::OutlinedPencilSquare)
+                    ->modalIconColor('primary')
+                    ->modalAlignment(Alignment::Start)
+                    ->modalWidth(Width::Large)
                     ->modalSubmitActionLabel(__('Save Changes'))
                     ->authorize(fn (): bool => $this->canManageFares())
                     ->using(

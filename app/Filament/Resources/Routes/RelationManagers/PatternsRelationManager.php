@@ -6,9 +6,13 @@ use App\Filament\Resources\Routes\Resources\RoutePatterns\RoutePatternResource;
 use App\Filament\Resources\Routes\Resources\RoutePatterns\Schemas\RoutePatternForm;
 use App\Filament\Resources\Routes\Resources\RoutePatterns\Schemas\RoutePatternInfolist;
 use App\Filament\Resources\Routes\RouteResource;
+use App\Filament\Support\TableSectionHeader;
 use App\Models\Company;
 use App\Models\Route;
 use App\Models\RoutePattern;
+use App\Enums\LucideIcon;
+use Filament\Support\Enums\Alignment;
+use Filament\Support\Enums\Width;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Facades\Filament;
@@ -16,12 +20,16 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Filament\Support\Colors\Color;
+use Filament\Support\Enums\FontFamily;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
 
 class PatternsRelationManager extends RelationManager
 {
     protected static string $relationship = 'patterns';
+
+    protected static string|\BackedEnum|null $icon = LucideIcon::Route;
 
     protected static ?string $recordTitleAttribute = 'name';
 
@@ -74,12 +82,22 @@ class PatternsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->heading(TableSectionHeader::heading(
+                __('Patterns'),
+                LucideIcon::Route,
+            ))
+            ->description(TableSectionHeader::description(__(
+                'Configure the travel patterns of this route. Each pattern has its own ordered stops and departure schedules.',
+            )))
             ->recordTitleAttribute('name')
             ->modelLabel(__('Pattern'))
             ->pluralModelLabel(__('Patterns'))
             ->columns([
                 TextColumn::make('code')
                     ->label(__('Code'))
+                    ->fontFamily(FontFamily::Mono)
+                    ->color(Color::Gray)
+                    ->badge()
                     ->searchable()
                     ->sortable(),
 
@@ -94,7 +112,15 @@ class PatternsRelationManager extends RelationManager
             ])
             ->defaultSort('code')
             ->headerActions([
-                CreateAction::make(),
+                CreateAction::make()
+                    ->modalHeading(__('Create Pattern'))
+                    ->modalDescription(__(
+                        'Define the code, name and destination. You can configure stops and departures after creating the pattern.',
+                    ))
+                    ->modalIcon(LucideIcon::Route)
+                    ->modalIconColor('primary')
+                    ->modalAlignment(Alignment::Start)
+                    ->modalWidth(Width::Large),
             ])
             ->recordActions([
                 Action::make('edit')

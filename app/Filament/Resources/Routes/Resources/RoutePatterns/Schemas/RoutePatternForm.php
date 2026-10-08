@@ -40,163 +40,177 @@ class RoutePatternForm
         Schema $schema,
         ?Route $ownerRoute = null,
     ): Schema {
-        return $schema->components([
-            Section::make(__('General Information'))
-                ->schema([
-                    TextInput::make('code')
-                        ->label(__('Code'))
-                        ->required()
-                        ->maxLength(50)
-                        ->rules(fn (?RoutePattern $record): array => [
-                            Rule::unique(RoutePattern::class, 'code')
-                                ->where(
-                                    'route_id',
-                                    $ownerRoute?->getKey() ?? $record?->route_id,
+        $generalFields = [
+            TextInput::make('code')
+                ->label(__('Code'))
+                ->prefixIcon(LucideIcon::Barcode)
+                ->required()
+                ->maxLength(50)
+                ->rules(fn (?RoutePattern $record): array => [
+                    Rule::unique(RoutePattern::class, 'code')
+                        ->where(
+                            'route_id',
+                            $ownerRoute?->getKey() ?? $record?->route_id,
+                        )
+                        ->ignore($record?->getKey()),
+                ]),
+
+            TextInput::make('name')
+                ->label(__('Pattern Name'))
+                ->prefixIcon(LucideIcon::Route)
+                ->required()
+                ->maxLength(255),
+
+            TextInput::make('headsign')
+                ->label(__('Destination'))
+                ->prefixIcon(Heroicon::OutlinedMapPin)
+                ->helperText(__('Destination displayed to passengers.'))
+                ->required()
+                ->maxLength(255),
+        ];
+
+        return $schema
+            ->columns($ownerRoute !== null ? 1 : 2)
+            ->components([
+                ...($ownerRoute !== null
+                    ? $generalFields
+                    : [
+                        Section::make(__('General Information'))
+                            ->description(__('The code, name and passenger destination of the pattern.'))
+                            ->icon(LucideIcon::Route)
+                            ->schema($generalFields)
+                            ->columns(2)
+                            ->columnSpanFull(),
+                    ]),
+
+                Section::make(__('Route Layout'))
+                    ->icon(Heroicon::OutlinedMap)
+                    ->description(__(
+                        'Search for the origin and destination. Changing endpoints clears the estimated stop times.',
+                    ))
+                    ->visible(
+                        fn (string $operation): bool => $operation === 'edit'
+                            && $ownerRoute === null,
+                    )
+                    ->schema([
+                        Grid::make(1)
+                            ->schema([
+                                self::endpointSearch(
+                                    'origin_search',
+                                    __('Search Origin'),
+                                    true,
                                 )
-                                ->ignore($record?->getKey()),
-                        ]),
-
-                    TextInput::make('name')
-                        ->label(__('Pattern Name'))
-                        ->required()
-                        ->maxLength(255),
-
-                    TextInput::make('headsign')
-                        ->label(__('Destination'))
-                        ->helperText(__('Destination displayed to passengers.'))
-                        ->required()
-                        ->maxLength(255),
-                ])
-                ->columns(2)
-                ->columnSpanFull(),
-
-            Section::make(__('Route Layout'))
-                ->description(__(
-                    'Search for the origin and destination. Changing endpoints clears the estimated stop times.',
-                ))
-                ->visible(
-                    fn (string $operation): bool => $operation === 'edit'
-                        && $ownerRoute === null,
-                )
-                ->schema([
-                    Grid::make(1)
-                        ->schema([
-                            self::endpointSearch(
-                                'origin_search',
-                                __('Search Origin'),
-                                true,
-                            )
-                                ->required(
-                                    fn (Get $get): bool => filled($get('destination_search')),
-                                ),
-
-                            self::endpointSearch(
-                                'destination_search',
-                                __('Search Destination'),
-                                false,
-                            )
-                                ->required(
-                                    fn (Get $get): bool => filled($get('origin_search')),
-                                ),
-
-                            Toggle::make('adjustment_mode')
-                                ->label(__('Adjust Route'))
-                                ->helperText(__(
-                                    'Orange points guide the calculated road route; they are not boarding stops. Select a segment and click the map to add points in travel order. Drag a point to move it, or click it to remove it.',
-                                ))
-                                ->default(false)
-                                ->live()
-                                ->dehydrated(false),
-
-                            Select::make('adjustment_segment')
-                                ->label(__('Route Segment'))
-                                ->options(
-                                    fn (?RoutePattern $record): array => self::routeSegmentOptions($record),
-                                )
-                                ->visible(
-                                    fn (Get $get): bool => (bool) $get('adjustment_mode'),
-                                )
-                                ->live()
-                                ->dehydrated(false),
-
-                            Hidden::make('routing_adjustments')
-                                ->default([])
-                                ->live()
-                                ->afterStateHydrated(
-                                    function (Hidden $component, ?RoutePattern $record): void {
-                                        $component->state($record?->routing_adjustments ?? []);
-                                    },
-                                )
-                                ->afterStateUpdated(
-                                    fn (Set $set) => self::clearCalculatedRoute($set),
-                                )
-                                ->dehydrated(true),
-
-                            Hidden::make('calculated_geometry')
-                                ->default(null)
-                                ->afterStateHydrated(
-                                    function (Hidden $component, ?RoutePattern $record): void {
-                                        $component->state($record?->route_geometry);
-                                    },
-                                )
-                                ->dehydrated(false),
-
-                            Hidden::make('distance_meters')
-                                ->default(null)
-                                ->afterStateHydrated(
-                                    function (Hidden $component, ?RoutePattern $record): void {
-                                        $component->state($record?->distance_meters);
-                                    },
-                                )
-                                ->dehydrated(false),
-
-                            Hidden::make('driving_duration_seconds')
-                                ->default(null)
-                                ->afterStateHydrated(
-                                    function (Hidden $component, ?RoutePattern $record): void {
-                                        $component->state($record?->driving_duration_seconds);
-                                    },
-                                )
-                                ->dehydrated(false),
-
-                            Actions::make([
-                                Action::make('calculateRoute')
-                                    ->label(__('Calculate Route'))
-                                    ->authorize(
-                                        fn (?RoutePattern $record): bool => $record !== null
-                                            && $record->route()->exists()
-                                            && RoutePatternResource::canEdit($record),
-                                    )
-                                    ->disabled(function (Get $get): bool {
-                                        $origin = $get('origin_search');
-                                        $destination = $get('destination_search');
-
-                                        return ! $origin instanceof GeoSearchResult
-                                            || $origin->coordinate === null
-                                            || ! $destination instanceof GeoSearchResult
-                                            || $destination->coordinate === null;
-                                    })
-                                    ->action(
-                                        fn (Get $get, Set $set, ?RoutePattern $record) => self::calculateRoute(
-                                            $get,
-                                            $set,
-                                            $record,
-                                        ),
+                                    ->required(
+                                        fn (Get $get): bool => filled($get('destination_search')),
                                     ),
-                            ])
-                                ->key('routing_actions'),
+
+                                self::endpointSearch(
+                                    'destination_search',
+                                    __('Search Destination'),
+                                    false,
+                                )
+                                    ->required(
+                                        fn (Get $get): bool => filled($get('origin_search')),
+                                    ),
+
+                                Toggle::make('adjustment_mode')
+                                    ->label(__('Adjust Route'))
+                                    ->helperText(__(
+                                        'Orange points guide the calculated road route; they are not boarding stops. Select a segment and click the map to add points in travel order. Drag a point to move it, or click it to remove it.',
+                                    ))
+                                    ->default(false)
+                                    ->live()
+                                    ->dehydrated(false),
+
+                                Select::make('adjustment_segment')
+                                    ->label(__('Route Segment'))
+                                    ->options(
+                                        fn (?RoutePattern $record): array => self::routeSegmentOptions($record),
+                                    )
+                                    ->visible(
+                                        fn (Get $get): bool => (bool) $get('adjustment_mode'),
+                                    )
+                                    ->live()
+                                    ->dehydrated(false),
+
+                                Hidden::make('routing_adjustments')
+                                    ->default([])
+                                    ->live()
+                                    ->afterStateHydrated(
+                                        function (Hidden $component, ?RoutePattern $record): void {
+                                            $component->state($record?->routing_adjustments ?? []);
+                                        },
+                                    )
+                                    ->afterStateUpdated(
+                                        fn (Set $set) => self::clearCalculatedRoute($set),
+                                    )
+                                    ->dehydrated(true),
+
+                                Hidden::make('calculated_geometry')
+                                    ->default(null)
+                                    ->afterStateHydrated(
+                                        function (Hidden $component, ?RoutePattern $record): void {
+                                            $component->state($record?->route_geometry);
+                                        },
+                                    )
+                                    ->dehydrated(false),
+
+                                Hidden::make('distance_meters')
+                                    ->default(null)
+                                    ->afterStateHydrated(
+                                        function (Hidden $component, ?RoutePattern $record): void {
+                                            $component->state($record?->distance_meters);
+                                        },
+                                    )
+                                    ->dehydrated(false),
+
+                                Hidden::make('driving_duration_seconds')
+                                    ->default(null)
+                                    ->afterStateHydrated(
+                                        function (Hidden $component, ?RoutePattern $record): void {
+                                            $component->state($record?->driving_duration_seconds);
+                                        },
+                                    )
+                                    ->dehydrated(false),
+
+                                Actions::make([
+                                    Action::make('calculateRoute')
+                                        ->label(__('Calculate Route'))
+                                        ->authorize(
+                                            fn (?RoutePattern $record): bool => $record !== null
+                                                && $record->route()->exists()
+                                                && RoutePatternResource::canEdit($record),
+                                        )
+                                        ->disabled(function (Get $get): bool {
+                                            $origin = $get('origin_search');
+                                            $destination = $get('destination_search');
+
+                                            return ! $origin instanceof GeoSearchResult
+                                                || $origin->coordinate === null
+                                                || ! $destination instanceof GeoSearchResult
+                                                || $destination->coordinate === null;
+                                        })
+                                        ->action(
+                                            fn (Get $get, Set $set, ?RoutePattern $record) => self::calculateRoute(
+                                                $get,
+                                                $set,
+                                                $record,
+                                            ),
+                                        ),
+                                ])
+                                    ->key('routing_actions'),
 
                                 TextInput::make('distance_preview')
-                                ->label(__('Total Distance'))
-                                ->prefixIcon(LucideIcon::Route)
-                                ->suffix('km')
-                                ->placeholder(__('Not Calculated'))
-                                ->disabled()
-                                ->dehydrated(false)
-                                ->afterStateHydrated(
-                                    function (TextInput $component, ?RoutePattern $record): void {
-                                        $component->state(
-                                            $record?->distance_meters !== null
+                                    ->label(__('Total Distance'))
+                                    ->prefixIcon(LucideIcon::Route)
+                                    ->suffix('km')
+                                    ->placeholder(__('Not Calculated'))
+                                    ->disabled()
+                                    ->dehydrated(false)
+                                    ->afterStateHydrated(
+                                        function (TextInput $component, ?RoutePattern $record): void {
+                                            $component->state(
+                                                $record?->distance_meters !== null
                                                 ? number_format(
                                                     (float) $record->distance_meters / 1000,
                                                     2,
@@ -204,116 +218,116 @@ class RoutePatternForm
                                                     '',
                                                 )
                                                 : null,
-                                        );
-                                    },
-                                ),
-                            
-                            TextInput::make('driving_duration_preview')
-                                ->label(__('Estimated Driving Time'))
-                                ->prefixIcon(Heroicon::Clock)
-                                ->suffix(__('min'))
-                                ->placeholder(__('Not Calculated'))
-                                ->disabled()
-                                ->dehydrated(false)
-                                ->afterStateHydrated(
-                                    function (TextInput $component, ?RoutePattern $record): void {
-                                        $component->state(
-                                            $record?->driving_duration_seconds !== null
+                                            );
+                                        },
+                                    ),
+
+                                TextInput::make('driving_duration_preview')
+                                    ->label(__('Estimated Driving Time'))
+                                    ->prefixIcon(Heroicon::Clock)
+                                    ->suffix(__('min'))
+                                    ->placeholder(__('Not Calculated'))
+                                    ->disabled()
+                                    ->dehydrated(false)
+                                    ->afterStateHydrated(
+                                        function (TextInput $component, ?RoutePattern $record): void {
+                                            $component->state(
+                                                $record?->driving_duration_seconds !== null
                                                 ? (int) ceil(
                                                     (float) $record->driving_duration_seconds / 60,
                                                 )
                                                 : null,
-                                        );
-                                    },
-                                ),
+                                            );
+                                        },
+                                    ),
 
-                            TextEntry::make('routing_notice')
-                                ->hiddenLabel()
-                                ->state(__(
-                                    'Review the suggested road route for bus operation. Driving time does not include boarding time or replace scheduled times.',
-                                )),
-                        ])
-                        ->columnSpan(1),
+                                TextEntry::make('routing_notice')
+                                    ->hiddenLabel()
+                                    ->state(__(
+                                        'Review the suggested road route for bus operation. Driving time does not include boarding time or replace scheduled times.',
+                                    )),
+                            ])
+                            ->columnSpan(1),
 
-                    RouteMapPicker::make('route_map')
-                        ->label(__('Pattern Map'))
-                        ->helperText(__('Stop locations are shown in travel order.'))
-                        ->view('filament.forms.components.route-map')
-                        ->height(450)
-                        ->center([9.9281, -84.0907])
-                        ->zoom(12)
-                        ->autoCenter(false)
-                        ->fitBounds()
-                        ->zoomControl()
-                        ->scaleControl()
-                        ->fullscreenControl()
-                        ->disabled()
-                        ->dehydrated(false)
-                        ->markers(
-                            fn (Get $get, ?RoutePattern $record): array => [
-                                ...self::routeMarkers($get, $record),
-                                ...self::adjustmentMarkers($get, $record),
-                            ],
-                        )
-                        ->shapes(function (Get $get): array {
-                            $geometry = $get('calculated_geometry');
-
-                            if (
-                                ! is_array($geometry)
-                                || ($geometry['type'] ?? null) !== 'LineString'
-                                || empty($geometry['coordinates'])
-                            ) {
-                                return [];
-                            }
-
-                            $points = array_map(
-                                static fn (array $coordinate): array => [
-                                    (float) $coordinate[1],
-                                    (float) $coordinate[0],
+                        RouteMapPicker::make('route_map')
+                            ->label(__('Pattern Map'))
+                            ->helperText(__('Stop locations are shown in travel order.'))
+                            ->view('filament.forms.components.route-map')
+                            ->height(450)
+                            ->center([9.9281, -84.0907])
+                            ->zoom(12)
+                            ->autoCenter(false)
+                            ->fitBounds()
+                            ->zoomControl()
+                            ->scaleControl()
+                            ->fullscreenControl()
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->markers(
+                                fn (Get $get, ?RoutePattern $record): array => [
+                                    ...self::routeMarkers($get, $record),
+                                    ...self::adjustmentMarkers($get, $record),
                                 ],
-                                $geometry['coordinates'],
-                            );
+                            )
+                            ->shapes(function (Get $get): array {
+                                $geometry = $get('calculated_geometry');
 
-                            return [
-                                Polyline::make($points)
-                                    ->id('calculated-route')
-                                    ->title(__('Calculated Road Route'))
-                                    ->blue()
-                                    ->weight(4)
-                                    ->fill(false)
-                                    ->fillOpacity(0),
-                            ];
-                        })
-                        ->onMapClick(
-                            fn (
+                                if (
+                                    ! is_array($geometry)
+                                    || ($geometry['type'] ?? null) !== 'LineString'
+                                    || empty($geometry['coordinates'])
+                                ) {
+                                    return [];
+                                }
+
+                                $points = array_map(
+                                    static fn (array $coordinate): array => [
+                                        (float) $coordinate[1],
+                                        (float) $coordinate[0],
+                                    ],
+                                    $geometry['coordinates'],
+                                );
+
+                                return [
+                                    Polyline::make($points)
+                                        ->id('calculated-route')
+                                        ->title(__('Calculated Road Route'))
+                                        ->blue()
+                                        ->weight(4)
+                                        ->fill(false)
+                                        ->fillOpacity(0),
+                                ];
+                            })
+                            ->onMapClick(
+                                fn (
                                 Get $get,
                                 Set $set,
                                 ?RoutePattern $record,
                                 float $latitude,
                                 float $longitude,
                             ) => self::addAdjustmentPoint(
-                                $get,
-                                $set,
-                                $record,
-                                $latitude,
-                                $longitude,
-                            ),
-                        )
-                        ->onLayerClick(
-                            fn (
+                                        $get,
+                                        $set,
+                                        $record,
+                                        $latitude,
+                                        $longitude,
+                                    ),
+                            )
+                            ->onLayerClick(
+                                fn (
                                 Get $get,
                                 Set $set,
                                 ?RoutePattern $record,
                                 ?BaseLayer $layer,
                             ) => self::removeAdjustmentPoint(
-                                $get,
-                                $set,
-                                $record,
-                                $layer,
-                            ),
-                        )
-                        ->onAdjustmentPointMove(
-                            fn (
+                                        $get,
+                                        $set,
+                                        $record,
+                                        $layer,
+                                    ),
+                            )
+                            ->onAdjustmentPointMove(
+                                fn (
                                 Get $get,
                                 Set $set,
                                 ?RoutePattern $record,
@@ -321,19 +335,19 @@ class RoutePatternForm
                                 float $latitude,
                                 float $longitude,
                             ) => self::moveAdjustmentPoint(
-                                $get,
-                                $set,
-                                $record,
-                                $layerId,
-                                $latitude,
-                                $longitude,
-                            ),
-                        )
-                        ->columnSpan(1),
-                ])
-                ->columns(2)
-                ->columnSpanFull(),
-        ]);
+                                        $get,
+                                        $set,
+                                        $record,
+                                        $layerId,
+                                        $latitude,
+                                        $longitude,
+                                    ),
+                            )
+                            ->columnSpan(1),
+                    ])
+                    ->columns(2)
+                    ->columnSpanFull(),
+            ]);
     }
 
     private static function endpointSearch(
@@ -359,7 +373,7 @@ class RoutePatternForm
                     ->reorder('stop_sequence', $isOrigin ? 'asc' : 'desc')
                     ->with('stop')
                     ->first()
-                    ?->stop;
+                        ?->stop;
 
                 if ($stop === null) {
                     $component->state(null);
@@ -398,7 +412,7 @@ class RoutePatternForm
                 $origin->coordinate->lat,
                 $origin->coordinate->lng,
             )
-            ->id('origin')
+                ->id('origin')
                 ->title($origin->name)
                 ->heroicon(Heroicon::PlayCircle)
                 ->green();

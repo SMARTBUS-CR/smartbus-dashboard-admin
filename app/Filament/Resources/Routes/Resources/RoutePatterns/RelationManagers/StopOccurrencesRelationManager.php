@@ -2,6 +2,11 @@
 
 namespace App\Filament\Resources\Routes\Resources\RoutePatterns\RelationManagers;
 
+use App\Filament\Support\TableSectionHeader;
+use Filament\Support\Icons\Heroicon;
+use App\Enums\LucideIcon;
+use Filament\Support\Enums\Alignment;
+use Filament\Support\Enums\Width;
 use App\Filament\Resources\Routes\Resources\RoutePatterns\Pages\EditRoutePattern;
 use App\Filament\Resources\Routes\Resources\RoutePatterns\RoutePatternResource;
 use App\Filament\Resources\Stops\Schemas\StopForm;
@@ -34,6 +39,8 @@ use Livewire\Attributes\On;
 class StopOccurrencesRelationManager extends RelationManager
 {
     protected static string $relationship = 'stopOccurrences';
+
+    protected static string|\BackedEnum|null $icon = LucideIcon::BusFront;
 
     public static function getTitle(
         Model $ownerRecord,
@@ -92,67 +99,88 @@ class StopOccurrencesRelationManager extends RelationManager
     {
         $companyId = Filament::getTenant()?->getKey();
 
-        return $schema->components([
-            Select::make('stop_id')
-                ->label(__('Stop'))
-                ->helperText(__('Choose a company stop or a shared stop.'))
-                ->relationship(
-                    name: 'stop',
-                    titleAttribute: 'name',
-                    modifyQueryUsing: fn (Builder $query): Builder => $query
-                        ->where(function (Builder $query) use ($companyId): void {
-                            $query
-                                ->where('company_id', $companyId)
-                                ->orWhereNull('company_id');
-                        }),
-                )
-                ->searchable()
-                ->createOptionForm(
-                    fn (Schema $schema): Schema => StopForm::configure(
-                        $schema->operation('create'),
-                    ),
-                )
-                ->createOptionModalHeading(__('Create Stop'))
-                ->createOptionAction(
-                    fn (Action $action): Action => $action
-                        ->label(__('Create Stop'))
-                        ->color('success')
-                        ->authorize(
-                            fn (): bool => $this->canManageStops()
-                                && StopResource::canCreate(),
+        return $schema
+            ->columns(1)
+            ->components([
+                Select::make('stop_id')
+                    ->label(__('Stop'))
+                    ->prefixIcon(LucideIcon::BusFront)
+                    ->helperText(__('Choose a company stop or a shared stop.'))
+                    ->relationship(
+                        name: 'stop',
+                        titleAttribute: 'name',
+                        modifyQueryUsing: fn (Builder $query): Builder => $query
+                            ->where(function (Builder $query) use ($companyId): void {
+                                $query
+                                    ->where('company_id', $companyId)
+                                    ->orWhereNull('company_id');
+                            }),
+                    )
+                    ->searchable()
+                    ->createOptionForm(
+                        fn (Schema $schema): Schema => StopForm::configure(
+                            $schema->operation('create'),
+                            compact: true,
                         ),
-                )
-                ->createOptionUsing(
-                    fn (array $data): string => $this->createCatalogStop($data),
-                )
-                ->required()
-                ->rules([
-                    Rule::exists(Stop::class, 'id')
-                        ->whereNull('deleted_at')
-                        ->where(function (QueryBuilder $query) use ($companyId): void {
-                            $query
-                                ->where('company_id', $companyId)
-                                ->orWhereNull('company_id');
-                        }),
-                ]),
+                    )
+                    ->createOptionModalHeading(__('Create Stop'))
+                    ->createOptionAction(
+                        fn (Action $action): Action => $action
+                            ->label(__('Create Stop'))
+                            ->color('success')
+                            ->modalDescription(__(
+                                'Enter the stop details and select its boarding point. The stop will be available in the company catalog.',
+                            ))
+                            ->modalIcon(LucideIcon::BusFront)
+                            ->modalIconColor('success')
+                            ->modalAlignment(Alignment::Start)
+                            ->modalWidth(Width::ThreeExtraLarge)
+                            ->authorize(
+                                fn (): bool => $this->canManageStops()
+                                    && StopResource::canCreate(),
+                            ),
+                    )
+                    ->createOptionUsing(
+                        fn (array $data): string => $this->createCatalogStop($data),
+                    )
+                    ->required()
+                    ->rules([
+                        Rule::exists(Stop::class, 'id')
+                            ->whereNull('deleted_at')
+                            ->where(function (QueryBuilder $query) use ($companyId): void {
+                                $query
+                                    ->where('company_id', $companyId)
+                                    ->orWhereNull('company_id');
+                            }),
+                    ]),
 
-            TextInput::make('minutes_from_start')
-                ->label(__('Minutes From Departure'))
-                ->helperText(__('Leave blank if the estimate is unknown.'))
-                ->numeric()
-                ->suffix(' '.__('min'))
-                ->rules([
-                    'nullable',
-                    'integer',
-                    'min:0',
-                    'max:2147483647',
-                ]),
-        ]);
+                TextInput::make('minutes_from_start')
+                    ->label(__('Minutes From Departure'))
+                    ->prefixIcon(Heroicon::OutlinedClock)
+                    ->helperText(__('Leave blank if the estimate is unknown.'))
+                    ->numeric()
+                    ->suffix(' '.__('min'))
+                    ->rules([
+                        'nullable',
+                        'integer',
+                        'min:0',
+                        'max:2147483647',
+                    ]),
+            ]);
     }
 
     public function table(Table $table): Table
     {
         return $table
+            ->heading(TableSectionHeader::heading(
+                __('Stops'),
+                LucideIcon::BusFront,
+            ))
+            ->description(fn () => TableSectionHeader::description(
+                $this->canManageStops()
+                ? __('Reordering stops clears all estimated minutes from departure and invalidates the calculated route. Arrange the stops first, then enter their estimated times and calculate the route again.')
+                : null,
+            ))
             ->modifyQueryUsing(
                 fn (Builder $query): Builder => $query->with('stop'),
             )
@@ -169,10 +197,6 @@ class StopOccurrencesRelationManager extends RelationManager
                     ->placeholder(__('Not Set')),
             ])
             ->defaultSort('stop_sequence')
-            ->description(fn (): ?string => $this->canManageStops()
-                ? __('Reordering stops clears all estimated minutes from departure and invalidates the calculated route. Arrange the stops first, then enter their estimated times and calculate the route again.')
-                : null
-            )
             ->reorderable('stop_sequence')
             ->authorizeReorder(fn (): bool => $this->canManageStops())
             ->paginatedWhileReordering(false)
@@ -183,6 +207,10 @@ class StopOccurrencesRelationManager extends RelationManager
                     ->modalDescription(__(
                         'The stop will be added at the end of this pattern.'
                     ))
+                    ->modalIcon(LucideIcon::BusFront)
+                    ->modalIconColor('success')
+                    ->modalAlignment(Alignment::Start)
+                    ->modalWidth(Width::Large)
                     ->modalSubmitActionLabel(__('Add Stop'))
                     ->after(fn () => $this->notifyPatternStopsChanged())
                     ->authorize(fn (): bool => $this->canManageStops())
@@ -193,6 +221,13 @@ class StopOccurrencesRelationManager extends RelationManager
             ->recordActions([
                 EditAction::make()
                     ->label(__('Edit Stop'))
+                    ->modalDescription(__(
+                        'Update the stop and its estimated minutes from departure.',
+                    ))
+                    ->modalIcon(Heroicon::OutlinedPencilSquare)
+                    ->modalIconColor('primary')
+                    ->modalAlignment(Alignment::Start)
+                    ->modalWidth(Width::Large)
                     ->modalHeading(__('Edit Stop'))
                     ->authorize(fn (): bool => $this->canManageStops())
                     ->using(fn (RoutePatternStop $record, array $data): RoutePatternStop => $this->updateOccurrence($record, $data)
