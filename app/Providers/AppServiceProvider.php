@@ -8,6 +8,7 @@ use App\Enums\UserRole;
 use App\Models\Company;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Route;
 use App\Models\User;
 use App\Services\AuthService;
 use BezhanSalleh\LanguageSwitch\Enums\TriggerStyle;
@@ -40,11 +41,19 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Prevent deletion of protected roles or roles that have users assigned to them
+        // Enforce protected deletion rules before granting global administrator access.
         Gate::before(function (User $user, string $ability, array $arguments): ?bool {
             $record = $arguments[0] ?? null;
 
-            if (($record instanceof Company || $record === Company::class) && in_array($ability, ['forceDelete', 'forceDeleteAny'], true)) {
+            $isProtectedOperationalModel = $record instanceof Company
+                || $record === Company::class
+                || $record instanceof Route
+                || $record === Route::class;
+
+            if (
+                $isProtectedOperationalModel
+                && in_array($ability, ['forceDelete', 'forceDeleteAny'], true)
+            ) {
                 return false;
             }
 

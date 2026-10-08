@@ -12,8 +12,8 @@ describe('Company Database Integrity', function (): void {
         $company = Company::factory()->make();
 
         try {
-            expect(fn () => $company->save())->toThrow(QueryException::class);
-            expect(Company::withTrashed()->whereKey($company->id)->exists())->toBeFalse()
+            expect(fn () => $company->save())->toThrow(QueryException::class)
+                ->and(Company::withTrashed()->whereKey($company->id)->exists())->toBeFalse()
                 ->and(Role::withoutGlobalScopes()->where('company_id', $company->id)->count())->toBe(0);
         } finally {
             DB::connection('mysql')->unprepared('DROP TRIGGER IF EXISTS reject_driver_role');

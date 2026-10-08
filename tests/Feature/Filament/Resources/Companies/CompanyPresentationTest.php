@@ -14,9 +14,12 @@ describe('Company Localized Presentation', function (): void {
         $component = Livewire::test(ListCompanies::class);
         $column = $component->instance()->getTable()->getColumn('created_at');
 
-        expect($column->record($company)->formatState($company->created_at))->toBe('2026-10-05 06:00:00')
-            ->and($column->record($other)->formatState($other->created_at))->toBe('2026-10-05 07:00:00')
-            ->and($company->fresh()->getRawOriginal('created_at'))->toBe('2026-10-05 12:00:00');
+        expect($column->record($company)->formatState($company->created_at))
+            ->toBe('05 oct., 2026 - 06:00 a. m.')
+            ->and($column->record($other)->formatState($other->created_at))
+            ->toBe('05 oct., 2026 - 07:00 a. m.')
+            ->and($company->fresh()->getRawOriginal('created_at'))
+            ->toBe('2026-10-05 12:00:00');
     });
 
     test('resolves display timezone dynamically when switching tenants', function (): void {
