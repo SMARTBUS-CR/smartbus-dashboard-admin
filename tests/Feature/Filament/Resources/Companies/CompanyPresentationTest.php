@@ -8,6 +8,8 @@ use Livewire\Livewire;
 
 describe('Company Localized Presentation', function (): void {
     test('renders timestamps in each company timezone while preserving UTC storage', function (): void {
+        app()->setLocale('es');
+
         $company = createCompany(['country_code' => 'CR', 'timezone' => 'America/Costa_Rica', 'created_at' => '2026-10-05 12:00:00']);
         $other = createCompany(['country_code' => 'PA', 'timezone' => 'America/Panama', 'created_at' => '2026-10-05 12:00:00']);
         actingAsInCompany(createUserWithRole(UserRole::SuperAdmin), $company);
