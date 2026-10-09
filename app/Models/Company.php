@@ -108,6 +108,24 @@ class Company extends Model implements HasCurrentTenantLabel, HasName
     }
 
     /**
+     * Get the routes that belong to this company.
+     *
+     * @return HasMany<Route, $this>
+     */
+    public function routes(): HasMany
+    {
+        return $this->hasMany(Route::class);
+    }
+
+    /**
+     * @return HasMany<Stop, $this>
+     */
+    public function stops(): HasMany
+    {
+        return $this->hasMany(Stop::class);
+    }
+
+    /**
      * Generate a unique slug for the company based on the provided name.
      */
     public static function generateUniqueSlug(string $name): string

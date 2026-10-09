@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\Companies\CompanyResource;
+use App\Filament\Resources\Stops\StopResource;
 use App\Filament\Resources\SuperAdmins\SuperAdminResource;
 use App\Models\Company;
 use App\Models\User;
@@ -74,7 +75,7 @@ return [
     */
 
     'super_admin' => [
-        'enabled' => true,
+        'enabled' => false,
         'name' => 'super-admin',
         'define_via_gate' => false,
         'intercept_gate' => 'before',
@@ -145,7 +146,7 @@ return [
 
     'policies' => [
         'path' => app_path('Policies'),
-        'merge' => true,
+        'merge' => false,
         'generate' => true,
         'methods' => [
             'viewAny', 'view', 'create', 'update', 'delete', 'deleteAny', 'restore',
@@ -197,6 +198,14 @@ return [
                 'create',
                 'update',
                 'delete',
+            ],
+            StopResource::class => [
+                'viewAny',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
             ],
         ],
         'exclude' => [
