@@ -109,7 +109,7 @@ describe('Route Pattern Inline Stop Creation', function (): void {
         expect($pattern->stopOccurrences()->count())->toBe(1);
     });
 
-    test('requires stop creation permission for inline creation', function (bool $canCreateStops, ): void {
+    test('requires stop creation permission for inline creation', function (bool $canCreateStops): void {
         $company = createCompany();
         $route = Route::factory()->for($company)->create();
         $pattern = RoutePattern::factory()->for($route)->create();
@@ -194,9 +194,9 @@ describe('Route Pattern Inline Stop Creation', function (): void {
             'stop_id' => $stop->getKey(),
         ]);
     })->with([
-                'without stop creation permission' => false,
-                'with stop creation permission' => true,
-            ]);
+        'without stop creation permission' => false,
+        'with stop creation permission' => true,
+    ]);
 
     test('allows a system admin to create a shared stop inline', function (): void {
         $company = createCompany();
@@ -253,7 +253,7 @@ describe('Route Pattern Inline Stop Creation', function (): void {
         expect($stop->fresh()->company_id)->toBeNull();
     });
 
-    test('rejects invalid inline stop data without creating records', function (array $overrides, array $errors, ): void {
+    test('rejects invalid inline stop data without creating records', function (array $overrides, array $errors): void {
         $company = createCompany();
         $route = Route::factory()->for($company)->create();
         $pattern = RoutePattern::factory()->for($route)->create();
@@ -287,17 +287,17 @@ describe('Route Pattern Inline Stop Creation', function (): void {
         expect(Stop::count())->toBe($stopsBefore)
             ->and($pattern->stopOccurrences()->exists())->toBeFalse();
     })->with([
-                'missing name' => [
-                    ['name' => ''],
-                    ['name' => 'required'],
-                ],
-                'invalid latitude' => [
-                    ['latitude' => '91'],
-                    ['latitude' => 'between'],
-                ],
-                'invalid longitude' => [
-                    ['longitude' => '-181'],
-                    ['longitude' => 'between'],
-                ],
-            ]);
+        'missing name' => [
+            ['name' => ''],
+            ['name' => 'required'],
+        ],
+        'invalid latitude' => [
+            ['latitude' => '91'],
+            ['latitude' => 'between'],
+        ],
+        'invalid longitude' => [
+            ['longitude' => '-181'],
+            ['longitude' => 'between'],
+        ],
+    ]);
 });

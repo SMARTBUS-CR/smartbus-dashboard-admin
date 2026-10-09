@@ -9,7 +9,7 @@ use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
 
 describe('Route Fare Conflict Messages', function (): void {
-    test('identifies an existing open-ended fare when it conflicts with a future free fare', function (string $locale, string $expectedMessage, ): void {
+    test('identifies an existing open-ended fare when it conflicts with a future free fare', function (string $locale, string $expectedMessage): void {
         app()->setLocale($locale);
 
         $company = createCompany();
@@ -51,13 +51,13 @@ describe('Route Fare Conflict Messages', function (): void {
             'valid_until' => null,
         ]);
     })->with([
-                'English' => [
-                    'en',
-                    'A fare of 600.00 CRC (from January 1, 2027, with no end date) already applies during the selected validity period.',
-                ],
-                'Spanish' => [
-                    'es',
-                    'Ya existe una tarifa de 600.00 CRC (desde el 1 de enero de 2027, sin fecha de finalización) vigente durante el periodo seleccionado.',
-                ],
-            ]);
+        'English' => [
+            'en',
+            'A fare of 600.00 CRC (from January 1, 2027, with no end date) already applies during the selected validity period.',
+        ],
+        'Spanish' => [
+            'es',
+            'Ya existe una tarifa de 600.00 CRC (desde el 1 de enero de 2027, sin fecha de finalización) vigente durante el periodo seleccionado.',
+        ],
+    ]);
 });

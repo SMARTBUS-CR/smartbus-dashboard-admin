@@ -4,20 +4,19 @@ namespace App\Filament\Resources\Stops\Tables;
 
 use App\Filament\Resources\Stops\StopResource;
 use App\Models\Stop;
-use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\EditAction;
 use Filament\Actions\RestoreAction;
+use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\Alignment;
+use Filament\Support\Enums\FontFamily;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Filters\TrashedFilter;
-use Illuminate\Validation\ValidationException;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
-use Filament\Support\Enums\FontFamily;
+use Illuminate\Validation\ValidationException;
 
 class StopsTable
 {
@@ -42,7 +41,7 @@ class StopsTable
                 TextColumn::make('latitude')
                     ->label(__('Latitude'))
                     ->fontFamily(FontFamily::Mono),
-                
+
                 TextColumn::make('longitude')
                     ->label(__('Longitude'))
                     ->fontFamily(FontFamily::Mono),
@@ -84,7 +83,7 @@ class StopsTable
                     ->modalWidth(Width::Large)
                     ->modalSubmitActionLabel(__('Archive'))
                     ->successNotificationTitle(__('Stop Archived'))
-                    ->using(function (Stop $record, DeleteAction $action, ): bool {
+                    ->using(function (Stop $record, DeleteAction $action): bool {
                         try {
                             return (bool) $record->delete();
                         } catch (ValidationException $exception) {

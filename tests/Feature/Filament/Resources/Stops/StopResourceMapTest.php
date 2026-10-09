@@ -165,7 +165,7 @@ describe('Stop Resource Map', function (): void {
         'longitude outside its range' => ['longitude', '-180.1', 'between'],
     ]);
 
-    test('uses a bus icon for the boarding point marker', function (bool $editing, ): void {
+    test('uses a bus icon for the boarding point marker', function (bool $editing): void {
         if ($editing) {
             $stop = Stop::factory()->for($this->company)->create([
                 'latitude' => '10.4523456',
@@ -193,7 +193,7 @@ describe('Stop Resource Map', function (): void {
             },
         );
     })->with([
-                'creating a stop' => false,
-                'editing a stop' => true,
-            ]);
+        'creating a stop' => false,
+        'editing a stop' => true,
+    ]);
 });

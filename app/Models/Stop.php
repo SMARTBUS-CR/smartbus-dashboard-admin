@@ -44,7 +44,7 @@ class Stop extends Model
                 ]);
             }
         });
-        
+
         static::updating(function (Stop $stop): void {
             if (! $stop->isDirty('company_id') || $stop->company_id === null) {
                 return;

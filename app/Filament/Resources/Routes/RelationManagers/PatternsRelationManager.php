@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Routes\RelationManagers;
 
+use App\Enums\LucideIcon;
 use App\Filament\Resources\Routes\Resources\RoutePatterns\RoutePatternResource;
 use App\Filament\Resources\Routes\Resources\RoutePatterns\Schemas\RoutePatternForm;
 use App\Filament\Resources\Routes\Resources\RoutePatterns\Schemas\RoutePatternInfolist;
@@ -10,19 +11,18 @@ use App\Filament\Support\TableSectionHeader;
 use App\Models\Company;
 use App\Models\Route;
 use App\Models\RoutePattern;
-use App\Enums\LucideIcon;
-use Filament\Support\Enums\Alignment;
-use Filament\Support\Enums\Width;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Facades\Filament;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
+use Filament\Support\Colors\Color;
+use Filament\Support\Enums\Alignment;
+use Filament\Support\Enums\FontFamily;
+use Filament\Support\Enums\Width;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Filament\Support\Colors\Color;
-use Filament\Support\Enums\FontFamily;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
 
 class PatternsRelationManager extends RelationManager
@@ -128,19 +128,17 @@ class PatternsRelationManager extends RelationManager
                     ->icon(Heroicon::PencilSquare)
                     ->color('primary')
                     ->authorize(
-                        fn (RoutePattern $record): bool =>
-                            RoutePatternResource::canEdit($record),
+                        fn (RoutePattern $record): bool => RoutePatternResource::canEdit($record),
                     )
-                    ->url(fn (RoutePattern $record): string =>
-                        RoutePatternResource::getUrl(
-                            'edit',
-                            [
-                                'route' => $this->getOwnerRecord()->getKey(),
-                                'record' => $record->getKey(),
-                            ],
-                            panel: 'admin',
-                            tenant: Filament::getTenant(),
-                        ),
+                    ->url(fn (RoutePattern $record): string => RoutePatternResource::getUrl(
+                        'edit',
+                        [
+                            'route' => $this->getOwnerRecord()->getKey(),
+                            'record' => $record->getKey(),
+                        ],
+                        panel: 'admin',
+                        tenant: Filament::getTenant(),
+                    ),
                     ),
 
                 Action::make('view')
@@ -148,20 +146,18 @@ class PatternsRelationManager extends RelationManager
                     ->icon(Heroicon::Eye)
                     ->color('info')
                     ->authorize(
-                        fn (RoutePattern $record): bool =>
-                            ! RoutePatternResource::canEdit($record)
+                        fn (RoutePattern $record): bool => ! RoutePatternResource::canEdit($record)
                             && RoutePatternResource::canView($record),
                     )
-                    ->url(fn (RoutePattern $record): string =>
-                        RoutePatternResource::getUrl(
-                            'view',
-                            [
-                                'route' => $this->getOwnerRecord()->getKey(),
-                                'record' => $record->getKey(),
-                            ],
-                            panel: 'admin',
-                            tenant: Filament::getTenant(),
-                        ),
+                    ->url(fn (RoutePattern $record): string => RoutePatternResource::getUrl(
+                        'view',
+                        [
+                            'route' => $this->getOwnerRecord()->getKey(),
+                            'record' => $record->getKey(),
+                        ],
+                        panel: 'admin',
+                        tenant: Filament::getTenant(),
+                    ),
                     ),
             ]);
     }

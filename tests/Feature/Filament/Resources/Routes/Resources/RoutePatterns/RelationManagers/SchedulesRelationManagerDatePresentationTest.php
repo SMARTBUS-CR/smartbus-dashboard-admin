@@ -38,7 +38,7 @@ describe('Route Schedule Date Presentation', function (): void {
         );
     });
 
-    test('shows suspension dates in the interface language', function (string $locale, string $expectedDate, ): void {
+    test('shows suspension dates in the interface language', function (string $locale, string $expectedDate): void {
         app()->setLocale($locale);
 
         Livewire::test(SchedulesRelationManager::class, [
@@ -55,11 +55,11 @@ describe('Route Schedule Date Presentation', function (): void {
             'service_date' => '2026-10-19',
         ]);
     })->with([
-                'English' => ['en', 'October 19, 2026'],
-                'Spanish' => ['es', '19 de octubre de 2026'],
-            ]);
+        'English' => ['en', 'October 19, 2026'],
+        'Spanish' => ['es', '19 de octubre de 2026'],
+    ]);
 
-    test('uses readable dates as resumption labels while preserving suspension identifiers', function (string $locale, string $expectedDate, ): void {
+    test('uses readable dates as resumption labels while preserving suspension identifiers', function (string $locale, string $expectedDate): void {
         app()->setLocale($locale);
 
         Livewire::test(SchedulesRelationManager::class, [
@@ -85,7 +85,7 @@ describe('Route Schedule Date Presentation', function (): void {
             'service_date' => '2026-10-19',
         ]);
     })->with([
-                'English' => ['en', 'October 19, 2026'],
-                'Spanish' => ['es', '19 de octubre de 2026'],
-            ]);
+        'English' => ['en', 'October 19, 2026'],
+        'Spanish' => ['es', '19 de octubre de 2026'],
+    ]);
 });

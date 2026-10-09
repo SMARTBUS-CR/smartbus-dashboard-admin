@@ -495,5 +495,17 @@
     "Stop Restored": "Stop Restored",
     "Could Not Archive Stop": "Could Not Archive Stop",
     "The stop will be hidden from the active catalog. Its data will be preserved and it can be restored.": "The stop will be hidden from the active catalog. Its data will be preserved and it can be restored.",
-    "The stop will become available in the active catalog again.": "The stop will become available in the active catalog again."
+    "The stop will become available in the active catalog again.": "The stop will become available in the active catalog again.",
+    "Shared stops are created by a System Admin. They can be used to create patterns across multiple companies.": "Shared stops are created by a System Admin. They can be used to create patterns across multiple companies.",
+    "Search for a place or select a point on the map. This sets the location without changing the stop name.": "Search for a place or select a point on the map. This sets the location without changing the stop name.",
+    "Selected Location (:latitude, :longitude)": "Selected Location (:latitude, :longitude)",
+    "Looking up location information...": "Looking up location information...",
+    "Review the calculated route": "Review the calculated route",
+    "The segment from :from to :to has a calculated distance of :distance km and may include a considerable detour.": "The segment from :from to :to has a calculated distance of :distance km and may include a considerable detour.",
+    "This may be caused by traffic restrictions, map connections or selected points. Check that the route matches the road used by the bus.": "This may be caused by traffic restrictions, map connections or selected points. Check that the route matches the road used by the bus.",
+    "Route review unavailable": "Route review unavailable",
+    "The calculation does not include the segment details needed to detect considerable detours. Review the suggested route on the map.": "The calculation does not include the segment details needed to detect considerable detours. Review the suggested route on the map.",
+    "Route leg distances must be finite non-negative numbers.": "Route leg distances must be finite non-negative numbers.",
+    "Locate segment": "Locate segment",
+    "Review the suggested route": "Review the suggested route"
 }

@@ -1,13 +1,13 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Filament\Resources\Stops\Pages\ListStops;
 use App\Models\Route;
 use App\Models\RoutePattern;
 use App\Models\RoutePatternStop;
-use Filament\Notifications\Notification;
-use App\Filament\Resources\Stops\Pages\ListStops;
 use App\Models\Stop;
 use Filament\Actions\Testing\TestAction;
+use Filament\Notifications\Notification;
 use Livewire\Livewire;
 
 describe('Stop Resource Archival', function (): void {
@@ -50,7 +50,7 @@ describe('Stop Resource Archival', function (): void {
             ->assertCanSeeTableRecords([$stop]);
     });
 
-    test('keeps a referenced stop active and explains why it cannot be archived', function (bool $archivedPattern, ): void {
+    test('keeps a referenced stop active and explains why it cannot be archived', function (bool $archivedPattern): void {
         $route = Route::factory()->for($this->company)->create();
         $pattern = RoutePattern::factory()->for($route)->create();
         $stop = Stop::factory()->for($this->company)->create();
@@ -88,9 +88,9 @@ describe('Stop Resource Archival', function (): void {
             'minutes_from_start' => 0,
         ]);
     })->with([
-                'active pattern' => false,
-                'archived pattern' => true,
-            ]);
+        'active pattern' => false,
+        'archived pattern' => true,
+    ]);
 
     test('allows a system admin to archive and restore a shared stop', function (): void {
         $stop = Stop::factory()->shared()->create();

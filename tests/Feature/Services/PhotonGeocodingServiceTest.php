@@ -158,9 +158,8 @@ describe('Photon Geocoding Service', function (): void {
         $firstResults = $service->search('Parada');
 
         expect($firstResults)->toHaveCount(1)
-            ->and($firstResults[0])->toBeInstanceOf(GeoSearchResult::class);
-
-        expect($service->search(''))->toBe([]);
+            ->and($firstResults[0])->toBeInstanceOf(GeoSearchResult::class)
+            ->and($service->search(''))->toBeEmpty();
 
         $cachedResults = $service->search('Parada');
 

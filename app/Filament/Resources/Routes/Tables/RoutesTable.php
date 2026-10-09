@@ -9,12 +9,12 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\ViewAction;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TrashedFilter;
-use Filament\Tables\Table;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\FontFamily;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Tables\Table;
 
 class RoutesTable
 {
@@ -46,8 +46,7 @@ class RoutesTable
             ->recordActions([
                 ViewAction::make()
                     ->visible(
-                        fn (Route $record): bool =>
-                            ! RouteResource::canEdit($record),
+                        fn (Route $record): bool => ! RouteResource::canEdit($record),
                     )
                     ->color('info'),
 

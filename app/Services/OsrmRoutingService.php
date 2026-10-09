@@ -34,7 +34,7 @@ class OsrmRoutingService
 
     /**
      * @param  list<array{lat: float|int|string, lng: float|int|string}>  $points
-     * @return array{distance_meters: float, duration_seconds: float, geometry: array}
+     * @return array{distance_meters: float, duration_seconds: float, geometry: array, leg_distances_meters: list<float>}
      */
     public function calculate(array $points): array
     {
@@ -49,7 +49,7 @@ class OsrmRoutingService
 
     /**
      * @param  list<array{lat: float|int|string, lng: float|int|string}>  $points
-     * @return array{distance_meters: float, duration_seconds: float, geometry: array}|null
+     * @return array{distance_meters: float, duration_seconds: float, geometry: array, leg_distances_meters: list<float>}|null
      */
     public function getCachedRoute(array $points): ?array
     {
@@ -89,10 +89,13 @@ class OsrmRoutingService
     }
 
     /**
+     * Fetches a route from the OSRM API.
+     *
      * @return array{
      *     distance_meters: float,
      *     duration_seconds: float,
-     *     geometry: array
+     *     geometry: array,
+     *     leg_distances_meters: list<float>
      * }
      */
     private function fetchRoute(string $coordinates): array
@@ -154,6 +157,9 @@ class OsrmRoutingService
             'route.geometry.coordinates.*' => ['required', 'array', 'list', 'size:2'],
             'route.geometry.coordinates.*.0' => ['required', 'numeric', 'between:-180,180'],
             'route.geometry.coordinates.*.1' => ['required', 'numeric', 'between:-90,90'],
+            'route.legs' => ['sometimes', 'array', 'list'],
+            'route.legs.*' => ['required', 'array'],
+            'route.legs.*.distance' => ['required', 'numeric', 'min:0'],
         ]);
 
         if ($validator->fails()) {
@@ -168,6 +174,10 @@ class OsrmRoutingService
             'distance_meters' => (float) $route['distance'],
             'duration_seconds' => (float) $route['duration'],
             'geometry' => $route['geometry'],
+            'leg_distances_meters' => array_map(
+                static fn (array $leg): float => (float) $leg['distance'],
+                $route['legs'] ?? [],
+            ),
         ];
     }
 
@@ -195,7 +205,7 @@ class OsrmRoutingService
 
     private function routeCacheKey(string $coordinates): string
     {
-        return 'osrm.route.'.hash(
+        return 'osrm.route.v2.'.hash(
             'sha256',
             $this->baseUrl.'|'.$coordinates,
         );

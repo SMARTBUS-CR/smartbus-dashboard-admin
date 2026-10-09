@@ -23,7 +23,7 @@ describe('Stop Lifecycle Authorization', function (): void {
         actingAsInCompany($this->actor, $this->company);
     });
 
-    test('requires the specific permission and company ownership', function (string $scope, bool $hasPermission, bool $expected, string $ability, string $permission, ): void {
+    test('requires the specific permission and company ownership', function (string $scope, bool $hasPermission, bool $expected, string $ability, string $permission): void {
         if ($hasPermission) {
             grantShield(
                 $this->actor,
@@ -59,7 +59,7 @@ describe('Stop Lifecycle Authorization', function (): void {
             'restore' => ['restore', 'Restore:Stop'],
         ]);
 
-    test('allows a system admin to manage private and shared stops', function (bool $shared, string $ability, ): void {
+    test('allows a system admin to manage private and shared stops', function (bool $shared, string $ability): void {
         Filament::setTenant(null, isQuiet: true);
 
         $actor = createUserWithRole(UserRole::SuperAdmin);
@@ -80,13 +80,9 @@ describe('Stop Lifecycle Authorization', function (): void {
 
         expect(
             Gate::forUser($actor)->allows($ability, $stop),
-        )->toBeTrue();
-
-        expect(
-            CompanyUser::query()
-                ->where('user_id', $actor->getKey())
-                ->exists(),
-        )->toBeFalse();
+        )->toBeTrue()
+            ->and(CompanyUser::query()
+                ->where('user_id', $actor->getKey())->exists())->toBeFalse();
     })
         ->with([
             'private stop' => false,
@@ -97,7 +93,7 @@ describe('Stop Lifecycle Authorization', function (): void {
             'restore' => 'restore',
         ]);
 
-    test('does not substitute archive and restore permissions', function (string $ability, string $otherPermission, ): void {
+    test('does not substitute archive and restore permissions', function (string $ability, string $otherPermission): void {
         grantShield(
             $this->actor,
             [$otherPermission],
@@ -114,13 +110,13 @@ describe('Stop Lifecycle Authorization', function (): void {
             Gate::forUser($this->actor)->allows($ability, $stop),
         )->toBeFalse();
     })->with([
-                'restore permission does not allow archiving' => [
-                    'delete',
-                    'Restore:Stop',
-                ],
-                'archive permission does not allow restoring' => [
-                    'restore',
-                    'Delete:Stop',
-                ],
-            ]);
+        'restore permission does not allow archiving' => [
+            'delete',
+            'Restore:Stop',
+        ],
+        'archive permission does not allow restoring' => [
+            'restore',
+            'Delete:Stop',
+        ],
+    ]);
 });

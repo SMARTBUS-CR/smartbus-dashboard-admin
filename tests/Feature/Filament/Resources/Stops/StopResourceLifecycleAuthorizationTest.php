@@ -1,13 +1,13 @@
 <?php
 
+use App\Filament\Resources\Stops\Pages\ListStops;
 use App\Models\CompanyUser;
 use App\Models\Stop;
-use App\Filament\Resources\Stops\Pages\ListStops;
 use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
 
 describe('Stop Resource Lifecycle Authorization', function (): void {
-    test('requires the corresponding permission to execute a lifecycle action', function (bool $allowed, string $action, string $permission, string $notification, ): void {
+    test('requires the corresponding permission to execute a lifecycle action', function (bool $allowed, string $action, string $permission, string $notification): void {
         app()->setLocale('en');
 
         $company = createCompany();

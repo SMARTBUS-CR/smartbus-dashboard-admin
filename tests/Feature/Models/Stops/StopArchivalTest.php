@@ -25,7 +25,7 @@ describe('Stop Archival', function (): void {
         ]);
     });
 
-    test('rejects archiving a stop referenced by a pattern', function (bool $archivedPattern, ): void {
+    test('rejects archiving a stop referenced by a pattern', function (bool $archivedPattern): void {
         $company = createCompany();
         $route = Route::factory()->for($company)->create();
         $pattern = RoutePattern::factory()->for($route)->create();
@@ -43,9 +43,8 @@ describe('Stop Archival', function (): void {
         }
 
         expect(fn () => $stop->delete())
-            ->toThrow(ValidationException::class);
-
-        expect($stop->fresh()->trashed())->toBeFalse();
+            ->toThrow(ValidationException::class)
+            ->and($stop->fresh()->trashed())->toBeFalse();
 
         $this->assertDatabaseHas(RoutePatternStop::class, [
             'id' => $occurrence->getKey(),
@@ -55,7 +54,7 @@ describe('Stop Archival', function (): void {
             'minutes_from_start' => 0,
         ]);
     })->with([
-                'active pattern' => false,
-                'archived pattern' => true,
-            ]);
+        'active pattern' => false,
+        'archived pattern' => true,
+    ]);
 });

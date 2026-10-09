@@ -189,12 +189,8 @@ describe('Route Pattern Map', function (): void {
                         ->where('type', 'marker')
                         ->firstWhere('id', $markerId);
 
-                    expect($marker)->not->toBeNull();
-
-                    expect(data_get($marker, 'icon.heroicon'))
-                        ->toBe(
-                            svg(LucideIcon::BusFront->value)->toHtml(),
-                        );
+                    expect($marker)->not->toBeNull()
+                        ->and(data_get($marker, 'icon.heroicon'))->toBe(svg(LucideIcon::BusFront->value)->toHtml());
 
                     return true;
                 },
@@ -221,12 +217,10 @@ describe('Route Pattern Map', function (): void {
                         $component->getMapData()['layersData'],
                     )->firstWhere('type', 'polyline');
 
-                    expect($line)->not->toBeNull();
-
-                    expect(data_get($line, 'options.weight'))->toBe(4)
+                    expect($line)->not->toBeNull()
+                        ->and(data_get($line, 'options.weight'))->toBe(4)
                         ->and(data_get($line, 'options.fill'))->toBeFalse()
-                        ->and(data_get($line, 'options.fillOpacity'))
-                        ->toEqual(0);
+                        ->and(data_get($line, 'options.fillOpacity'))->toEqual(0);
 
                     return true;
                 },

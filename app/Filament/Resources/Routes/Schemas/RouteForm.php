@@ -2,8 +2,8 @@
 
 namespace App\Filament\Resources\Routes\Schemas;
 
-use App\Models\Route;
 use App\Enums\LucideIcon;
+use App\Models\Route;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Callout;

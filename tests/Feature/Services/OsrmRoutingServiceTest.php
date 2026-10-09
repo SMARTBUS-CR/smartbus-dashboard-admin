@@ -29,6 +29,16 @@ describe('OSRM Routing Service', function (): void {
                         'distance' => 1200.5,
                         'duration' => 180.0,
                         'geometry' => $geometry,
+                        'legs' => [
+                            [
+                                'distance' => 500.0,
+                                'duration' => 75.0,
+                            ],
+                            [
+                                'distance' => 700.5,
+                                'duration' => 105.0,
+                            ],
+                        ],
                     ],
                 ],
             ]),
@@ -42,7 +52,11 @@ describe('OSRM Routing Service', function (): void {
 
         expect($result['distance_meters'])->toBe(1200.5)
             ->and($result['duration_seconds'])->toBe(180.0)
-            ->and($result['geometry'])->toBe($geometry);
+            ->and($result['geometry'])->toBe($geometry)
+            ->and($result['leg_distances_meters'])->toBe([
+                500.0,
+                700.5,
+            ]);
 
         Http::assertSent(function ($request): bool {
             parse_str(

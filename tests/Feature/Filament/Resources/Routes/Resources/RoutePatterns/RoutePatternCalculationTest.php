@@ -6,6 +6,7 @@ use App\Models\Route;
 use App\Models\RoutePattern;
 use App\Models\RoutePatternStop;
 use App\Models\Stop;
+use App\Services\OsrmRoutingService;
 use Filament\Actions\Testing\TestAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -358,9 +359,8 @@ describe('Route Pattern Calculation', function (): void {
             ->assertSchemaComponentExists(
                 'distance_preview',
                 checkComponentUsing: function ($component): bool {
-                    expect($component)->toBeInstanceOf(TextInput::class);
-
-                    expect($component->isDisabled())->toBeTrue()
+                    expect($component)->toBeInstanceOf(TextInput::class)
+                        ->and($component->isDisabled())->toBeTrue()
                         ->and($component->isDehydrated())->toBeFalse()
                         ->and($component->getState())->toBe('1.20')
                         ->and($component->getSuffixLabel())->toBe('km');
@@ -371,9 +371,8 @@ describe('Route Pattern Calculation', function (): void {
             ->assertSchemaComponentExists(
                 'driving_duration_preview',
                 checkComponentUsing: function ($component): bool {
-                    expect($component)->toBeInstanceOf(TextInput::class);
-
-                    expect($component->isDisabled())->toBeTrue()
+                    expect($component)->toBeInstanceOf(TextInput::class)
+                        ->and($component->isDisabled())->toBeTrue()
                         ->and($component->isDehydrated())->toBeFalse()
                         ->and((string) $component->getState())->toBe('3')
                         ->and(trim((string) $component->getSuffixLabel()))->toBe('min');
@@ -383,7 +382,7 @@ describe('Route Pattern Calculation', function (): void {
             );
     });
 
-    test('loads saved metrics into disabled preview inputs', function (string $distance, string $duration, string $expectedDistance, int $expectedMinutes, ): void {
+    test('loads saved metrics into disabled preview inputs', function (string $distance, string $duration, string $expectedDistance, int $expectedMinutes): void {
         Http::fake();
 
         $this->pattern->update([
@@ -427,7 +426,271 @@ describe('Route Pattern Calculation', function (): void {
 
         Http::assertNothingSent();
     })->with([
-                'saved metrics' => ['1200.50', '181.00', '1.20', 4],
-                'zero metrics' => ['0.00', '0.00', '0.00', 0],
-            ]);
+        'saved metrics' => ['1200.50', '181.00', '1.20', 4],
+        'zero metrics' => ['0.00', '0.00', '0.00', 0],
+    ]);
+
+    test('warns about a considerable stop segment detour while preserving the calculation', function (): void {
+        $response = $this->routingResponse;
+
+        $response['routes'][0]['distance'] = 48000.0;
+        $response['routes'][0]['duration'] = 3600.0;
+        $response['routes'][0]['legs'] = [
+            ['distance' => 40000.0, 'duration' => 3000.0],
+            ['distance' => 8000.0, 'duration' => 600.0],
+        ];
+
+        Http::fake([
+            'https://osrm.test/route/v1/driving/*' => Http::response(
+                $response,
+            ),
+        ]);
+
+        Livewire::test(EditRoutePattern::class, [
+            'record' => $this->pattern->getRouteKey(),
+            'parentRecord' => $this->route,
+        ])
+            ->callAction(
+                TestAction::make('calculateRoute')
+                    ->schemaComponent('routing_actions'),
+            )
+            ->assertHasNoErrors()
+            ->assertSchemaStateSet([
+                'calculated_geometry' => $this->geometry,
+                'distance_meters' => 48000.0,
+                'driving_duration_seconds' => 3600.0,
+                'distance_preview' => '48.00',
+                'driving_duration_preview' => 60,
+                'route_detour_warnings' => [
+                    [
+                        'from_name' => $this->stops[0]->name,
+                        'to_name' => $this->stops[1]->name,
+                        'distance_meters' => 40000.0,
+                        'segment_index' => 0,
+                    ],
+                ],
+            ])
+            ->assertSchemaComponentExists('routing_detour_warning')
+            ->assertSee('Review the calculated route')
+            ->assertSee(__(
+                'The segment from :from to :to has a calculated distance of :distance km and may include a considerable detour.',
+                [
+                    'from' => $this->stops[0]->name,
+                    'to' => $this->stops[1]->name,
+                    'distance' => '40.00',
+                ],
+            ));
+
+        Http::assertSentCount(1);
+    });
+
+    test('does not display a detour warning for a normal calculated route', function (): void {
+        $response = $this->routingResponse;
+
+        $response['routes'][0]['distance'] = 16000.0;
+        $response['routes'][0]['legs'] = [
+            ['distance' => 8000.0],
+            ['distance' => 8000.0],
+        ];
+
+        Http::fake([
+            'https://osrm.test/route/v1/driving/*' => Http::response(
+                $response,
+            ),
+        ]);
+
+        Livewire::test(EditRoutePattern::class, [
+            'record' => $this->pattern->getRouteKey(),
+            'parentRecord' => $this->route,
+        ])
+            ->callAction(
+                TestAction::make('calculateRoute')
+                    ->schemaComponent('routing_actions'),
+            )
+            ->assertHasNoErrors()
+            ->assertSchemaStateSet([
+                'calculated_geometry' => $this->geometry,
+                'distance_meters' => 16000.0,
+                'route_detour_warnings' => [],
+                'route_detour_analysis_available' => true,
+            ])
+            ->assertDontSee('Review the calculated route')
+            ->assertDontSee('Route review unavailable');
+
+        Http::assertSentCount(1);
+    });
+
+    test('displays an unavailable review notice when segment details are missing', function (): void {
+        Http::fake([
+            'https://osrm.test/route/v1/driving/*' => Http::response(
+                $this->routingResponse,
+            ),
+        ]);
+
+        Livewire::test(EditRoutePattern::class, [
+            'record' => $this->pattern->getRouteKey(),
+            'parentRecord' => $this->route,
+        ])
+            ->callAction(
+                TestAction::make('calculateRoute')
+                    ->schemaComponent('routing_actions'),
+            )
+            ->assertHasNoErrors()
+            ->assertSchemaStateSet([
+                'calculated_geometry' => $this->geometry,
+                'distance_meters' => 1200.5,
+                'route_detour_warnings' => [],
+                'route_detour_analysis_available' => false,
+            ])
+            ->assertSee('Route review unavailable')
+            ->assertDontSee('Review the calculated route');
+
+        Http::assertSentCount(1);
+    });
+
+    test('clears detour warnings when routing data is refreshed after stop changes', function (): void {
+        $response = $this->routingResponse;
+
+        $response['routes'][0]['distance'] = 48000.0;
+        $response['routes'][0]['legs'] = [
+            ['distance' => 40000.0],
+            ['distance' => 8000.0],
+        ];
+
+        Http::fake([
+            'https://osrm.test/route/v1/driving/*' => Http::response(
+                $response,
+            ),
+        ]);
+
+        $component = Livewire::test(EditRoutePattern::class, [
+            'record' => $this->pattern->getRouteKey(),
+            'parentRecord' => $this->route,
+        ])
+            ->callAction(
+                TestAction::make('calculateRoute')
+                    ->schemaComponent('routing_actions'),
+            )
+            ->assertHasNoErrors()
+            ->assertSee('Review the calculated route');
+
+        // Stop changes replace the unsaved calculation with persisted routing data.
+        $component
+            ->call('refreshRoutingData')
+            ->assertSchemaStateSet([
+                'calculated_geometry' => null,
+                'route_detour_warnings' => [],
+                'route_detour_analysis_available' => null,
+            ])
+            ->assertDontSee('Review the calculated route')
+            ->assertDontSee('Route review unavailable');
+
+        Http::assertSentCount(1);
+    });
+
+    test('saves trusted leg distances instead of values supplied by the browser', function (): void {
+        $response = $this->routingResponse;
+
+        $response['routes'][0]['distance'] = 48000.0;
+        $response['routes'][0]['duration'] = 3600.0;
+        $response['routes'][0]['legs'] = [
+            ['distance' => 40000.0, 'duration' => 3000.0],
+            ['distance' => 8000.0, 'duration' => 600.0],
+        ];
+
+        Http::fake([
+            'https://osrm.test/route/v1/driving/*' => Http::response(
+                $response,
+            ),
+        ]);
+
+        Livewire::test(EditRoutePattern::class, [
+            'record' => $this->pattern->getRouteKey(),
+            'parentRecord' => $this->route,
+        ])
+            ->callAction(
+                TestAction::make('calculateRoute')
+                    ->schemaComponent('routing_actions'),
+            )
+            ->assertHasNoErrors()
+            ->set('data.routing_leg_distances', [1.0, 1.0])
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $pattern = $this->pattern->fresh();
+
+        expect($pattern->routing_leg_distances)
+            ->toEqual([40000.0, 8000.0])
+            ->and($pattern->distance_meters)->toBe('48000.00')
+            ->and($pattern->driving_duration_seconds)->toBe('3600.00');
+
+        Http::assertSentCount(1);
+    });
+
+    test('restores the detour warning from persisted leg distances without contacting the provider', function (): void {
+        $response = $this->routingResponse;
+
+        $response['routes'][0]['distance'] = 48000.0;
+        $response['routes'][0]['duration'] = 3600.0;
+        $response['routes'][0]['legs'] = [
+            ['distance' => 40000.0, 'duration' => 3000.0],
+            ['distance' => 8000.0, 'duration' => 600.0],
+        ];
+
+        Http::fake([
+            'https://osrm.test/route/v1/driving/*' => Http::response(
+                $response,
+            ),
+        ]);
+
+        Livewire::test(EditRoutePattern::class, [
+            'record' => $this->pattern->getRouteKey(),
+            'parentRecord' => $this->route,
+        ])
+            ->callAction(
+                TestAction::make('calculateRoute')
+                    ->schemaComponent('routing_actions'),
+            )
+            ->assertHasNoErrors()
+            ->call('save')
+            ->assertHasNoErrors();
+
+        expect($this->pattern->fresh()->routing_leg_distances)
+            ->toEqual([40000.0, 8000.0]);
+
+        $this->travel(
+            (int) config('services.osrm.cache_ttl', 3600) + 1,
+        )->seconds();
+
+        $points = array_map(
+            static fn ($stop): array => [
+                'lat' => (float) $stop->latitude,
+                'lng' => (float) $stop->longitude,
+            ],
+            $this->stops,
+        );
+
+        expect(app(OsrmRoutingService::class)->getCachedRoute($points))
+            ->toBeNull();
+
+        Livewire::test(EditRoutePattern::class, [
+            'record' => $this->pattern->getRouteKey(),
+            'parentRecord' => $this->route,
+        ])
+            ->assertSchemaStateSet([
+                'route_detour_analysis_available' => true,
+                'route_detour_warnings' => [
+                    [
+                        'from_name' => $this->stops[0]->name,
+                        'to_name' => $this->stops[1]->name,
+                        'distance_meters' => 40000.0,
+                        'segment_index' => 0,
+                    ],
+                ],
+            ])
+            ->assertSee('Review the calculated route')
+            ->assertDontSee('Route review unavailable');
+
+        Http::assertSentCount(1);
+    });
 });

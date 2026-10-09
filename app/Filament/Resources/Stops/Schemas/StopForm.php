@@ -2,10 +2,11 @@
 
 namespace App\Filament\Resources\Stops\Schemas;
 
+use App\Enums\LucideIcon;
 use App\Filament\Forms\Components\LocationSearchInput;
 use App\Filament\Maps\Layers\LucideMarker;
 use App\Models\Stop;
-use App\Enums\LucideIcon;
+use App\Services\PhotonGeocodingService;
 use EduardoRibeiroDev\FilamentLeaflet\Fields\MapPicker;
 use EduardoRibeiroDev\FilamentLeaflet\ValueObjects\Coordinate;
 use EduardoRibeiroDev\FilamentLeaflet\ValueObjects\GeoSearchResult;
@@ -17,6 +18,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use RuntimeException;
 
 class StopForm
 {
@@ -72,13 +74,12 @@ class StopForm
                             ->prefixIcon(Heroicon::OutlinedMagnifyingGlass)
                             ->extraAttributes(['data-testid' => 'location-search'])
                             ->helperText(__(
-                                'Search for a place, select a result, then adjust the boarding point on the map.',
+                                'Search for a place or select a point on the map. This sets the location without changing the stop name.',
                             ))
                             ->live()
                             ->dehydrated(false)
                             ->coordinateLabelUsing(
-                                fn (?Stop $record): string => $record?->name
-                                    ?? __('Selected Location'),
+                                fn (): string => __('Selected Location'),
                             )
                             ->afterStateHydrated(function (LocationSearchInput $component, ?Stop $record): void {
                                 if (
@@ -114,6 +115,7 @@ class StopForm
                             ->columnSpanFull(),
 
                         MapPicker::make('location')
+                            ->view('filament.forms.components.stop-map')
                             ->label(__('Boarding Point'))
                             ->helperText(__('Search for a place or select the boarding point on the map.'))
                             ->height(400)
@@ -153,6 +155,17 @@ class StopForm
                                 $set('latitude', sprintf('%.7f', $state->lat));
                                 $set('longitude', sprintf('%.7f', $state->lng));
                             })
+                            ->onMapClick(
+                                fn (
+                                    Set $set,
+                                    float $latitude,
+                                    float $longitude,
+                                ) => self::selectMapLocation(
+                                    $set,
+                                    $latitude,
+                                    $longitude,
+                                ),
+                            )
                             ->columnSpanFull(),
 
                         Section::make(__('Advanced Coordinates'))
@@ -201,6 +214,54 @@ class StopForm
                     ->collapsed($compact)
                     ->columnSpanFull(),
             ]);
+    }
+
+    private static function selectMapLocation(
+        Set $set,
+        float $latitude,
+        float $longitude,
+    ): void {
+        if (
+            ! is_finite($latitude)
+            || ! is_finite($longitude)
+            || $latitude < -90
+            || $latitude > 90
+            || $longitude < -180
+            || $longitude > 180
+        ) {
+            return;
+        }
+
+        $set('latitude', sprintf('%.7f', $latitude));
+        $set('longitude', sprintf('%.7f', $longitude));
+        $set('location', [
+            'lat' => $latitude,
+            'lng' => $longitude,
+        ]);
+
+        try {
+            $result = app(PhotonGeocodingService::class)->reverse(
+                $latitude,
+                $longitude,
+            );
+        } catch (RuntimeException) {
+            $result = null;
+        }
+
+        $set(
+            'location_search',
+            $result ?? GeoSearchResult::fromArray([
+                'coordinate' => [
+                    'lat' => $latitude,
+                    'lng' => $longitude,
+                ],
+                'name' => __('Selected Location'),
+                'display_name' => __('Selected Location (:latitude, :longitude)', [
+                    'latitude' => sprintf('%.7f', $latitude),
+                    'longitude' => sprintf('%.7f', $longitude),
+                ]),
+            ]),
+        );
     }
 
     private static function syncMapLocation(

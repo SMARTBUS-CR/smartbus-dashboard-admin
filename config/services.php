@@ -54,5 +54,9 @@ return [
         'timeout' => 10,
         'cache_ttl' => 3600,
         'user_agent' => 'SmartBus Dashboard University Project',
+        'detour' => [
+            'minimum_ratio' => 3,
+            'minimum_excess_meters' => 10000,
+        ],
     ],
 ];

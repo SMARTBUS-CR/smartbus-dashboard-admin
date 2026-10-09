@@ -4,9 +4,9 @@ use App\Enums\UserRole;
 use App\Filament\Resources\Stops\Pages\ListStops;
 use App\Filament\Resources\Stops\Pages\ViewStop;
 use App\Filament\Resources\Stops\StopResource;
-use Filament\Actions\Testing\TestAction;
 use App\Models\CompanyUser;
 use App\Models\Stop;
+use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
 
 describe('Stop Resource View', function (): void {
@@ -151,7 +151,7 @@ describe('Stop Resource View', function (): void {
                 tenant: $company,
             ));
     })->with([
-                'company stop' => false,
-                'shared stop' => true,
-            ]);
+        'company stop' => false,
+        'shared stop' => true,
+    ]);
 });

@@ -119,10 +119,8 @@ describe('Route Pattern Stop Synchronization', function (): void {
                         ->toEqual([
                             [10.4, -84.0],
                             [10.5, -84.1],
-                        ]);
-
-                    expect($layers->where('type', 'polyline')->count())
-                        ->toBe(0);
+                        ])
+                        ->and($layers->where('type', 'polyline')->count())->toBe(0);
 
                     return true;
                 },

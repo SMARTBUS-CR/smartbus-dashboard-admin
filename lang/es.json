@@ -528,5 +528,17 @@
     "Stop Restored": "Parada restaurada",
     "Could Not Archive Stop": "No se pudo archivar la parada",
     "The stop will be hidden from the active catalog. Its data will be preserved and it can be restored.": "La parada se ocultará del catálogo activo. Sus datos se conservarán y podrá restaurarse.",
-    "The stop will become available in the active catalog again.": "La parada volverá a estar disponible en el catálogo activo."
+    "The stop will become available in the active catalog again.": "La parada volverá a estar disponible en el catálogo activo.",
+    "Shared stops are created by a System Admin. They can be used to create patterns across multiple companies.": "Las paradas compartidas son paradas creadas por un Administrador del Sistema. Estas pueden utilizarse para crear recorridos en varias compañías.",
+    "Search for a place or select a point on the map. This sets the location without changing the stop name.": "Busca un lugar o selecciona un punto en el mapa. Esto establece la ubicación sin cambiar el nombre de la parada.",
+    "Selected Location (:latitude, :longitude)": "Ubicación seleccionada (:latitude, :longitude)",
+    "Looking up location information...": "Buscando información de la ubicación...",
+    "Review the calculated route": "Revisa el recorrido calculado",
+    "The segment from :from to :to has a calculated distance of :distance km and may include a considerable detour.": "El tramo entre :from y :to tiene una distancia calculada de :distance km y podría incluir un desvío considerable.",
+    "This may be caused by traffic restrictions, map connections or selected points. Check that the route matches the road used by the bus.": "Esto puede deberse a restricciones de circulación, conexiones del mapa o los puntos seleccionados. Comprueba que el trazado corresponda al camino utilizado por el autobús.",
+    "Route review unavailable": "Análisis del recorrido no disponible",
+    "The calculation does not include the segment details needed to detect considerable detours. Review the suggested route on the map.": "El cálculo no incluye el detalle de los tramos necesario para detectar desvíos considerables. Revisa el trazado sugerido en el mapa.",
+    "Route leg distances must be finite non-negative numbers.": "Las distancias de los tramos deben ser números finitos mayores o iguales a cero.",
+    "Locate segment": "Localizar tramo",
+    "Review the suggested route": "Revisa el trazado sugerido"
 }

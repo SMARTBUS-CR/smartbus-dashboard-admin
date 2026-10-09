@@ -31,7 +31,7 @@ class RouteResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
 
     protected static string|UnitEnum|null $navigationGroup = NavigationGroup::Transport;
-    
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedMap;
 
     protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::Map;

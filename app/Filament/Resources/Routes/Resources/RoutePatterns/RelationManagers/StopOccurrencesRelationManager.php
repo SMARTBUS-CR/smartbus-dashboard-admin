@@ -2,15 +2,12 @@
 
 namespace App\Filament\Resources\Routes\Resources\RoutePatterns\RelationManagers;
 
-use App\Filament\Support\TableSectionHeader;
-use Filament\Support\Icons\Heroicon;
 use App\Enums\LucideIcon;
-use Filament\Support\Enums\Alignment;
-use Filament\Support\Enums\Width;
 use App\Filament\Resources\Routes\Resources\RoutePatterns\Pages\EditRoutePattern;
 use App\Filament\Resources\Routes\Resources\RoutePatterns\RoutePatternResource;
 use App\Filament\Resources\Stops\Schemas\StopForm;
 use App\Filament\Resources\Stops\StopResource;
+use App\Filament\Support\TableSectionHeader;
 use App\Models\Company;
 use App\Models\RoutePattern;
 use App\Models\RoutePatternStop;
@@ -26,6 +23,9 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Alignment;
+use Filament\Support\Enums\Width;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -327,7 +327,7 @@ class StopOccurrencesRelationManager extends RelationManager
     }
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     protected function updateOccurrence(
         RoutePatternStop $record,

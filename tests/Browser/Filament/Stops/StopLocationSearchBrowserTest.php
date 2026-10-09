@@ -4,6 +4,7 @@ use App\Enums\UserRole;
 use App\Filament\Resources\Stops\StopResource;
 use App\Models\Stop;
 use Illuminate\Support\Facades\Http;
+use Pest\Browser\Execution;
 use Pest\Browser\Support\Selector;
 use Tests\Support\BrowserSession;
 
@@ -64,11 +65,42 @@ describe('Stop Location Search Browser Flow', function (): void {
                 'name' => 'Central Terminal, Sarapiquí, Costa Rica',
                 'exact' => true,
             ]))
-            ->assertVisible('.leaflet-marker-icon')
-            ->click(Selector::getByRoleSelector('button', [
-                'name' => 'Create',
-                'exact' => true,
-            ]))
+            ->assertVisible('.leaflet-marker-icon');
+
+        Execution::instance()->waitForExpectation(function () use ($page): void {
+            $page->assertScript(<<<'JS'
+                    () => {
+                        const element = document.querySelector('.leaflet-container');
+                        const root = element?.closest('[x-data]');
+                        const component = root ? window.Alpine.$data(root) : null;
+                        const state = component?.getState?.();
+                        const map = component?.mapCore?.map;
+
+                        if (!map || state?.lat == null || state?.lng == null) {
+                            return false;
+                        }
+
+                        const latitude = Number(state.lat);
+                        const longitude = Number(state.lng);
+
+                        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+                            return false;
+                        }
+
+                        const leafletMap = window.Alpine.raw(map);
+
+                        return leafletMap.distance(
+                            leafletMap.getCenter(),
+                            [latitude, longitude],
+                        ) < 25;
+                    }
+                    JS);
+        });
+
+        $page->click(Selector::getByRoleSelector('button', [
+            'name' => 'Create',
+            'exact' => true,
+        ]))
             ->assertSee('Created')
             ->assertNoJavaScriptErrors();
 

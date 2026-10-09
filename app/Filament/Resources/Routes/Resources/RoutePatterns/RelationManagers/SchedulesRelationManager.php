@@ -2,11 +2,6 @@
 
 namespace App\Filament\Resources\Routes\Resources\RoutePatterns\RelationManagers;
 
-use Filament\Actions\ActionGroup;
-use Filament\Support\Enums\Alignment;
-use Filament\Support\Enums\Width;
-use Filament\Support\Icons\Heroicon;
-use Illuminate\Support\Carbon;
 use App\Filament\Resources\Routes\Resources\RoutePatterns\RoutePatternResource;
 use App\Filament\Support\TableSectionHeader;
 use App\Models\Company;
@@ -14,6 +9,7 @@ use App\Models\RoutePattern;
 use App\Models\RouteSchedule;
 use App\Models\RouteScheduleException;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
@@ -25,10 +21,14 @@ use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Alignment;
+use Filament\Support\Enums\Width;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\HtmlString;
@@ -237,7 +237,7 @@ class SchedulesRelationManager extends RelationManager
                         fn (RouteSchedule $record, array $data): RouteSchedule => $this->updateSchedule($record, $data),
                     )
                     ->successNotificationTitle(__('Departure Updated')),
-                
+
                 ActionGroup::make([
                     Action::make('viewSuspensions')
                         ->label(__('View Suspensions'))
@@ -265,10 +265,9 @@ class SchedulesRelationManager extends RelationManager
                                         ->orderBy('service_date')
                                         ->get()
                                         ->map(
-                                            fn (RouteScheduleException $exception): string =>
-                                                $exception->service_date
-                                                    ->locale(app()->getLocale())
-                                                    ->isoFormat('LL'),
+                                            fn (RouteScheduleException $exception): string => $exception->service_date
+                                                ->locale(app()->getLocale())
+                                                ->isoFormat('LL'),
                                         )
                                         ->all(),
                                 )

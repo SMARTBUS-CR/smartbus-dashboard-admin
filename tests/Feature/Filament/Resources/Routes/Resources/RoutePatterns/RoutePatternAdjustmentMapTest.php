@@ -151,9 +151,8 @@ describe('Route Pattern Adjustment Map', function (): void {
                             [10.4, -84.0],
                             [10.45, -84.05],
                             [10.5, -84.1],
-                        ]);
-
-                    expect($adjustmentMarkers)->toHaveCount(2);
+                        ])
+                        ->and($adjustmentMarkers)->toHaveCount(2);
 
                     foreach ($adjustmentMarkers as $marker) {
                         expect(data_get($marker, 'icon.heroicon'))

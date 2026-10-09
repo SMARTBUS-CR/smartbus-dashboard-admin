@@ -2,11 +2,8 @@
 
 namespace App\Filament\Resources\Routes\RelationManagers;
 
-use App\Filament\Support\TableSectionHeader;
-use Filament\Support\Enums\Alignment;
-use Filament\Support\Enums\Width;
-use Filament\Support\Icons\Heroicon;
 use App\Filament\Resources\Routes\RouteResource;
+use App\Filament\Support\TableSectionHeader;
 use App\Models\Company;
 use App\Models\Route;
 use App\Models\RouteFare;
@@ -19,10 +16,13 @@ use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Support\Colors\Color;
+use Filament\Support\Enums\Alignment;
+use Filament\Support\Enums\FontFamily;
+use Filament\Support\Enums\Width;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Filament\Support\Colors\Color;
-use Filament\Support\Enums\FontFamily;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -338,11 +338,11 @@ class FaresRelationManager extends RelationManager
         $locale = app()->getLocale();
 
         $from = $fare->valid_from
-                ?->locale($locale)
+            ?->locale($locale)
             ->isoFormat('LL');
 
         $until = $fare->valid_until
-                ?->locale($locale)
+            ?->locale($locale)
             ->isoFormat('LL');
 
         $period = match (true) {

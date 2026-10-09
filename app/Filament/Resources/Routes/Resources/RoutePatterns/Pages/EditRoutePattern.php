@@ -50,6 +50,9 @@ class EditRoutePattern extends EditRecord
             $data['distance_meters'],
             $data['driving_duration_seconds'],
             $data['routing_points_hash'],
+            $data['routing_leg_distances'],
+            $data['route_detour_warnings'],
+            $data['route_detour_analysis_available'],
         );
 
         try {
@@ -136,6 +139,9 @@ class EditRoutePattern extends EditRecord
             )
             : null;
         $this->data['adjustment_segment'] = null;
+        $this->data['route_detour_warnings'] = [];
+        $this->data['route_detour_analysis_available'] =
+            $record->route_geometry !== null ? false : null;
 
         $occurrences = $record->stopOccurrences()
             ->with('stop')
@@ -159,6 +165,13 @@ class EditRoutePattern extends EditRecord
                     'display_name' => $stop->name,
                 ], JSON_THROW_ON_ERROR);
         }
+
+        $this->form
+            ->getComponentByStatePath(
+                'route_detour_analysis_available',
+                withHidden: true,
+            )
+            ?->callAfterStateHydrated();
     }
 
     private function saveCalculatedRoute(RoutePattern $pattern): void
@@ -215,17 +228,18 @@ class EditRoutePattern extends EditRecord
 
         $pointsHash = hash('sha256', $coordinates);
 
+        $calculation = app(OsrmRoutingService::class)
+            ->getCachedRoute($points);
+
         if (
             $pattern->route_geometry !== null
             && $pattern->distance_meters !== null
             && $pattern->driving_duration_seconds !== null
             && $pattern->routing_points_hash === $pointsHash
+            && $calculation === null
         ) {
             return;
         }
-
-        $calculation = app(OsrmRoutingService::class)
-            ->getCachedRoute($points);
 
         if ($calculation === null) {
             throw ValidationException::withMessages([
@@ -240,6 +254,11 @@ class EditRoutePattern extends EditRecord
             'distance_meters' => $calculation['distance_meters'],
             'driving_duration_seconds' => $calculation['duration_seconds'],
             'routing_points_hash' => $pointsHash,
+            'routing_leg_distances' => filled(
+                $calculation['leg_distances_meters'] ?? [],
+            )
+                ? $calculation['leg_distances_meters']
+                : null,
         ]);
     }
 }

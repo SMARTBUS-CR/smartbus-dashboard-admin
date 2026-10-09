@@ -10,6 +10,7 @@ use App\Filament\Resources\Routes\Resources\RoutePatterns\RoutePatternResource;
 use App\Models\Route;
 use App\Models\RoutePattern;
 use App\Services\OsrmRoutingService;
+use App\Services\RouteDetourAnalyzer;
 use App\Services\RouteRoutingPointsService;
 use EduardoRibeiroDev\FilamentLeaflet\Layers\BaseLayer;
 use EduardoRibeiroDev\FilamentLeaflet\Layers\Marker;
@@ -20,19 +21,25 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Alignment;
+use Filament\Support\Enums\VerticalAlignment;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use Livewire\Component as LivewireComponent;
 use RuntimeException;
+
+use function count;
 
 class RoutePatternForm
 {
@@ -93,6 +100,14 @@ class RoutePatternForm
                             && $ownerRoute === null,
                     )
                     ->schema([
+                        Callout::make(__('Review the suggested route'))
+                            ->key('routing_notice')
+                            ->description(__(
+                                'Review the suggested road route for bus operation. Driving time does not include boarding time or replace scheduled times.',
+                            ))
+                            ->info()
+                            ->columnSpanFull(),
+
                         Grid::make(1)
                             ->schema([
                                 self::endpointSearch(
@@ -112,26 +127,6 @@ class RoutePatternForm
                                     ->required(
                                         fn (Get $get): bool => filled($get('origin_search')),
                                     ),
-
-                                Toggle::make('adjustment_mode')
-                                    ->label(__('Adjust Route'))
-                                    ->helperText(__(
-                                        'Orange points guide the calculated road route; they are not boarding stops. Select a segment and click the map to add points in travel order. Drag a point to move it, or click it to remove it.',
-                                    ))
-                                    ->default(false)
-                                    ->live()
-                                    ->dehydrated(false),
-
-                                Select::make('adjustment_segment')
-                                    ->label(__('Route Segment'))
-                                    ->options(
-                                        fn (?RoutePattern $record): array => self::routeSegmentOptions($record),
-                                    )
-                                    ->visible(
-                                        fn (Get $get): bool => (bool) $get('adjustment_mode'),
-                                    )
-                                    ->live()
-                                    ->dehydrated(false),
 
                                 Hidden::make('routing_adjustments')
                                     ->default([])
@@ -173,32 +168,42 @@ class RoutePatternForm
                                     )
                                     ->dehydrated(false),
 
-                                Actions::make([
-                                    Action::make('calculateRoute')
-                                        ->label(__('Calculate Route'))
-                                        ->authorize(
-                                            fn (?RoutePattern $record): bool => $record !== null
-                                                && $record->route()->exists()
-                                                && RoutePatternResource::canEdit($record),
-                                        )
-                                        ->disabled(function (Get $get): bool {
-                                            $origin = $get('origin_search');
-                                            $destination = $get('destination_search');
+                                Hidden::make('route_detour_warnings')
+                                    ->default([])
+                                    ->dehydrated(false),
 
-                                            return ! $origin instanceof GeoSearchResult
-                                                || $origin->coordinate === null
-                                                || ! $destination instanceof GeoSearchResult
-                                                || $destination->coordinate === null;
-                                        })
-                                        ->action(
-                                            fn (Get $get, Set $set, ?RoutePattern $record) => self::calculateRoute(
+                                Hidden::make('route_detour_analysis_available')
+                                    ->default(null)
+                                    ->dehydrated(false)
+                                    ->afterStateHydrated(function (Hidden $component, Get $get, Set $set, ?RoutePattern $record): void {
+                                        $set('route_detour_warnings', []);
+
+                                        if ($record?->route_geometry === null) {
+                                            $component->state(null);
+
+                                            return;
+                                        }
+
+                                        $component->state(false);
+
+                                        if ($record->routing_leg_distances === null) {
+                                            return;
+                                        }
+
+                                        try {
+                                            $warnings = self::routeDetourWarnings(
                                                 $get,
-                                                $set,
                                                 $record,
-                                            ),
-                                        ),
-                                ])
-                                    ->key('routing_actions'),
+                                                self::routePoints($get, $record),
+                                                $record->routing_leg_distances,
+                                            );
+                                        } catch (InvalidArgumentException|ValidationException) {
+                                            return;
+                                        }
+
+                                        $set('route_detour_warnings', $warnings ?? []);
+                                        $component->state($warnings !== null);
+                                    }),
 
                                 TextInput::make('distance_preview')
                                     ->label(__('Total Distance'))
@@ -241,11 +246,59 @@ class RoutePatternForm
                                         },
                                     ),
 
-                                TextEntry::make('routing_notice')
-                                    ->hiddenLabel()
-                                    ->state(__(
-                                        'Review the suggested road route for bus operation. Driving time does not include boarding time or replace scheduled times.',
-                                    )),
+                                Toggle::make('adjustment_mode')
+                                    ->label(__('Adjust Route'))
+                                    ->helperText(__(
+                                        'Orange points guide the calculated road route; they are not boarding stops. Select a segment and click the map to add points in travel order. Drag a point to move it, or click it to remove it.',
+                                    ))
+                                    ->default(false)
+                                    ->live()
+                                    ->dehydrated(false),
+
+                                Grid::make(2)
+                                    ->schema([
+                                        Select::make('adjustment_segment')
+                                            ->label(__('Route Segment'))
+                                            ->options(
+                                                fn (?RoutePattern $record): array => self::routeSegmentOptions($record),
+                                            )
+                                            ->visible(
+                                                fn (Get $get): bool => (bool) $get('adjustment_mode'),
+                                            )
+                                            ->live()
+                                            ->dehydrated(false),
+
+                                        Actions::make([
+                                            Action::make('calculateRoute')
+                                                ->label(__('Calculate Route'))
+                                                ->authorize(
+                                                    fn (?RoutePattern $record): bool => $record !== null
+                                                        && $record->route()->exists()
+                                                        && RoutePatternResource::canEdit($record),
+                                                )
+                                                ->disabled(function (Get $get): bool {
+                                                    $origin = $get('origin_search');
+                                                    $destination = $get('destination_search');
+
+                                                    return ! $origin instanceof GeoSearchResult
+                                                        || $origin->coordinate === null
+                                                        || ! $destination instanceof GeoSearchResult
+                                                        || $destination->coordinate === null;
+                                                })
+                                                ->action(
+                                                    fn (Get $get, Set $set, ?RoutePattern $record) => self::calculateRoute(
+                                                        $get,
+                                                        $set,
+                                                        $record,
+                                                    ),
+                                                ),
+                                        ])
+                                            ->alignment(Alignment::End)
+                                            ->verticalAlignment(VerticalAlignment::End)
+                                            ->columnStart(2)
+                                            ->columnSpan(1)
+                                            ->key('routing_actions'),
+                                    ]),
                             ])
                             ->columnSpan(1),
 
@@ -300,50 +353,156 @@ class RoutePatternForm
                             })
                             ->onMapClick(
                                 fn (
-                                Get $get,
-                                Set $set,
-                                ?RoutePattern $record,
-                                float $latitude,
-                                float $longitude,
-                            ) => self::addAdjustmentPoint(
-                                        $get,
-                                        $set,
-                                        $record,
-                                        $latitude,
-                                        $longitude,
-                                    ),
+                                    Get $get,
+                                    Set $set,
+                                    ?RoutePattern $record,
+                                    float $latitude,
+                                    float $longitude,
+                                ) => self::addAdjustmentPoint(
+                                    $get,
+                                    $set,
+                                    $record,
+                                    $latitude,
+                                    $longitude,
+                                ),
                             )
                             ->onLayerClick(
                                 fn (
-                                Get $get,
-                                Set $set,
-                                ?RoutePattern $record,
-                                ?BaseLayer $layer,
-                            ) => self::removeAdjustmentPoint(
-                                        $get,
-                                        $set,
-                                        $record,
-                                        $layer,
-                                    ),
+                                    Get $get,
+                                    Set $set,
+                                    ?RoutePattern $record,
+                                    ?BaseLayer $layer,
+                                ) => self::removeAdjustmentPoint(
+                                    $get,
+                                    $set,
+                                    $record,
+                                    $layer,
+                                ),
                             )
                             ->onAdjustmentPointMove(
                                 fn (
-                                Get $get,
-                                Set $set,
-                                ?RoutePattern $record,
-                                string $layerId,
-                                float $latitude,
-                                float $longitude,
-                            ) => self::moveAdjustmentPoint(
-                                        $get,
-                                        $set,
-                                        $record,
-                                        $layerId,
-                                        $latitude,
-                                        $longitude,
-                                    ),
+                                    Get $get,
+                                    Set $set,
+                                    ?RoutePattern $record,
+                                    string $layerId,
+                                    float $latitude,
+                                    float $longitude,
+                                ) => self::moveAdjustmentPoint(
+                                    $get,
+                                    $set,
+                                    $record,
+                                    $layerId,
+                                    $latitude,
+                                    $longitude,
+                                ),
                             )
                             ->columnSpan(1),
+
+                        Callout::make(__('Review the calculated route'))
+                            ->key('routing_detour_warning')
+                            ->warning()
+                            ->extraAttributes(['role' => 'status'])
+                            ->visible(
+                                fn (Get $get): bool => filled($get('calculated_geometry'))
+                                    && filled($get('route_detour_warnings')),
+                            )
+                            ->description(function (Get $get): string {
+                                $messages = array_map(
+                                    static fn (array $warning): string => __(
+                                        'The segment from :from to :to has a calculated distance of :distance km and may include a considerable detour.',
+                                        [
+                                            'from' => $warning['from_name'],
+                                            'to' => $warning['to_name'],
+                                            'distance' => number_format(
+                                                $warning['distance_meters'] / 1000,
+                                                2,
+                                                '.',
+                                                '',
+                                            ),
+                                        ],
+                                    ),
+                                    $get('route_detour_warnings') ?? [],
+                                );
+
+                                $messages[] = __(
+                                    'This may be caused by traffic restrictions, map connections or selected points. Check that the route matches the road used by the bus.',
+                                );
+
+                                return implode(' ', $messages);
+                            })
+                            ->actions([
+                                function (Get $get, ?RoutePattern $record): array {
+                                    $actions = [];
+
+                                    foreach ($get('route_detour_warnings') ?? [] as $index => $warning) {
+                                        $actions[] = Action::make('locateDetourSegment'.$index)
+                                            ->label(__('Locate segment'))
+                                            ->icon(Heroicon::OutlinedMapPin)
+                                            ->tooltip($warning['from_name'].' → '.$warning['to_name'])
+                                            ->action(function (LivewireComponent $livewire) use ($record, $warning): void {
+                                                if ($record === null) {
+                                                    return;
+                                                }
+
+                                                $map = $livewire->form->getComponentByStatePath(
+                                                    'route_map',
+                                                    withHidden: true,
+                                                );
+
+                                                if (! $map instanceof RouteMapPicker) {
+                                                    return;
+                                                }
+
+                                                $ids = $record->stopOccurrences()
+                                                    ->orderBy('stop_sequence')
+                                                    ->pluck('id')
+                                                    ->all();
+
+                                                $segmentIndex = $warning['segment_index'];
+                                                $lastIndex = count($ids) - 1;
+
+                                                if (
+                                                    count($ids) >= 2
+                                                    && ! isset($ids[$segmentIndex + 1])
+                                                ) {
+                                                    return;
+                                                }
+
+                                                $fromLayerId = $segmentIndex === 0
+                                                    ? 'origin'
+                                                    : 'stop-'.$ids[$segmentIndex];
+
+                                                $toLayerId = count($ids) < 2
+                                                    || $segmentIndex + 1 === $lastIndex
+                                                    ? 'destination'
+                                                    : 'stop-'.$ids[$segmentIndex + 1];
+
+                                                $livewire->dispatch(
+                                                    'route-detour-segment-focus',
+                                                    mapId: $map->getMapData()['mapId'],
+                                                    fromLayerId: $fromLayerId,
+                                                    toLayerId: $toLayerId,
+                                                    fromOccurrenceId: $ids[$segmentIndex] ?? 'draft-origin',
+                                                    toOccurrenceId: $ids[$segmentIndex + 1] ?? 'draft-destination',
+                                                );
+                                            });
+                                    }
+
+                                    return $actions;
+                                }])
+                            ->columnSpanFull(),
+
+                        Callout::make(__('Route review unavailable'))
+                            ->key('routing_detour_unavailable')
+                            ->info()
+                            ->visible(
+                                fn (Get $get): bool => filled($get('calculated_geometry'))
+                                    && $get('route_detour_analysis_available') === false,
+                            )
+                            ->description(__(
+                                'The calculation does not include the segment details needed to detect considerable detours. Review the suggested route on the map.',
+                            ))
+                            ->columnSpanFull(),
                     ])
                     ->columns(2)
                     ->columnSpanFull(),
@@ -373,7 +532,7 @@ class RoutePatternForm
                     ->reorder('stop_sequence', $isOrigin ? 'asc' : 'desc')
                     ->with('stop')
                     ->first()
-                        ?->stop;
+                    ?->stop;
 
                 if ($stop === null) {
                     $component->state(null);
@@ -533,6 +692,8 @@ class RoutePatternForm
         $set('driving_duration_seconds', null);
         $set('distance_preview', null);
         $set('driving_duration_preview', null);
+        $set('route_detour_warnings', []);
+        $set('route_detour_analysis_available', null);
     }
 
     private static function calculateRoute(
@@ -550,8 +711,15 @@ class RoutePatternForm
         self::clearCalculatedRoute($set);
 
         try {
-            $result = app(OsrmRoutingService::class)->calculate(
-                self::routePoints($get, $record),
+            $points = self::routePoints($get, $record);
+
+            $result = app(OsrmRoutingService::class)->calculate($points);
+
+            $warnings = self::routeDetourWarnings(
+                $get,
+                $record,
+                $points,
+                $result['leg_distances_meters'] ?? [],
             );
         } catch (InvalidArgumentException $exception) {
             Notification::make()
@@ -573,6 +741,8 @@ class RoutePatternForm
             return;
         }
 
+        $set('route_detour_warnings', $warnings ?? []);
+        $set('route_detour_analysis_available', $warnings !== null);
         $set('calculated_geometry', $result['geometry']);
         $set('distance_meters', $result['distance_meters']);
         $set('driving_duration_seconds', $result['duration_seconds']);
@@ -878,5 +1048,109 @@ class RoutePatternForm
                 return;
             }
         }
+    }
+
+    /**
+     * @param  list<array{lat: float, lng: float}>  $points
+     * @param  list<float>  $legDistances
+     * @return list<array{
+     *     from_name: string,
+     *     to_name: string,
+     *     distance_meters: float,
+     *     segment_index: int,
+     * }>|null
+     */
+    private static function routeDetourWarnings(
+        Get $get,
+        RoutePattern $record,
+        array $points,
+        array $legDistances,
+    ): ?array {
+        if (
+            count($points) < 2
+            || count($legDistances) !== count($points) - 1
+        ) {
+            return null;
+        }
+
+        $occurrences = $record->stopOccurrences()
+            ->with('stop')
+            ->orderBy('stop_sequence')
+            ->get()
+            ->all();
+
+        $count = count($occurrences);
+
+        $stops = [
+            [
+                'id' => $count > 0
+                    ? $occurrences[0]->getKey()
+                    : 'draft-origin',
+                'name' => $get('origin_search')->name,
+            ],
+        ];
+
+        for ($index = 1; $index < $count - 1; $index++) {
+            $stops[] = [
+                'id' => $occurrences[$index]->getKey(),
+                'name' => $occurrences[$index]->stop->name,
+            ];
+        }
+
+        $stops[] = [
+            'id' => $count >= 2
+                ? $occurrences[$count - 1]->getKey()
+                : 'draft-destination',
+            'name' => $get('destination_search')->name,
+        ];
+
+        $adjustments = $get('routing_adjustments') ?? [];
+        $segments = [];
+        $pointIndex = 0;
+
+        for ($index = 0; $index < count($stops) - 1; $index++) {
+            $adjustmentCount = 0;
+
+            foreach ($adjustments as $adjustment) {
+                if (
+                    $adjustment['from_occurrence_id'] === $stops[$index]['id']
+                    && $adjustment['to_occurrence_id'] === $stops[$index + 1]['id']
+                ) {
+                    $adjustmentCount = count($adjustment['points']);
+
+                    break;
+                }
+            }
+
+            $nextPointIndex = $pointIndex + $adjustmentCount + 1;
+
+            $segments[] = [
+                'from_point_index' => $pointIndex,
+                'to_point_index' => $nextPointIndex,
+            ];
+
+            $pointIndex = $nextPointIndex;
+        }
+
+        // Inconsistent metadata must not be presented as a successful review.
+        if ($pointIndex !== count($points) - 1) {
+            return null;
+        }
+
+        $warnings = app(RouteDetourAnalyzer::class)->analyze(
+            $points,
+            $legDistances,
+            $segments,
+        );
+
+        return array_map(
+            static fn (array $warning): array => [
+                'segment_index' => $warning['segment_index'],
+                'from_name' => $stops[$warning['segment_index']]['name'],
+                'to_name' => $stops[$warning['segment_index'] + 1]['name'],
+                'distance_meters' => $warning['distance_meters'],
+            ],
+            $warnings,
+        );
     }
 }

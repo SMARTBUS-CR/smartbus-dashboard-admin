@@ -1,9 +1,6 @@
 <?php
 
 use App\Enums\LucideIcon;
-use EduardoRibeiroDev\FilamentLeaflet\Infolists\MapEntry;
-use Filament\Support\Enums\IconSize;
-use Filament\Support\Icons\Heroicon;
 use App\Enums\UserRole;
 use App\Filament\Resources\Routes\Resources\RoutePatterns\Pages\EditRoutePattern;
 use App\Filament\Resources\Routes\Resources\RoutePatterns\Pages\ViewRoutePattern;
@@ -12,7 +9,10 @@ use App\Models\Route;
 use App\Models\RoutePattern;
 use App\Models\RoutePatternStop;
 use App\Models\Stop;
+use EduardoRibeiroDev\FilamentLeaflet\Infolists\MapEntry;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Support\Enums\IconSize;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 

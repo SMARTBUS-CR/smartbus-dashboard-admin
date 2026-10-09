@@ -24,6 +24,7 @@ use InvalidArgumentException;
     'distance_meters',
     'driving_duration_seconds',
     'routing_points_hash',
+    'routing_leg_distances',
 ])]
 class RoutePattern extends Model
 {
@@ -36,6 +37,7 @@ class RoutePattern extends Model
             'routing_adjustments' => 'array',
             'distance_meters' => 'decimal:2',
             'driving_duration_seconds' => 'decimal:2',
+            'routing_leg_distances' => 'array',
         ];
     }
 
@@ -138,15 +140,21 @@ class RoutePattern extends Model
                 'distance_meters' => null,
                 'driving_duration_seconds' => null,
                 'routing_points_hash' => null,
+                'routing_leg_distances' => null,
             ]);
         });
 
         static::saving(function (RoutePattern $pattern): void {
+            if ($pattern->route_geometry === null) {
+                $pattern->routing_leg_distances = null;
+            }
+
             $fields = [
                 'route_geometry',
                 'distance_meters',
                 'driving_duration_seconds',
                 'routing_points_hash',
+                'routing_leg_distances',
             ];
 
             if (! $pattern->isDirty($fields)) {
@@ -167,6 +175,8 @@ class RoutePattern extends Model
             )) {
                 return;
             }
+
+            $data['routing_leg_distances'] = $pattern->routing_leg_distances;
 
             Validator::make($data, [
                 'route_geometry' => ['required', 'array'],
@@ -212,7 +222,29 @@ class RoutePattern extends Model
                     'string',
                     'regex:/\A[a-f0-9]{64}\z/',
                 ],
+                'routing_leg_distances' => [
+                    'nullable',
+                    'array',
+                    'list',
+                    'min:1',
+                    'max:99',
+                ],
+                'routing_leg_distances.*' => [
+                    'required',
+                    'numeric',
+                    'min:0',
+                ],
             ])->validate();
+
+            foreach ($pattern->routing_leg_distances ?? [] as $distance) {
+                if (! is_finite((float) $distance)) {
+                    throw ValidationException::withMessages([
+                        'routing_leg_distances' => __(
+                            'Route leg distances must be finite non-negative numbers.',
+                        ),
+                    ]);
+                }
+            }
 
             if (! $pattern->route()->exists()) {
                 throw ValidationException::withMessages([

@@ -9,6 +9,7 @@ use EduardoRibeiroDev\FilamentLeaflet\ValueObjects\Coordinate;
 use EduardoRibeiroDev\FilamentLeaflet\ValueObjects\GeoSearchResult;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
+use InvalidArgumentException;
 use RuntimeException;
 
 class PhotonGeocodingService
@@ -49,32 +50,84 @@ class PhotonGeocodingService
             $cacheKey,
             (int) config('services.photon.cache_ttl', 3600),
             fn (): array => array_map(
-                static fn (GeoSearchResult $result): array =>
-                    $result->toArray(),
+                static fn (GeoSearchResult $result): array => $result->toArray(),
                 $this->fetchResults($query),
             ),
         );
 
         return array_map(
-            static fn (array $result): GeoSearchResult =>
-                GeoSearchResult::fromArray($result),
+            static fn (array $result): GeoSearchResult => GeoSearchResult::fromArray($result),
             $cachedResults,
         );
     }
 
+    public function reverse(
+        float $latitude,
+        float $longitude,
+    ): ?GeoSearchResult {
+        if (
+            ! is_finite($latitude)
+            || ! is_finite($longitude)
+            || $latitude < -90
+            || $latitude > 90
+            || $longitude < -180
+            || $longitude > 180
+        ) {
+            throw new InvalidArgumentException(
+                'Reverse geocoding requires valid coordinates.',
+            );
+        }
+
+        $cacheKey = 'photon.reverse.v1.'.hash(
+            'sha256',
+            $this->baseUrl.'|'.app()->getLocale().'|'.sprintf(
+                '%.7F,%.7F',
+                $latitude,
+                $longitude,
+            ),
+        );
+
+        $cachedResults = Cache::remember(
+            $cacheKey,
+            (int) config('services.photon.cache_ttl', 3600),
+            fn (): array => array_map(
+                static fn (GeoSearchResult $result): array => $result->toArray(),
+                $this->convertFeatures(
+                    $this->fetchFeatures('/reverse', [
+                        'lat' => $latitude,
+                        'lon' => $longitude,
+                        'limit' => 1,
+                    ]),
+                ),
+            ),
+        );
+
+        if ($cachedResults === []) {
+            return null;
+        }
+
+        return GeoSearchResult::fromArray([
+            ...$cachedResults[0],
+            'coordinate' => [
+                'lat' => $latitude,
+                'lng' => $longitude,
+            ],
+        ]);
+    }
+
     /**
-     * @return list<GeoSearchResult>
+     * @param  array<string, mixed>  $queryParams
+     * @return array<array-key, mixed>
      */
-    private function fetchResults(string $query): array
-    {
+    private function fetchFeatures(
+        string $endpoint,
+        array $queryParams,
+    ): array {
         try {
             $response = $this->sendHttpRequest(
                 method: 'GET',
-                endpoint: '/api/',
-                queryParams: [
-                    'q' => $query,
-                    'limit' => 5,
-                ],
+                endpoint: $endpoint,
+                queryParams: $queryParams,
             );
         } catch (ConnectionException $exception) {
             $this->log('warning', 'Photon geocoding connection failed.');
@@ -105,6 +158,15 @@ class PhotonGeocodingService
             );
         }
 
+        return $features;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $features
+     * @return list<GeoSearchResult>
+     */
+    private function convertFeatures(array $features): array
+    {
         $results = [];
 
         foreach (array_slice($features, 0, 5) as $feature) {
@@ -186,5 +248,18 @@ class PhotonGeocodingService
         }
 
         return $results;
+    }
+
+    /**
+     * @return list<GeoSearchResult>
+     */
+    private function fetchResults(string $query): array
+    {
+        return $this->convertFeatures(
+            $this->fetchFeatures('/api/', [
+                'q' => $query,
+                'limit' => 5,
+            ]),
+        );
     }
 }

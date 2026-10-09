@@ -4,7 +4,6 @@ namespace App\Filament\Resources\Routes\Resources\RoutePatterns\Schemas;
 
 use App\Enums\LucideIcon;
 use App\Filament\Maps\Layers\LucideMarker;
-use Filament\Support\Icons\Heroicon;
 use App\Models\RoutePattern;
 use App\Models\RoutePatternStop;
 use EduardoRibeiroDev\FilamentLeaflet\Infolists\MapEntry;
@@ -13,6 +12,7 @@ use EduardoRibeiroDev\FilamentLeaflet\Layers\Shapes\Polyline;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 
 class RoutePatternInfolist
 {
@@ -86,7 +86,7 @@ class RoutePatternInfolist
                             $lastIndex = $occurrences->count() - 1;
 
                             return $occurrences
-                                ->map(function (RoutePatternStop $occurrence, int $index, ) use ($lastIndex): ?Marker {
+                                ->map(function (RoutePatternStop $occurrence, int $index) use ($lastIndex): ?Marker {
                                     $stop = $occurrence->stop;
 
                                     if ($stop === null) {
