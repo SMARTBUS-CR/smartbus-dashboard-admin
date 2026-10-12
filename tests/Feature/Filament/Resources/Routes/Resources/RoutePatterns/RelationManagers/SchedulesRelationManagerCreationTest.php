@@ -276,4 +276,51 @@ describe('Route Pattern Schedule Relation Manager Creation', function (): void {
             'valid_until' => '2026-11-30',
         ]);
     });
+
+    test('checks the parent route once while rendering schedule actions', function (): void {
+        $schedules = [];
+
+        foreach (['06:30:00', '07:30:00', '08:30:00'] as $departure) {
+            $schedules[] = RouteSchedule::factory()->create([
+                'route_pattern_id' => $this->pattern->getKey(),
+                'day_of_week' => 1,
+                'departure_time' => $departure,
+            ]);
+        }
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $this->company,
+        );
+
+        $connection = $this->route->getConnection();
+        $connection->flushQueryLog();
+        $connection->enableQueryLog();
+
+        try {
+            Livewire::test(SchedulesRelationManager::class, [
+                'ownerRecord' => $this->pattern,
+                'pageClass' => EditRoutePattern::class,
+            ])->assertCanSeeTableRecords($schedules);
+
+            $queries = collect($connection->getQueryLog())
+                ->filter(
+                    fn (array $query): bool => str_contains($query['query'], 'select exists')
+                        && str_contains($query['query'], 'from "routes"'),
+                );
+
+            expect($queries->count())->toBeLessThanOrEqual(1);
+        } finally {
+            $connection->disableQueryLog();
+            $connection->flushQueryLog();
+        }
+    });
+
+    test('refreshes parent route availability after archiving', function (): void {
+        expect($this->pattern->hasAvailableRoute())->toBeTrue();
+
+        $this->route->delete();
+
+        expect($this->pattern->hasAvailableRoute())->toBeFalse();
+    });
 });

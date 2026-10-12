@@ -36,4 +36,28 @@ class Role extends SpatieRole
     {
         return $this->belongsTo(Company::class);
     }
+
+    public function hasAssignedUsers(): bool
+    {
+        $connection = $this->getConnection();
+        $request = app('request');
+        $attribute = 'dashboard.role_assignment_checks';
+
+        $key = $connection->getName().'|'.$this->getKey();
+        $checks = $request->attributes->get($attribute, []);
+        $canReuse = $connection->transactionLevel() === 0;
+
+        if ($canReuse && array_key_exists($key, $checks)) {
+            return $checks[$key];
+        }
+
+        $result = $this->users()->withoutGlobalScopes()->exists();
+
+        if ($canReuse) {
+            $checks[$key] = $result;
+            $request->attributes->set($attribute, $checks);
+        }
+
+        return $result;
+    }
 }

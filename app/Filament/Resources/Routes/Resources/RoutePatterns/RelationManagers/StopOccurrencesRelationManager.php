@@ -296,7 +296,7 @@ class StopOccurrencesRelationManager extends RelationManager
 
         return ! $this->isReadOnly()
             && ! $pattern->trashed()
-            && $pattern->route()->exists()
+            && $pattern->hasAvailableRoute()
             && RoutePatternResource::canEdit($pattern);
     }
 

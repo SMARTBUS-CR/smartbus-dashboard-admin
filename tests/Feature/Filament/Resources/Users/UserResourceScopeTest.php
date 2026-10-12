@@ -138,4 +138,71 @@ describe('User Resource Tenant Scope', function (): void {
             ->and(UserResource::getRecordRouteBindingEloquentQuery()
                 ->whereKey($user->id)->exists())->toBeFalse();
     });
+
+    test('loads tenant membership IDs once when building repeated user queries', function (): void {
+        $company = createCompany();
+        $admin = createUserWithRole(UserRole::Admin, $company);
+
+        CompanyUser::create([
+            'company_id' => $company->getKey(),
+            'user_id' => $admin->getKey(),
+        ]);
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $company,
+        );
+
+        $connection = $company->getConnection();
+        $connection->flushQueryLog();
+        $connection->enableQueryLog();
+
+        try {
+            foreach (range(1, 3) as $iteration) {
+                expect(
+                    UserResource::getEloquentQuery()
+                        ->pluck('users.id')
+                        ->all(),
+                )->toBe([$admin->getKey()]);
+            }
+
+            $queries = collect($connection->getQueryLog())
+                ->filter(
+                    fn (array $query): bool => str_contains(
+                        $query['query'],
+                        'select "user_id" from "company_users"',
+                    ),
+                );
+
+            expect($queries)->toHaveCount(1);
+        } finally {
+            $connection->disableQueryLog();
+            $connection->flushQueryLog();
+        }
+    });
+
+    test('refreshes membership IDs after company access is removed', function (): void {
+        $company = createCompany();
+        $admin = createUserWithRole(UserRole::Admin, $company);
+
+        $membership = CompanyUser::create([
+            'company_id' => $company->getKey(),
+            'user_id' => $admin->getKey(),
+        ]);
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $company,
+        );
+
+        expect(
+            UserResource::getEloquentQuery()->pluck('users.id')->all(),
+        )->toBe([$admin->getKey()]);
+
+        $membership->delete();
+
+        expect(
+            UserResource::getEloquentQuery()->pluck('users.id')->all(),
+        )->toBeEmpty();
+    });
 });

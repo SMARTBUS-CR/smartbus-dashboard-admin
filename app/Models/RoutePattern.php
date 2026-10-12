@@ -334,6 +334,22 @@ class RoutePattern extends Model
         ]);
     }
 
+    public function hasAvailableRoute(): bool
+    {
+        $request = app('request');
+        $attribute = 'dashboard.available_routes';
+        $key = $this->getConnection()->getName().'|'.$this->route_id;
+
+        $checks = $request->attributes->get($attribute, []);
+
+        if (! array_key_exists($key, $checks)) {
+            $checks[$key] = $this->route()->exists();
+            $request->attributes->set($attribute, $checks);
+        }
+
+        return $checks[$key];
+    }
+
     /**
      * @return BelongsTo<Route, $this>
      */

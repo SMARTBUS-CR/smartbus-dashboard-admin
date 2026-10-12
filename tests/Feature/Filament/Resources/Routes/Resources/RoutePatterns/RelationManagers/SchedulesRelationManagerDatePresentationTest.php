@@ -88,4 +88,59 @@ describe('Route Schedule Date Presentation', function (): void {
         'English' => ['en', 'October 19, 2026'],
         'Spanish' => ['es', '19 de octubre de 2026'],
     ]);
+
+    test('reuses the company timezone across departure tooltips', function (): void {
+        app()->setLocale('en');
+
+        $schedules = [$this->schedule];
+
+        foreach (['07:30:00', '08:30:00'] as $departure) {
+            $schedules[] = RouteSchedule::factory()->create([
+                'route_pattern_id' => $this->pattern->getKey(),
+                'day_of_week' => 1,
+                'departure_time' => $departure,
+                'valid_from' => '2026-10-12',
+                'valid_until' => '2026-12-31',
+            ]);
+        }
+
+        $component = Livewire::test(SchedulesRelationManager::class, [
+            'ownerRecord' => $this->pattern,
+            'pageClass' => EditRoutePattern::class,
+        ]);
+
+        $page = $component->instance();
+        $column = $page->getTable()->getColumn('departure_time');
+
+        $records = array_map(
+            fn (RouteSchedule $schedule) => $page->getTableRecord($schedule->getKey()),
+            $schedules,
+        );
+
+        $connection = $this->company->getConnection();
+        $connection->flushQueryLog();
+        $connection->enableQueryLog();
+
+        try {
+            foreach ($records as $record) {
+                expect((string) $column->record($record)->getTooltip())
+                    ->toBe(
+                        'Company timezone: '.$this->company->timezone,
+                    );
+            }
+
+            $queries = collect($connection->getQueryLog())
+                ->filter(
+                    fn (array $query): bool => str_contains(
+                        $query['query'],
+                        'from "companies"',
+                    ),
+                );
+
+            expect($queries->count())->toBeLessThanOrEqual(1);
+        } finally {
+            $connection->disableQueryLog();
+            $connection->flushQueryLog();
+        }
+    });
 });

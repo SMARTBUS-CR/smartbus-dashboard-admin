@@ -57,7 +57,7 @@ class RolePolicy
         }
 
         // Block deletion if the role has associated users
-        if ($role->users()->withoutGlobalScopes()->exists()) {
+        if ($role->hasAssignedUsers()) {
             return false;
         }
 

@@ -32,6 +32,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\VerticalAlignment;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -273,7 +274,7 @@ class RoutePatternForm
                                                 ->label(__('Calculate Route'))
                                                 ->authorize(
                                                     fn (?RoutePattern $record): bool => $record !== null
-                                                        && $record->route()->exists()
+                                                        && $record->hasAvailableRoute()
                                                         && RoutePatternResource::canEdit($record),
                                                 )
                                                 ->disabled(function (Get $get): bool {
@@ -528,11 +529,12 @@ class RoutePatternForm
                     return;
                 }
 
-                $stop = $record->stopOccurrences()
-                    ->reorder('stop_sequence', $isOrigin ? 'asc' : 'desc')
-                    ->with('stop')
-                    ->first()
-                    ?->stop;
+                $occurrences = self::routeOccurrences($record);
+
+                $stop = ($isOrigin
+                    ? $occurrences->first()
+                    : $occurrences->last()
+                )?->stop;
 
                 if ($stop === null) {
                     $component->state(null);
@@ -577,9 +579,7 @@ class RoutePatternForm
                 ->green();
         }
 
-        $occurrences = $record?->stopOccurrences()
-            ->with('stop')
-            ->get();
+        $occurrences = self::routeOccurrences($record);
 
         if ($occurrences !== null && $occurrences->count() > 2) {
             foreach ($occurrences->slice(1, $occurrences->count() - 2) as $occurrence) {
@@ -773,11 +773,7 @@ class RoutePatternForm
      */
     private static function routeSegmentOptions(?RoutePattern $record): array
     {
-        $occurrences = $record?->stopOccurrences()
-            ->with('stop')
-            ->orderBy('stop_sequence')
-            ->get()
-            ->all() ?? [];
+        $occurrences = self::routeOccurrences($record)->all();
 
         $options = [];
 
@@ -1152,5 +1148,32 @@ class RoutePatternForm
             ],
             $warnings,
         );
+    }
+
+    private static function routeOccurrences(
+        ?RoutePattern $record,
+    ): Collection {
+        if ($record === null || ! $record->exists) {
+            return collect();
+        }
+
+        $request = app('request');
+        $attribute = 'dashboard.routing_stop_occurrences';
+
+        $key = $record->getConnection()->getName()
+            .'|'.$record->getKey();
+
+        $occurrences = $request->attributes->get($attribute, []);
+
+        if (! array_key_exists($key, $occurrences)) {
+            $occurrences[$key] = $record->stopOccurrences()
+                ->with('stop')
+                ->orderBy('stop_sequence')
+                ->get();
+
+            $request->attributes->set($attribute, $occurrences);
+        }
+
+        return $occurrences[$key];
     }
 }

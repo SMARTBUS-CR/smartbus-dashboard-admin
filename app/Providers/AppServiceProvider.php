@@ -17,8 +17,12 @@ use Filament\Facades\Filament;
 use Filament\Support\Facades\FilamentTimezone;
 use Filament\Tables\Table;
 use GuzzleHttp\Middleware;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Database\Events\TransactionRolledBack;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Psr\Http\Message\RequestInterface;
@@ -41,6 +45,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Invalidate request-local results after database writes.
+        DB::listen(function (QueryExecuted $query): void {
+            if (preg_match('/^\s*select\b/i', $query->sql) === 1) {
+                return;
+            }
+
+            $this->clearRequestResults($query->connectionName);
+        });
+
+        // Discard results that may have been read before a rollback.
+        Event::listen(
+            TransactionRolledBack::class,
+            fn (TransactionRolledBack $event) => $this->clearRequestResults($event->connectionName),
+        );
+
         // Enforce protected deletion rules before granting global administrator access.
         Gate::before(function (User $user, string $ability, array $arguments): ?bool {
             $record = $arguments[0] ?? null;
@@ -62,7 +81,7 @@ class AppServiceProvider extends ServiceProvider
             }
 
             if ($record instanceof Role && in_array($ability, ['delete', 'forceDelete'], true)) {
-                if (in_array($record->name, UserRole::protectedRoles(), true) || $record->users()->withoutGlobalScopes()->exists()) {
+                if (in_array($record->name, UserRole::protectedRoles(), true) || $record->hasAssignedUsers()) {
                     return false;
                 }
             }
@@ -124,5 +143,35 @@ class AppServiceProvider extends ServiceProvider
                 ->userPreferredLocale(fn () => auth()->user()?->locale)
                 ->nativeLabel();
         });
+    }
+
+    private function clearRequestResults(string $connectionName): void
+    {
+        if (! in_array($connectionName, ['mysql', 'pgsql'], true)) {
+            return;
+        }
+
+        $attributes = app('request')->attributes;
+
+        $keys = [
+            'dashboard.administrator_tenants',
+            'dashboard.company_member_ids',
+            'dashboard.manageable_company_members',
+            'dashboard.available_routes',
+            'dashboard.routing_stop_occurrences',
+            'dashboard.company_access_checks',
+        ];
+
+        if ($connectionName === 'mysql') {
+            $keys = [
+                ...$keys,
+                'dashboard.super_admin_checks',
+                'dashboard.role_assignment_checks',
+            ];
+        }
+
+        foreach ($keys as $key) {
+            $attributes->remove($key);
+        }
     }
 }

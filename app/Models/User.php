@@ -64,7 +64,29 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants,
      */
     public function isSuperAdmin(): bool
     {
-        return ! $this->trashed() && $this->getConnection()
+        if ($this->trashed()) {
+            return false;
+        }
+
+        $connection = $this->getConnection();
+        $request = app('request');
+        $attribute = 'dashboard.super_admin_checks';
+
+        $key = implode('|', [
+            $connection->getName(),
+            $this->getMorphClass(),
+            (string) $this->getKey(),
+        ]);
+
+        // Read fresh authorization data inside database transactions.
+        $canReuse = $connection->transactionLevel() === 0;
+        $checks = $request->attributes->get($attribute, []);
+
+        if ($canReuse && array_key_exists($key, $checks)) {
+            return $checks[$key];
+        }
+
+        $result = $connection
             ->table('model_has_roles as mhr')
             ->join('roles as r', 'r.id', '=', 'mhr.role_id')
             ->join('users', 'users.id', '=', 'mhr.model_uuid')
@@ -76,6 +98,13 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants,
             ->whereNull('r.company_id')
             ->whereNull('mhr.company_id')
             ->exists();
+
+        if ($canReuse) {
+            $checks[$key] = $result;
+            $request->attributes->set($attribute, $checks);
+        }
+
+        return $result;
     }
 
     /**
@@ -139,16 +168,58 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants,
     public function getTenants(Panel $panel): array|Collection
     {
         if ($this->isSuperAdmin()) {
-            return Company::all();
+            $request = app('request');
+            $attribute = 'dashboard.administrator_tenants';
+
+            $key = implode('|', [
+                $this->getConnection()->getName(),
+                $this->getMorphClass(),
+                (string) $this->getKey(),
+                $panel->getId(),
+            ]);
+
+            $tenants = $request->attributes->get($attribute, []);
+
+            if (! array_key_exists($key, $tenants)) {
+                $tenants[$key] = Company::all();
+                $request->attributes->set($attribute, $tenants);
+            }
+
+            return $tenants[$key];
         }
 
-        return $this->trashed() ? collect() : $this->dashboardCompanies()->get();
+        return $this->trashed()
+            ? collect()
+            : $this->dashboardCompanies()->get();
     }
 
     public function hasCompanyDashboardAccess(Company $company): bool
     {
-        return ! $this->trashed() && ! $company->trashed()
-            && $this->dashboardCompanies()->whereKey($company->getKey())->exists();
+        if ($this->trashed() || $company->trashed()) {
+            return false;
+        }
+
+        $request = app('request');
+        $attribute = 'dashboard.company_access_checks';
+
+        $key = implode('|', [
+            $this->getConnection()->getName(),
+            $this->getMorphClass(),
+            (string) $this->getKey(),
+            (string) $company->getKey(),
+        ]);
+
+        $checks = $request->attributes->get($attribute, []);
+
+        if (! array_key_exists($key, $checks)) {
+            $checks[$key] = $this->dashboardCompanies()
+                ->whereKey($company->getKey())
+                ->exists();
+
+            $request->attributes->set($attribute, $checks);
+        }
+
+        return $checks[$key];
     }
 
     /** @return Builder<Company> */

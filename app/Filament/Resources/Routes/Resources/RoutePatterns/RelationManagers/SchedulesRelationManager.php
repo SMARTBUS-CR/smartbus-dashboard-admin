@@ -157,6 +157,7 @@ class SchedulesRelationManager extends RelationManager
             )
             ->modifyQueryUsing(
                 fn (Builder $query): Builder => $query
+                    ->withExists('exceptions')
                     ->orderBy('day_of_week')
                     ->orderBy('departure_time'),
             )
@@ -179,14 +180,7 @@ class SchedulesRelationManager extends RelationManager
                     ->label(__('Departure Time'))
                     ->tooltip(fn (): string => __(
                         'Company timezone: :timezone',
-                        [
-                            'timezone' => $this->getOwnerRecord()
-                                ->route()
-                                ->withTrashed()
-                                ->firstOrFail()
-                                ->company
-                                ->timezone,
-                        ],
+                        ['timezone' => $this->departureTimezone()],
                     ))
                     ->formatStateUsing(
                         fn (string $state): string => substr($state, 0, 5),
@@ -327,7 +321,7 @@ class SchedulesRelationManager extends RelationManager
                         ->color('success')
                         ->authorize(fn (): bool => $this->canManageSchedules())
                         ->disabled(
-                            fn (RouteSchedule $record): bool => ! $record->exceptions()->exists(),
+                            fn (RouteSchedule $record): bool => ! $record->exceptions_exists,
                         )
                         ->schema(fn (RouteSchedule $record): array => [
                             Select::make('exception_id')
@@ -375,7 +369,7 @@ class SchedulesRelationManager extends RelationManager
 
         return ! $this->isReadOnly()
             && ! $pattern->trashed()
-            && $pattern->route()->exists()
+            && $pattern->hasAvailableRoute()
             && RoutePatternResource::canEdit($pattern);
     }
 
@@ -580,12 +574,7 @@ class SchedulesRelationManager extends RelationManager
 
     private function departureTimezoneDescription(): string
     {
-        $timezone = $this->getOwnerRecord()
-            ->route()
-            ->withTrashed()
-            ->firstOrFail()
-            ->company
-            ->timezone;
+        $timezone = $this->departureTimezone();
 
         $location = (string) str($timezone)
             ->afterLast('/')
@@ -600,5 +589,28 @@ class SchedulesRelationManager extends RelationManager
                 'offset' => $offset,
             ],
         );
+    }
+
+    private function departureTimezone(): string
+    {
+        $pattern = $this->getOwnerRecord();
+
+        if (
+            ! $pattern->relationLoaded('route')
+            || $pattern->route === null
+        ) {
+            $pattern->setRelation(
+                'route',
+                $pattern->route()
+                    ->withTrashed()
+                    ->with('company')
+                    ->firstOrFail(),
+            );
+        }
+
+        $route = $pattern->route;
+        $route->loadMissing('company');
+
+        return (string) $route->company->timezone;
     }
 }

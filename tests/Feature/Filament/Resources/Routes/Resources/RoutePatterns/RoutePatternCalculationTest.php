@@ -693,4 +693,102 @@ describe('Route Pattern Calculation', function (): void {
 
         Http::assertSentCount(1);
     });
+
+    test('reuses ordered stop occurrences while building map layers', function (): void {
+        $middleOccurrence = $this->pattern->stopOccurrences()
+            ->where('stop_sequence', 2)
+            ->sole();
+
+        $connection = $this->pattern->getConnection();
+        $connection->flushQueryLog();
+        $connection->enableQueryLog();
+
+        $component = Livewire::test(EditRoutePattern::class, [
+            'record' => $this->pattern->getRouteKey(),
+            'parentRecord' => $this->route,
+        ])->assertHasNoErrors();
+
+        try {
+            $component->assertSchemaComponentExists(
+                'route_map',
+                checkComponentUsing: function ($map) use ($middleOccurrence): bool {
+                    foreach (range(1, 3) as $iteration) {
+                        $data = $map->getMapData();
+                        $layerIds = collect($data['layersData'])
+                            ->pluck('id')
+                            ->all();
+
+                        expect($layerIds)
+                            ->toContain('origin')
+                            ->toContain('destination')
+                            ->toContain(
+                                'stop-'.$middleOccurrence->getKey(),
+                            );
+                    }
+
+                    return true;
+                },
+            );
+
+            $queries = collect($connection->getQueryLog())
+                ->filter(
+                    fn (array $query): bool => str_starts_with($query['query'], 'select *')
+                        && str_contains(
+                            $query['query'],
+                            'from "route_pattern_stops"',
+                        ),
+                );
+
+            expect($queries->count())->toBeLessThanOrEqual(1);
+        } finally {
+            $connection->disableQueryLog();
+            $connection->flushQueryLog();
+        }
+    });
+
+    test('bounds parent route checks when saving a calculated route', function (): void {
+        Http::fake([
+            'https://osrm.test/route/v1/driving/*' => Http::response(
+                $this->routingResponse,
+            ),
+        ]);
+
+        $component = Livewire::test(EditRoutePattern::class, [
+            'record' => $this->pattern->getRouteKey(),
+            'parentRecord' => $this->route,
+        ])
+            ->callAction(
+                TestAction::make('calculateRoute')
+                    ->schemaComponent('routing_actions'),
+            )
+            ->assertHasNoErrors();
+
+        $connection = $this->pattern->getConnection();
+        $connection->flushQueryLog();
+        $connection->enableQueryLog();
+
+        try {
+            $component->call('save')->assertHasNoErrors();
+
+            $queries = collect($connection->getQueryLog())
+                ->filter(
+                    fn (array $query): bool => str_contains($query['query'], 'select exists')
+                        && str_contains(
+                            $query['query'],
+                            'from "routes"',
+                        ),
+                );
+
+            // Two presentation checks around the write, plus model validation.
+            expect($queries->count())->toBeLessThanOrEqual(3);
+        } finally {
+            $connection->disableQueryLog();
+            $connection->flushQueryLog();
+        }
+
+        expect($this->pattern->fresh()->route_geometry)
+            ->toBe($this->geometry);
+
+        Http::assertSentCount(1);
+    });
 });

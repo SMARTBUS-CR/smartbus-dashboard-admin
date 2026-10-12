@@ -11,6 +11,8 @@ use App\Models\RouteSchedule;
 use App\Models\Stop;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class SarapiquiRoutesSeeder extends Seeder
@@ -220,6 +222,22 @@ class SarapiquiRoutesSeeder extends Seeder
             default => [],
         };
 
+        $existingSchedules = RouteSchedule::query()
+            ->where('route_pattern_id', $pattern->getKey())
+            ->whereNull('valid_from')
+            ->whereNull('valid_until')
+            ->get(['day_of_week', 'departure_time'])
+            ->mapWithKeys(
+                fn (RouteSchedule $schedule): array => [
+                    $schedule->day_of_week.'|'
+                    .substr((string) $schedule->departure_time, 0, 8) => true,
+                ],
+            )
+            ->all();
+
+        $rows = [];
+        $timestamp = now();
+
         foreach (range(0, 6) as $day) {
             $dailyDepartures = $departures;
 
@@ -242,15 +260,40 @@ class SarapiquiRoutesSeeder extends Seeder
             }
 
             foreach ($dailyDepartures as $departure) {
-                RouteSchedule::firstOrCreate([
+                $time = $departure.':00';
+
+                if (isset($existingSchedules[$day.'|'.$time])) {
+                    continue;
+                }
+
+                $rows[] = [
+                    'id' => (string) Str::uuid7(),
                     'route_pattern_id' => $pattern->getKey(),
                     'day_of_week' => $day,
-                    'departure_time' => $departure.':00',
+                    'departure_time' => $time,
                     'valid_from' => null,
                     'valid_until' => null,
-                ]);
+                    'created_at' => $timestamp,
+                    'updated_at' => $timestamp,
+                ];
             }
         }
+
+        if ($rows === []) {
+            return;
+        }
+
+        Validator::make(['schedules' => $rows], [
+            'schedules' => ['required', 'array', 'list'],
+            'schedules.*.id' => ['required', 'uuid'],
+            'schedules.*.route_pattern_id' => ['required', 'uuid'],
+            'schedules.*.day_of_week' => ['required', 'integer', 'between:0,6'],
+            'schedules.*.departure_time' => ['required', 'string', 'date_format:H:i:s'],
+            'schedules.*.valid_from' => ['nullable', 'date'],
+            'schedules.*.valid_until' => ['nullable', 'date'],
+        ])->validate();
+
+        RouteSchedule::query()->insert($rows);
     }
 
     private function seedStops(Company $company): void

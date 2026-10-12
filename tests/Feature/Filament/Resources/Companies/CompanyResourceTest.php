@@ -469,4 +469,41 @@ describe('Company Resource', function (): void {
 
         expect($company->fresh()->timezone)->toBe('America/Panama');
     });
+
+    test('loads company status badges with one query and excludes archived companies', function (): void {
+        $active = createCompany();
+        $inactive = createCompany();
+        $inactive->update(['status' => CompanyStatus::INACTIVE]);
+
+        $archived = createCompany();
+        $archived->delete();
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $active,
+        );
+
+        $page = Livewire::test(ListCompanies::class)->instance();
+        $connection = $active->getConnection();
+
+        $connection->flushQueryLog();
+        $connection->enableQueryLog();
+
+        try {
+            $tabs = $page->getTabs();
+
+            expect((int) $tabs['active']->getBadge())->toBe(1)
+                ->and((int) $tabs['inactive']->getBadge())->toBe(1);
+
+            $queries = collect($connection->getQueryLog())
+                ->filter(
+                    fn (array $query): bool => str_contains($query['query'], '"companies"'),
+                );
+
+            expect($queries)->toHaveCount(1);
+        } finally {
+            $connection->disableQueryLog();
+            $connection->flushQueryLog();
+        }
+    });
 });

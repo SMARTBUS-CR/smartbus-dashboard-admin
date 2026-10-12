@@ -248,4 +248,64 @@ describe('Route Pattern Schedule Relation Manager Resumption', function (): void
 
         expect($this->schedule->exceptions()->count())->toBe(2);
     });
+
+    test('renders resumption availability without separate suspension checks per row', function (): void {
+        $withoutSuspensions = [];
+
+        foreach (['07:30:00', '08:30:00'] as $departure) {
+            $withoutSuspensions[] = RouteSchedule::factory()->create([
+                'route_pattern_id' => $this->pattern->getKey(),
+                'day_of_week' => 1,
+                'departure_time' => $departure,
+                'valid_from' => '2026-10-01',
+                'valid_until' => '2026-12-31',
+            ]);
+        }
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $this->company,
+        );
+
+        $connection = $this->schedule->getConnection();
+        $connection->flushQueryLog();
+        $connection->enableQueryLog();
+
+        try {
+            $component = Livewire::test(
+                SchedulesRelationManager::class,
+                [
+                    'ownerRecord' => $this->pattern,
+                    'pageClass' => EditRoutePattern::class,
+                ],
+            )
+                ->assertCanSeeTableRecords([
+                    $this->schedule,
+                    ...$withoutSuspensions,
+                ])
+                ->assertActionEnabled(
+                    TestAction::make('resume')->table($this->schedule),
+                );
+
+            foreach ($withoutSuspensions as $schedule) {
+                $component->assertActionDisabled(
+                    TestAction::make('resume')->table($schedule),
+                );
+            }
+
+            $queries = collect($connection->getQueryLog())
+                ->filter(
+                    fn (array $query): bool => str_contains($query['query'], 'select exists')
+                        && str_contains(
+                            $query['query'],
+                            '"route_schedule_exceptions"',
+                        ),
+                );
+
+            expect($queries)->toBeEmpty();
+        } finally {
+            $connection->disableQueryLog();
+            $connection->flushQueryLog();
+        }
+    });
 });

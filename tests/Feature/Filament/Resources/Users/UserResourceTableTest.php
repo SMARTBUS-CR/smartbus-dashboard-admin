@@ -121,4 +121,58 @@ describe('Company Admin Resource Table', function (): void {
         'name' => ['Ana Administradora'],
         'email' => ['ana@example.test'],
     ]);
+
+    test('loads roles for multiple listed users with one query', function (): void {
+        $company = createCompany();
+        $users = [];
+
+        foreach (range(1, 3) as $index) {
+            $user = createUserWithRole(UserRole::Admin, $company);
+
+            CompanyUser::create([
+                'company_id' => $company->getKey(),
+                'user_id' => $user->getKey(),
+            ]);
+
+            $users[] = $user;
+        }
+
+        actingAsInCompany(
+            createUserWithRole(UserRole::SuperAdmin),
+            $company,
+        );
+
+        $userIds = array_map(
+            fn ($user): string => (string) $user->getKey(),
+            $users,
+        );
+
+        $connection = $users[0]->getConnection();
+        $connection->flushQueryLog();
+        $connection->enableQueryLog();
+
+        try {
+            Livewire::test(ListUsers::class)
+                ->assertCanSeeTableRecords($users)
+                ->assertCanRenderTableColumn('roles');
+
+            $queries = collect($connection->getQueryLog())
+                ->filter(
+                    fn (array $query): bool => str_contains($query['query'], 'select `roles`.')
+                        && str_contains(
+                            $query['query'],
+                            'join `model_has_roles`',
+                        )
+                        && array_intersect(
+                            $userIds,
+                            $query['bindings'],
+                        ) !== [],
+                );
+
+            expect($queries)->toHaveCount(1);
+        } finally {
+            $connection->disableQueryLog();
+            $connection->flushQueryLog();
+        }
+    });
 });

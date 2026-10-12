@@ -95,9 +95,22 @@ class UserResource extends Resource
             return $query->whereRaw('1 = 0');
         }
 
-        $memberIds = CompanyUser::query()
-            ->where('company_id', $tenant->getKey())
-            ->pluck('user_id');
+        $request = app('request');
+        $attribute = 'dashboard.company_member_ids';
+        $companyId = (string) $tenant->getKey();
+
+        $memberships = $request->attributes->get($attribute, []);
+
+        if (! array_key_exists($companyId, $memberships)) {
+            $memberships[$companyId] = CompanyUser::query()
+                ->where('company_id', $companyId)
+                ->pluck('user_id')
+                ->all();
+
+            $request->attributes->set($attribute, $memberships);
+        }
+
+        $memberIds = $memberships[$companyId];
 
         $user = new User;
 
