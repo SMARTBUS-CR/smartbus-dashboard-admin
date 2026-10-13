@@ -1,58 +1,81 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
-
 <p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+  <img src="public/assets/smartbus-logo.webp" width="300" alt="SmartBus Global Logo">
 </p>
 
-## About Laravel
+# SmartBus Global - Panel Administrativo
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+[![PHP Version](https://img.shields.io/badge/PHP-8.5%2B-777BB4?style=flat-square&logo=php)](https://php.net/)
+[![Laravel Version](https://img.shields.io/badge/Laravel-13.x-FF2D20?style=flat-square&logo=laravel)](https://laravel.com/)
+[![Filament Version](https://img.shields.io/badge/Filament-5.x-FF2D20?style=flat-square&logo=laravel)](https://filamentphp.com/)
+[![Testing](https://img.shields.io/badge/Tested_with-Pest-F16529?style=flat-square)](https://pestphp.com/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Visión General y Arquitectura
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+**SmartBus Global** es una plataforma integral de transporte público (B2G enfocada en Costa Rica), diseñada para la visualización de autobuses en tiempo real, predicción de llegadas (ETA) y gestión eficiente de rutas.
 
-## Learning Laravel
+Este repositorio corresponde al **Panel Administrativo** del proyecto, encargado de la gestión de empresas transportistas, conductores, rutas y reportes analíticos.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+*   **Clientes Frontend:** Aplicación móvil unificada en Flutter que adapta su interfaz, estado y funcionalidades de forma dinámica (Conductor vs. Pasajero), y un Panel Web Administrativo (Filament).
+*   **Ecosistema de Microservicios:**
+    *   **Servicio de Autenticación:** Emisión e introspección de tokens Sanctum.
+    *   **API Gateway:** Servicio de enrutamiento y control de acceso.
+    *   **Rastreo GPS en tiempo real:** Comunicación bidireccional usando Laravel Reverb/WebSockets.
+    *   **Motor Predictivo ETA:** Inteligencia Artificial implementada en Python/TensorFlow.
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+---
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+## Stack Tecnológico y Características Principales
 
-## Agentic Development
+### Bases de Datos y Control de Acceso
+*   **Múltiples Bases de Datos:**
+    *   `MySQL`: Optimizada para el manejo exclusivo de usuarios, escalabilidad y análisis demográfico.
+    *   `PostgreSQL` + `PostGIS`: Base de datos transaccional con extensiones espaciales para operaciones logísticas complejas.
+*   **Gestión de Roles (`spatie/laravel-permission`):**
+    *   `super-admin`: Control gubernamental y acceso total.
+    *   `company-admin`: Dueños de empresas transportistas.
+    *   `driver`: Conductores operativos.
+    *   `passenger`: Pasajeros y usuarios finales.
+*   **Arquitectura Multi-inquilino (Multitenancy):** Aislamiento lógico gestionado por Filament para vincular cada `company-admin` estrictamente a su flotilla.
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+### Seguridad, Autenticación y API
+*   **Gestión de Sesiones Seguras (`laravel/sanctum`):** Tokens con expiración dinámica jerárquica (Ej: Conductores 2h, Pasajeros 30 días).
+*   **Defensa y Recuperación de Cuentas:**
+    *   *Rate Limiting* estricto para mitigar ataques de fuerza bruta.
+    *   Flujo seguro de recuperación mediante **OTP** (códigos de 6 dígitos enviados por correo, con validez de 15 minutos).
+*   **Documentación Interactiva (`dedoc/scramble`):** Especificación OpenAPI generada dinámicamente y siempre actualizada.
+
+### Calidad e Internacionalización
+*   **Soporte Bilingüe (i18n):** Middleware personalizado que interpreta el header `Accept-Language` para adaptar los mensajes, validaciones y respuestas (Español / Inglés).
+*   **Pruebas Exhaustivas (`pestphp/pest`):** Suite de testing que abarca verificación de rutas protegidas, mocks de envío de correos, aserciones avanzadas y manipulación temporal (`freezeTime`).
+*   **Estandarización y Clean Code (`laravel/pint`):** Garantía de uniformidad y calidad en el código fuente del equipo de desarrollo.
+
+---
+
+## CI/CD y Despliegue
+
+El ciclo de vida del software está automatizado para asegurar entregas rápidas y seguras:
+
+1.  **Integración Continua (CI):** Flujos de trabajo en **GitHub Actions** ejecutan el linter (Laravel Pint) y la suite de pruebas (Pest PHP) con cada Pull Request, garantizando integridad en un modelo *GitFlow*.
+2.  **Despliegue y Contenedores (CD):** El entorno de producción está completamente paquetizado mediante un `Dockerfile` optimizado (Multistage build), listo para aprovisionamiento directo en la infraestructura Cloud.
+
+---
+
+## Instalación Local
 
 ```bash
-composer require laravel/boost --dev
+# 1. Clonar el repositorio
+git clone <url-del-repo>
+cd smartbus-dashboard-admin
 
-php artisan boost:install
+# 2. Instalar dependencias
+composer install
+npm install
+
+# 3. Configurar entorno
+cp .env.example .env
+php artisan key:generate
+
+# 4. Levantar entorno local
+composer run dev
 ```
-
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).

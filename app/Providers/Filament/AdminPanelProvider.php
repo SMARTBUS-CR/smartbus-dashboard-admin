@@ -2,7 +2,9 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Auth\Login;
 use App\Filament\Pages\Dashboard;
+use App\Http\Middleware\EnsureExternalTokenIsValid;
 use App\Http\Middleware\SyncSpatieTeam;
 use App\Models\Company;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
@@ -31,7 +33,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->spa(hasPrefetching: true)
-            ->login()
+            ->login(Login::class)
             ->colors([
                 'primary' => Color::Indigo,
             ])
@@ -58,12 +60,18 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-            ])
+                EnsureExternalTokenIsValid::class,
+            ], isPersistent: true)
             ->plugins([
                 FilamentShieldPlugin::make()
                     ->scopeToTenant(true)
+                    ->localizePermissionLabels()
                     ->tenantRelationshipName('roles')
-                    ->tenantOwnershipRelationshipName('company'),
+                    ->tenantOwnershipRelationshipName('company')
+                    ->globallySearchable(true)
+                    ->globalSearchResultsLimit(50)
+                    ->forceGlobalSearchCaseInsensitive(true)
+                    ->splitGlobalSearchTerms(false),
             ])
             ->tenantMiddleware([SyncSpatieTeam::class], isPersistent: true)
             ->tenant(model: Company::class, slugAttribute: 'slug')

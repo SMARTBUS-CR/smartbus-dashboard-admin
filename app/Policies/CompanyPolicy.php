@@ -15,6 +15,10 @@ class CompanyPolicy
 
     public function before(User $user, string $ability): ?bool
     {
+        if (in_array($ability, ['forceDelete', 'forceDeleteAny'], true)) {
+            return false;
+        }
+
         if ($user->isSuperAdmin()) {
             return true;
         }

@@ -8,6 +8,10 @@ namespace App\Enums;
 enum LucideIcon: string
 {
     case Barcode = 'lucide-barcode';
+    case Code2 = 'lucide-code-2';
     case IDCardLanyard = 'lucide-id-card-lanyard';
+    case Mail = 'lucide-mail';
     case Route = 'lucide-route';
+    case UserKey = 'lucide-user-key';
+    case UserRound = 'lucide-user-round';
 }

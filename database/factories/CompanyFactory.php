@@ -20,6 +20,7 @@ class CompanyFactory extends Factory
      * @var array<string, string>
      */
     private const TIMEZONES_BY_COUNTRY = [
+        'BZ' => 'America/Belize',
         'CR' => 'America/Costa_Rica',
         'GT' => 'America/Guatemala',
         'SV' => 'America/El_Salvador',
@@ -45,7 +46,7 @@ class CompanyFactory extends Factory
             'country_code' => $countryCode,
             'legal_id' => fake()->unique()->numerify('##########'),
             'operator_number' => 'OP-'.fake()->unique()->numerify('########'),
-            'phone' => fake()->phoneNumber(),
+            'phone' => '+50688888888',
             'email' => fake()->companyEmail(),
             'address' => fake()->address(),
             'timezone' => self::TIMEZONES_BY_COUNTRY[$countryCode],

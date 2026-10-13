@@ -11,11 +11,24 @@ trait ApiLogger
             $formattedMessage = "[{$className}] {$message}";
 
             match ($type) {
-                'warning' => \Log::warning($formattedMessage, [...$context]),
-                'error' => \Log::error($formattedMessage, [...$context]),
-                'debug' => \Log::debug($formattedMessage, [...$context]),
-                default => \Log::info($formattedMessage, [...$context]),
+                'warning' => \Log::warning($formattedMessage, $this->sanitizeLogContext($context)),
+                'error' => \Log::error($formattedMessage, $this->sanitizeLogContext($context)),
+                'debug' => \Log::debug($formattedMessage, $this->sanitizeLogContext($context)),
+                default => \Log::info($formattedMessage, $this->sanitizeLogContext($context)),
             };
         }
+    }
+
+    protected function sanitizeLogContext(array $context): array
+    {
+        foreach ($context as $key => $value) {
+            if (in_array(strtolower((string) $key), ['password', 'password_confirmation', 'token', 'access_token', 'refresh_token', 'authorization', 'secret'], true)) {
+                $context[$key] = '[REDACTED]';
+            } elseif (is_array($value)) {
+                $context[$key] = $this->sanitizeLogContext($value);
+            }
+        }
+
+        return $context;
     }
 }

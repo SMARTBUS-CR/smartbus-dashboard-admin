@@ -103,9 +103,10 @@ class SessionGuard implements StatefulGuard
         if ($token) {
             $isLoggedOut = app(AuthService::class)->logout($token);
             if (! $isLoggedOut) {
-                $this->log('warning', 'Failed to log out from external authentication service.', [
-                    'external_auth_token' => $token,
-                ]);
+                $this->log(
+                    'warning',
+                    'Failed to log out from external authentication service.',
+                );
             }
         }
 

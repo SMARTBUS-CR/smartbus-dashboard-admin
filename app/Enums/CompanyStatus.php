@@ -17,8 +17,8 @@ enum CompanyStatus: string implements HasColor, HasLabel
     public function getLabel(): string|Htmlable|null
     {
         return match ($this) {
-            self::ACTIVE => trans_choice('Active', 2),
-            self::INACTIVE => trans_choice('Inactive', 2),
+            self::ACTIVE => __('Active'),
+            self::INACTIVE => __('Inactive'),
         };
     }
 
@@ -28,8 +28,8 @@ enum CompanyStatus: string implements HasColor, HasLabel
     public function getPluralLabel(): string|Htmlable|null
     {
         return match ($this) {
-            self::ACTIVE => trans_choice('Active', 4),
-            self::INACTIVE => trans_choice('Inactive', 4),
+            self::ACTIVE => __('Active Companies'),
+            self::INACTIVE => __('Inactive Companies'),
         };
     }
 

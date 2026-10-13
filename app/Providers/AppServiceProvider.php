@@ -5,10 +5,15 @@ namespace App\Providers;
 use App\Auth\ExternalUserProvider;
 use App\Auth\SessionGuard;
 use App\Enums\UserRole;
+use App\Models\Company;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\AuthService;
+use BezhanSalleh\LanguageSwitch\Enums\TriggerStyle;
+use BezhanSalleh\LanguageSwitch\LanguageSwitch;
+use Filament\Facades\Filament;
+use Filament\Support\Facades\FilamentTimezone;
 use Filament\Tables\Table;
 use GuzzleHttp\Middleware;
 use Illuminate\Http\Client\Factory as HttpFactory;
@@ -17,6 +22,8 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Psr\Http\Message\RequestInterface;
 use Spatie\Permission\PermissionRegistrar;
+
+use function in_array;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -33,8 +40,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Prevent deletion of protected roles or roles that have users assigned to them
         Gate::before(function (User $user, string $ability, array $arguments): ?bool {
             $record = $arguments[0] ?? null;
+
+            if (($record instanceof Company || $record === Company::class) && in_array($ability, ['forceDelete', 'forceDeleteAny'], true)) {
+                return false;
+            }
+
+            if ($record instanceof User || $record === User::class) {
+                return null;
+            }
 
             if ($record instanceof Role && in_array($ability, ['delete', 'forceDelete'], true)) {
                 if (in_array($record->name, UserRole::protectedRoles(), true) || $record->users()->withoutGlobalScopes()->exists()) {
@@ -45,6 +61,7 @@ class AppServiceProvider extends ServiceProvider
             return $user->isSuperAdmin() ? true : null;
         });
 
+        // Configure Spatie Permission package to use custom models
         app(PermissionRegistrar::class)
             ->setPermissionClass(Permission::class)
             ->setRoleClass(Role::class);
@@ -77,6 +94,8 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
+        FilamentTimezone::set(fn (): string => Filament::getTenant()?->timezone ?? config('app.timezone'));
+
         // Configure default date and time formats for Filament tables
         Table::configureUsing(fn (Table $table) => $table
             ->defaultDateDisplayFormat('d M, Y')
@@ -84,5 +103,17 @@ class AppServiceProvider extends ServiceProvider
             ->defaultDateTimeDisplayFormat('d M, Y - h:i A')
         );
 
+        // Configure LanguageSwitch package for language switching functionality
+        LanguageSwitch::configureUsing(function (LanguageSwitch $switch) {
+            $switch
+                ->locales(['es', 'en'])
+                ->flags([
+                    'es' => 'https://flagcdn.com/es.svg',
+                    'en' => 'https://flagcdn.com/us.svg',
+                ])
+                ->trigger(style: TriggerStyle::Flag)
+                ->userPreferredLocale(fn () => auth()->user()?->locale)
+                ->nativeLabel();
+        });
     }
 }

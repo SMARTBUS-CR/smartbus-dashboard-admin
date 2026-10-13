@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\Companies\CompanyResource;
+use App\Filament\Resources\SuperAdmins\SuperAdminResource;
 use App\Models\Company;
 use App\Models\User;
 use BezhanSalleh\FilamentShield\Resources\Roles\RoleResource;
-use Filament\Pages\Dashboard;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 
@@ -200,6 +201,7 @@ return [
         ],
         'exclude' => [
             CompanyResource::class,
+            SuperAdminResource::class,
         ],
     ],
 

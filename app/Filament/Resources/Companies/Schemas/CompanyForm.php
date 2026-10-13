@@ -9,12 +9,36 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
+use Ysfkaya\FilamentPhoneInput\Forms\PhoneInput;
+use Ysfkaya\FilamentPhoneInput\PhoneInputNumberType;
 
 class CompanyForm
 {
+    private const COUNTRIES = [
+        'BZ' => 'Belize',
+        'CR' => 'Costa Rica',
+        'SV' => 'El Salvador',
+        'GT' => 'Guatemala',
+        'HN' => 'Honduras',
+        'NI' => 'Nicaragua',
+        'PA' => 'Panama',
+    ];
+
+    private const COUNTRY_TIMEZONES = [
+        'BZ' => 'America/Belize',
+        'CR' => 'America/Costa_Rica',
+        'SV' => 'America/El_Salvador',
+        'GT' => 'America/Guatemala',
+        'HN' => 'America/Tegucigalpa',
+        'NI' => 'America/Managua',
+        'PA' => 'America/Panama',
+    ];
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -57,12 +81,20 @@ class CompanyForm
                     ->icon(Heroicon::OutlinedEnvelopeOpen)
                     ->collapsible()
                     ->schema([
-                        TextInput::make('phone')
+                        PhoneInput::make('phone')
                             ->label(__('Phone'))
-                            ->prefixIcon(Heroicon::OutlinedPhone)
-                            ->tel()
+                            ->helperText(__(
+                                'The phone number may belong to a different country than the company.'
+                            ))
                             ->required()
-                            ->maxLength(50),
+                            ->rules(['string', 'max:50'])
+                            ->initialCountry('cr')
+                            ->defaultCountry('CR')
+                            ->disableLookup()
+                            ->countryOrder(['cr', 'gt', 'sv', 'hn', 'ni', 'pa', 'bz'])
+                            ->validateFor(country: 'INTERNATIONAL')
+                            ->inputNumberFormat(PhoneInputNumberType::E164)
+                            ->displayNumberFormat(PhoneInputNumberType::INTERNATIONAL),
 
                         TextInput::make('email')
                             ->label(__('Email'))
@@ -87,23 +119,63 @@ class CompanyForm
                     ->icon(Heroicon::OutlinedCog6Tooth)
                     ->collapsible()
                     ->schema([
-                        TextInput::make('country_code')
+                        Select::make('country_code')
                             ->label(__('Country'))
-                            ->required()
                             ->prefixIcon(Heroicon::OutlinedGlobeAmericas)
-                            ->length(2)
-                            ->maxLength(2)
-                            ->dehydrateStateUsing(
-                                fn (?string $state): ?string => $state
+                            ->options(fn (): array => array_map(
+                                fn (string $name): string => __($name),
+                                self::COUNTRIES,
+                            ))
+                            ->required()
+                            ->searchable()
+                            ->live()
+                            ->rules([
+                                'string',
+                                'size:2',
+                                Rule::in(array_keys(self::COUNTRIES)),
+                            ])
+                            ->mutateStateForValidationUsing(
+                                fn (?string $state): ?string => $state !== null
                                     ? strtoupper($state)
-                                    : null
-                            ),
+                                    : null,
+                            )
+                            ->dehydrateStateUsing(
+                                fn (?string $state): ?string => $state !== null
+                                    ? strtoupper($state)
+                                    : null,
+                            )
+                            ->afterStateUpdated(function (Set $set, ?string $state): void {
+                                $country = strtoupper($state ?? '');
 
-                        TextInput::make('timezone')
+                                $set('country_code', $state !== null ? $country : null);
+                                $set('timezone', self::COUNTRY_TIMEZONES[$country] ?? null);
+                            }),
+
+                        Select::make('timezone')
                             ->label(__('Timezone'))
                             ->prefixIcon(Heroicon::OutlinedClock)
+                            ->helperText(__(
+                                'Used to interpret and display company dates and times.'
+                            ))
+                            ->options(function (Get $get): array {
+                                $country = strtoupper((string) $get('country_code'));
+                                $timezone = self::COUNTRY_TIMEZONES[$country] ?? null;
+
+                                return $timezone !== null
+                                    ? [$timezone => $timezone]
+                                    : [];
+                            })
                             ->required()
-                            ->maxLength(64),
+                            ->rules(function (Get $get): array {
+                                $country = strtoupper((string) $get('country_code'));
+                                $timezone = self::COUNTRY_TIMEZONES[$country] ?? null;
+
+                                return [
+                                    'string',
+                                    'max:64',
+                                    Rule::in($timezone !== null ? [$timezone] : []),
+                                ];
+                            }),
 
                         Select::make('status')
                             ->label(__('Status'))

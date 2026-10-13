@@ -23,7 +23,7 @@ class ListCompanies extends ListRecords
     public function getTabs(): array
     {
         $tabs = [
-            'all' => Tab::make(trans_choice('All', 2))
+            'all' => Tab::make(__('All Companies'))
                 ->icon(Heroicon::ListBullet),
         ];
 

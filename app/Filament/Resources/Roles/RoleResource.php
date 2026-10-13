@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Roles;
 
+use App\Enums\LucideIcon;
 use App\Enums\NavigationGroup;
 use App\Enums\UserRole;
 use App\Filament\Resources\Roles\Pages\CreateRole;
 use App\Filament\Resources\Roles\Pages\EditRole;
 use App\Filament\Resources\Roles\Pages\ListRoles;
-use App\Filament\Resources\Roles\Pages\ViewRole;
 use App\Models\Role;
+use BackedEnum;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use BezhanSalleh\FilamentShield\Support\Utils;
 use BezhanSalleh\FilamentShield\Traits\HasShieldFormComponents;
@@ -25,6 +26,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Panel;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
@@ -32,8 +34,10 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\FontWeight;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -54,12 +58,32 @@ class RoleResource extends Resource
 
     protected static ?string $model = Role::class;
 
+    protected static ?int $navigationSort = 20;
+
     protected static ?string $recordTitleAttribute = 'display_name';
 
     #[Override]
     public static function getNavigationGroup(): string|UnitEnum|null
     {
-        return NavigationGroup::RolesAndPermissions;
+        return NavigationGroup::AccessManagement;
+    }
+
+    #[Override]
+    public static function getNavigationIcon(): BackedEnum|Htmlable|string|null
+    {
+        return Heroicon::OutlinedKey;
+    }
+
+    #[Override]
+    public static function getActiveNavigationIcon(): BackedEnum|Htmlable|string|null
+    {
+        return Heroicon::Key;
+    }
+
+    #[Override]
+    public static function getNavigationLabel(): string
+    {
+        return __('Access Control');
     }
 
     #[Override]
@@ -73,11 +97,12 @@ class RoleResource extends Resource
                             ->schema([
                                 TextInput::make('display_name')
                                     ->label(__('Name'))
+                                    ->prefixIcon(LucideIcon::UserKey)
                                     ->placeholder(__('i.e.: Administrator, Dispatcher, Supervisor'))
                                     ->helperText(__('Name of the role that will be displayed in the application'))
                                     ->required()
                                     ->maxLength(255)
-                                    ->live(onBlur: true)
+                                    ->live(debounce: 500)
                                     ->afterStateUpdated(function (string $operation, ?string $state, Set $set, ?Role $record) {
                                         // Generate automatic slug if it's creation or not a protected role
                                         $isProtected = in_array($record?->name, UserRole::protectedRoles(), true);
@@ -88,6 +113,7 @@ class RoleResource extends Resource
                                     }),
                                 TextInput::make('name')
                                     ->label(__('System Identifier'))
+                                    ->prefixIcon(LucideIcon::Code2)
                                     ->helperText(__('Unique identifier of the role for permission control'))
                                     ->disabled()
                                     ->readOnly()
@@ -125,6 +151,14 @@ class RoleResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->columnSpanFull(),
+
+                Callout::make(__('Company Permissions'))
+                    ->description(__(
+                        'Selected permissions determine which actions users with this role can perform in the current company.'
+                    ))
+                    ->info()
+                    ->columnSpanFull(),
+
                 static::getShieldFormComponents(),
             ]);
     }
@@ -140,10 +174,13 @@ class RoleResource extends Resource
                     ->default(fn (Role $record) => Str::headline($record->display_name))
                     ->searchable(),
                 TextColumn::make('name')
-                    // ->weight(FontWeight::Medium)
                     ->label(__('Identifier'))
                     ->badge()
-                    ->color(Color::Gray)
+                    ->color(function (string $state, Role $record): array {
+                        $color = $record->color ?: '#'.substr(hash('sha256', (string) $record->getKey()), 0, 6);
+
+                        return Color::hex($color);
+                    })
                     ->searchable(),
                 TextColumn::make('team.name')
                     ->default('Global')
@@ -227,7 +264,6 @@ class RoleResource extends Resource
         return [
             'index' => ListRoles::route('/'),
             'create' => CreateRole::route('/create'),
-            'view' => ViewRole::route('/{record}'),
             'edit' => EditRole::route('/{record}/edit'),
         ];
     }
