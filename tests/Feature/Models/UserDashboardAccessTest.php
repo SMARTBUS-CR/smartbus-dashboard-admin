@@ -73,4 +73,141 @@ describe('Company Dashboard Access', function (): void {
         expect($user->canAccessPanel(Filament::getPanel('admin')))->toBeFalse()
             ->and($user->canAccessTenant($company))->toBeFalse();
     });
+
+    test('checks global administrator access only once for repeated checks', function (): void {
+        $user = createUserWithRole(UserRole::SuperAdmin);
+        $connection = $user->getConnection();
+
+        $connection->flushQueryLog();
+        $connection->enableQueryLog();
+
+        try {
+            foreach (range(1, 20) as $iteration) {
+                expect($user->isSuperAdmin())->toBeTrue();
+            }
+
+            $queries = collect($connection->getQueryLog())
+                ->filter(
+                    fn (array $query): bool => str_contains($query['query'], 'model_has_roles')
+                        && in_array(
+                            UserRole::SuperAdmin->value,
+                            $query['bindings'],
+                            true,
+                        ),
+                );
+
+            expect($queries)->toHaveCount(1);
+        } finally {
+            $connection->disableQueryLog();
+            $connection->flushQueryLog();
+        }
+    });
+
+    test('rechecks administrator access after account deactivation', function (): void {
+        $user = createUserWithRole(UserRole::SuperAdmin);
+        $cachedUser = $user->fresh();
+
+        expect($cachedUser->isSuperAdmin())->toBeTrue();
+
+        $user->delete();
+
+        expect($cachedUser->isSuperAdmin())->toBeFalse();
+    });
+
+    test('loads administrator tenants only once for repeated checks', function (): void {
+        $company = createCompany();
+        $user = createUserWithRole(UserRole::SuperAdmin);
+        $panel = Filament::getPanel('admin');
+        $connection = $company->getConnection();
+
+        $connection->flushQueryLog();
+        $connection->enableQueryLog();
+
+        try {
+            foreach (range(1, 3) as $iteration) {
+                expect($user->getTenants($panel)->modelKeys())
+                    ->toContain($company->getKey());
+            }
+
+            $queries = collect($connection->getQueryLog())
+                ->filter(
+                    fn (array $query): bool => str_contains(
+                        $query['query'],
+                        'select * from "companies"',
+                    ),
+                );
+
+            expect($queries)->toHaveCount(1);
+        } finally {
+            $connection->disableQueryLog();
+            $connection->flushQueryLog();
+        }
+    });
+
+    test('refreshes administrator tenants after a company is archived', function (): void {
+        $company = createCompany();
+        $user = createUserWithRole(UserRole::SuperAdmin);
+        $panel = Filament::getPanel('admin');
+
+        expect($user->getTenants($panel)->modelKeys())
+            ->toContain($company->getKey());
+
+        $company->delete();
+
+        expect($user->getTenants($panel)->modelKeys())
+            ->not->toContain($company->getKey());
+    });
+
+    test('checks company administrator membership once across repeated tenant access checks', function (): void {
+        $company = createCompany();
+        $user = createUserWithRole(UserRole::Admin, $company);
+
+        CompanyUser::create([
+            'company_id' => $company->getKey(),
+            'user_id' => $user->getKey(),
+        ]);
+
+        actingAsInCompany($user, $company);
+
+        $connection = $company->getConnection();
+        $connection->flushQueryLog();
+        $connection->enableQueryLog();
+
+        try {
+            foreach (range(1, 3) as $iteration) {
+                expect($user->canAccessTenant($company))->toBeTrue();
+            }
+
+            $queries = collect($connection->getQueryLog())
+                ->filter(
+                    fn (array $query): bool => str_contains(
+                        $query['query'],
+                        'from "company_users"',
+                    ),
+                );
+
+            expect($queries)->toHaveCount(1);
+        } finally {
+            $connection->disableQueryLog();
+            $connection->flushQueryLog();
+        }
+    });
+
+    test('rechecks cached tenant access after membership removal', function (): void {
+        $company = createCompany();
+        $user = createUserWithRole(UserRole::Admin, $company);
+
+        $membership = CompanyUser::create([
+            'company_id' => $company->getKey(),
+            'user_id' => $user->getKey(),
+        ]);
+
+        actingAsInCompany($user, $company);
+
+        expect($user->canAccessTenant($company))->toBeTrue();
+
+        $membership->delete();
+
+        expect($user->canAccessTenant($company))->toBeFalse();
+    });
 });

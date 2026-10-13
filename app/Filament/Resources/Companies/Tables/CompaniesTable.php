@@ -66,7 +66,7 @@ class CompaniesTable
 
                 TextColumn::make('created_at')
                     ->label(__('Created At'))
-                    ->dateTime('Y-m-d H:i:s')
+                    ->dateTime()
                     ->timezone(fn (Company $record): string => $record->timezone)
                     ->dateTimeTooltip('Y-m-d H:i:s T', fn (Company $record): string => $record->timezone)
                     ->sortable()

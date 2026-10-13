@@ -149,18 +149,32 @@ class UserPolicy
             ->exists();
     }
 
-    private function isManageableMemberInCompany(User $user, Company $company): bool
-    {
+    private function isManageableMemberInCompany(
+        User $user,
+        Company $company,
+    ): bool {
+        $request = app('request');
+        $attribute = 'dashboard.manageable_company_members';
+
+        $key = implode('|', [
+            $user->getConnection()->getName(),
+            $user->getMorphClass(),
+            (string) $user->getKey(),
+            (string) $company->getKey(),
+        ]);
+
+        $checks = $request->attributes->get($attribute, []);
+
+        if (array_key_exists($key, $checks)) {
+            return $checks[$key];
+        }
+
         $hasMembership = CompanyUser::query()
             ->where('company_id', $company->getKey())
             ->where('user_id', $user->getKey())
             ->exists();
 
-        if (! $hasMembership) {
-            return false;
-        }
-
-        return DB::connection('mysql')
+        $result = $hasMembership && DB::connection('mysql')
             ->table('model_has_roles as assignments')
             ->join('roles', 'roles.id', '=', 'assignments.role_id')
             ->where('assignments.model_uuid', $user->getKey())
@@ -174,5 +188,10 @@ class UserPolicy
                 UserRole::SuperAdmin->value,
             ])
             ->exists();
+
+        $checks[$key] = $result;
+        $request->attributes->set($attribute, $checks);
+
+        return $result;
     }
 }

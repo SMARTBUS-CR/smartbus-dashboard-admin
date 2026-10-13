@@ -66,4 +66,40 @@ describe('Global SuperAdmin Resource Access', function (): void {
 
         expect(SuperAdminResource::canEdit($target))->toBeFalse();
     });
+
+    test('reuses the administrator check across resource authorizations', function (): void {
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+
+        actingAsInCompany($actor, createCompany());
+
+        $connection = $actor->getConnection();
+        $connection->flushQueryLog();
+        $connection->enableQueryLog();
+
+        try {
+            foreach (range(1, 5) as $iteration) {
+                expect(SuperAdminResource::canViewAny())->toBeTrue()
+                    ->and(SuperAdminResource::canCreate())->toBeTrue();
+            }
+
+            $queries = collect($connection->getQueryLog())
+                ->filter(
+                    fn (array $query): bool => str_contains($query['query'], 'select exists')
+                        && str_contains(
+                            $query['query'],
+                            'model_has_roles',
+                        )
+                        && in_array(
+                            UserRole::SuperAdmin->value,
+                            $query['bindings'],
+                            true,
+                        ),
+                );
+
+            expect($queries)->toHaveCount(1);
+        } finally {
+            $connection->disableQueryLog();
+            $connection->flushQueryLog();
+        }
+    });
 });

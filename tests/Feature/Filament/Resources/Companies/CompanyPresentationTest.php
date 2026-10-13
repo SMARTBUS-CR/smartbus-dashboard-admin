@@ -8,15 +8,20 @@ use Livewire\Livewire;
 
 describe('Company Localized Presentation', function (): void {
     test('renders timestamps in each company timezone while preserving UTC storage', function (): void {
+        app()->setLocale('es');
+
         $company = createCompany(['country_code' => 'CR', 'timezone' => 'America/Costa_Rica', 'created_at' => '2026-10-05 12:00:00']);
         $other = createCompany(['country_code' => 'PA', 'timezone' => 'America/Panama', 'created_at' => '2026-10-05 12:00:00']);
         actingAsInCompany(createUserWithRole(UserRole::SuperAdmin), $company);
         $component = Livewire::test(ListCompanies::class);
         $column = $component->instance()->getTable()->getColumn('created_at');
 
-        expect($column->record($company)->formatState($company->created_at))->toBe('2026-10-05 06:00:00')
-            ->and($column->record($other)->formatState($other->created_at))->toBe('2026-10-05 07:00:00')
-            ->and($company->fresh()->getRawOriginal('created_at'))->toBe('2026-10-05 12:00:00');
+        expect($column->record($company)->formatState($company->created_at))
+            ->toBe('05 oct., 2026 - 06:00 a. m.')
+            ->and($column->record($other)->formatState($other->created_at))
+            ->toBe('05 oct., 2026 - 07:00 a. m.')
+            ->and($company->fresh()->getRawOriginal('created_at'))
+            ->toBe('2026-10-05 12:00:00');
     });
 
     test('resolves display timezone dynamically when switching tenants', function (): void {

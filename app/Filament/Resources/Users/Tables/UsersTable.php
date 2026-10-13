@@ -13,6 +13,7 @@ use Filament\Support\Colors\Color;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -22,6 +23,9 @@ class UsersTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(
+                fn (Builder $query): Builder => $query->with('roles'),
+            )
             ->columns([
                 TextColumn::make('name')
                     ->label(__('Name'))

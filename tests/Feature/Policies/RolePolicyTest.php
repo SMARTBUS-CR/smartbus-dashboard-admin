@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Policies\RolePolicy;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Auth\User as AuthUser;
+use Illuminate\Support\Facades\Gate;
 
 function actingInTenant(?Company $company, callable $callback): mixed
 {
@@ -173,5 +174,75 @@ describe('Role Policy', function () {
         $canInB = actingInTenant($companyB, fn () => $user->can('View:Role'));
 
         expect($canInA)->toBeTrue()->and($canInB)->toBeFalse();
+    });
+
+    test('checks role assignments once across repeated deletion authorizations', function (): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+
+        $role = Role::create([
+            'name' => 'dispatcher-performance',
+            'guard_name' => 'web',
+            'company_id' => $company->getKey(),
+        ]);
+
+        grantShield($actor, ['Delete:Role'], $company);
+        actingAsInCompany($actor, $company);
+
+        $connection = $role->getConnection();
+        $connection->flushQueryLog();
+        $connection->enableQueryLog();
+
+        try {
+            foreach (range(1, 3) as $iteration) {
+                expect(
+                    Gate::forUser($actor)->allows('delete', $role),
+                )->toBeTrue();
+            }
+
+            $queries = collect($connection->getQueryLog())
+                ->filter(
+                    fn (array $query): bool => str_contains($query['query'], 'select exists')
+                        && str_contains(
+                            $query['query'],
+                            'model_has_roles',
+                        )
+                        && in_array(
+                            $role->getKey(),
+                            $query['bindings'],
+                            true,
+                        ),
+                );
+
+            expect($queries)->toHaveCount(1);
+        } finally {
+            $connection->disableQueryLog();
+            $connection->flushQueryLog();
+        }
+    });
+
+    test('rejects deletion after a previously unassigned role is assigned', function (): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+        $target = User::factory()->create();
+
+        $role = Role::create([
+            'name' => 'dispatcher-assignment',
+            'guard_name' => 'web',
+            'company_id' => $company->getKey(),
+        ]);
+
+        grantShield($actor, ['Delete:Role'], $company);
+        actingAsInCompany($actor, $company);
+
+        expect(
+            Gate::forUser($actor)->allows('delete', $role),
+        )->toBeTrue();
+
+        $target->assignRole($role);
+
+        expect(
+            Gate::forUser($actor)->allows('delete', $role),
+        )->toBeFalse();
     });
 });

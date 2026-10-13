@@ -191,4 +191,73 @@ describe('User Policy', function (): void {
         'update' => ['update', 'Update:User'],
         'remove access' => ['removeCompanyAccess', 'Delete:User'],
     ]);
+
+    test('checks target membership once across repeated authorizations', function (): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+        $target = createUserWithRole(UserRole::Admin, $company);
+
+        CompanyUser::create([
+            'company_id' => $company->getKey(),
+            'user_id' => $target->getKey(),
+        ]);
+
+        actingAsInCompany($actor, $company);
+
+        $connection = $company->getConnection();
+        $connection->flushQueryLog();
+        $connection->enableQueryLog();
+
+        try {
+            foreach (range(1, 3) as $iteration) {
+                expect(
+                    Gate::forUser($actor)->allows('update', $target),
+                )->toBeTrue()
+                    ->and(Gate::forUser($actor)->allows('removeCompanyAccess', $target))->toBeTrue();
+            }
+
+            $queries = collect($connection->getQueryLog())
+                ->filter(
+                    fn (array $query): bool => str_contains($query['query'], 'select exists')
+                        && str_contains(
+                            $query['query'],
+                            '"company_users"',
+                        ),
+                );
+
+            expect($queries)->toHaveCount(1);
+        } finally {
+            $connection->disableQueryLog();
+            $connection->flushQueryLog();
+        }
+    });
+
+    test('denies target management after a cached membership is removed', function (): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+        $target = createUserWithRole(UserRole::Admin, $company);
+
+        $membership = CompanyUser::create([
+            'company_id' => $company->getKey(),
+            'user_id' => $target->getKey(),
+        ]);
+
+        actingAsInCompany($actor, $company);
+
+        expect(
+            Gate::forUser($actor)->allows('update', $target),
+        )->toBeTrue();
+
+        $membership->delete();
+
+        expect(
+            Gate::forUser($actor)->allows('update', $target),
+        )->toBeFalse()
+            ->and(
+                Gate::forUser($actor)->allows(
+                    'removeCompanyAccess',
+                    $target,
+                ),
+            )->toBeFalse();
+    });
 });

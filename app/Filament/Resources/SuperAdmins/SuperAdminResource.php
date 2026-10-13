@@ -122,8 +122,6 @@ class SuperAdminResource extends Resource
 
     private static function isActiveGlobalSuperAdmin(User $user): bool
     {
-        return static::getEloquentQuery()
-            ->whereKey($user->getKey())
-            ->exists();
+        return $user->isSuperAdmin();
     }
 }

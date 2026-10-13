@@ -22,6 +22,12 @@ class ListCompanies extends ListRecords
 
     public function getTabs(): array
     {
+        $counts = $this->getModel()::query()
+            ->select('status')
+            ->selectRaw('COUNT(*) AS total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
         $tabs = [
             'all' => Tab::make(__('All Companies'))
                 ->icon(Heroicon::ListBullet),
@@ -31,7 +37,7 @@ class ListCompanies extends ListRecords
             $tabs[$status->value] = Tab::make($status->getPluralLabel())
                 ->icon(Heroicon::UserGroup)
                 ->badgeColor($status->getColor())
-                ->badge($this->getModel()::where('status', $status->value)->count())
+                ->badge((int) ($counts[$status->value] ?? 0))
                 ->modifyQueryUsing(fn ($query) => $query->where('status', $status->value));
         }
 

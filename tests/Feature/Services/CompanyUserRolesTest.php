@@ -27,8 +27,8 @@ describe('Company User Role Assignment', function (): void {
             'name' => 'Unauthorized Admin', 'email' => 'escalation@example.test',
             'password' => 'N7v!qL2#rX9@kP4', 'password_confirmation' => 'N7v!qL2#rX9@kP4',
             'roles' => [$adminRole->id],
-        ]))->toThrow(AuthorizationException::class);
-        expect(User::count())->toBe(1);
+        ]))->toThrow(AuthorizationException::class)
+            ->and(User::count())->toBe(1);
     });
 
     beforeEach(function (): void {
