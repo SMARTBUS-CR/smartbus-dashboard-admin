@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Http;
 
 class BrowserSession
 {
-    public const string VALIDATE_URL = 'https://gateway.test/auth/token/validate';
+    public const VALIDATE_URL = 'https://gateway.test/auth/token/validate';
 
     /** @param array<string, mixed> $responses */
     public static function start(User $actor, array $responses = []): void
