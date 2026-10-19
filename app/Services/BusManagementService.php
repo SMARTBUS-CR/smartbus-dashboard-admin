@@ -38,6 +38,15 @@ class BusManagementService
                 ]);
             }
 
+            Validator::make($data, [
+                'id' => ['missing'],
+                'company_id' => ['missing'],
+                'is_active' => ['missing'],
+                'created_at' => ['missing'],
+                'updated_at' => ['missing'],
+                'deleted_at' => ['missing'],
+            ])->validate();
+
             $normalized = [
                 'country_code' => strtoupper(trim($data['country_code'])),
                 'plate_number' => strtoupper(trim($data['plate_number'])),
