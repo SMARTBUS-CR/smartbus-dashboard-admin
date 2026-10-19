@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Enums\CompanyStatus;
 use App\Models\Bus;
 use App\Models\Company;
 use App\Models\User;
 use illuminate\support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 class BusManagementService
 {
@@ -28,6 +30,12 @@ class BusManagementService
                 'create',
                 [Bus::class, $company],
             );
+
+            if ($company->status !== CompanyStatus::ACTIVE) {
+                throw ValidationException::withMessages([
+                    'company' => __('An active company context is required.'),
+                ]);
+            }
 
             return Bus::query()->create([
                 'company_id' => $company->getKey(),
