@@ -129,4 +129,37 @@ describe('Bus Creation', function (): void {
             'unit_number' => 'UNIT-101',
         ]);
     });
+    test('rejects a plate number that is empty after normalization', function (): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+
+        CompanyUser::create([
+            'company_id' => $company->getKey(),
+            'user_id' => $actor->getKey(),
+        ]);
+
+        grantShield($actor, ['Create:Bus'], $company);
+
+        try {
+            app(BusManagementService::class)->create(
+                $actor,
+                $company,
+                [
+                    'country_code' => 'CR',
+                    'plate_number' => '   ',
+                    'unit_number' => 'UNIT-101',
+                    'capacity' => 40,
+                ],
+            );
+
+            $this->fail('Expected a validation exception.');
+        } catch (ValidationException $exception) {
+            expect($exception->errors())->toHaveKey('plate_number');
+
+            $this->assertDatabaseMissing('buses', [
+                'company_id' => $company->getKey(),
+                'unit_number' => 'UNIT-101',
+            ]);
+        }
+    });
 });

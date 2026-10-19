@@ -6,7 +6,8 @@ use App\Enums\CompanyStatus;
 use App\Models\Bus;
 use App\Models\Company;
 use App\Models\User;
-use illuminate\support\Facades\Gate;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class BusManagementService
@@ -37,12 +38,20 @@ class BusManagementService
                 ]);
             }
 
-            return Bus::query()->create([
-                'company_id' => $company->getKey(),
+            $normalized = [
                 'country_code' => strtoupper(trim($data['country_code'])),
                 'plate_number' => strtoupper(trim($data['plate_number'])),
                 'unit_number' => trim($data['unit_number']),
                 'capacity' => $data['capacity'],
+            ];
+
+            Validator::make($normalized, [
+                'plate_number' => ['required', 'string', 'max:30'],
+            ])->validate();
+
+            return Bus::query()->create([
+                'company_id' => $company->getKey(),
+                ...$normalized,
             ]);
         } finally {
             setPermissionsTeamId($previousTeam);
