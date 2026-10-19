@@ -39,9 +39,9 @@ class BusManagementService
 
             return Bus::query()->create([
                 'company_id' => $company->getKey(),
-                'country_code' => $data['country_code'],
-                'plate_number' => $data['plate_number'],
-                'unit_number' => $data['unit_number'],
+                'country_code' => strtoupper(trim($data['country_code'])),
+                'plate_number' => strtoupper(trim($data['plate_number'])),
+                'unit_number' => trim($data['unit_number']),
                 'capacity' => $data['capacity'],
             ]);
         } finally {
