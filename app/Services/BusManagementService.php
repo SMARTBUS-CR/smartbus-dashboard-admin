@@ -47,6 +47,7 @@ class BusManagementService
 
             Validator::make($normalized, [
                 'plate_number' => ['required', 'string', 'max:30'],
+                'capacity' => ['required', 'integer', 'between:1,32767'],
             ])->validate();
 
             return Bus::query()->create([

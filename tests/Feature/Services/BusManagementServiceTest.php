@@ -162,4 +162,44 @@ describe('Bus Creation', function (): void {
             ]);
         }
     });
+    test('rejects invalid capacity without persisting a bus', function (mixed $capacity): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+
+        CompanyUser::create([
+            'company_id' => $company->getKey(),
+            'user_id' => $actor->getKey(),
+        ]);
+
+        grantShield($actor, ['Create:Bus'], $company);
+
+        try {
+            app(BusManagementService::class)->create(
+                $actor,
+                $company,
+                [
+                    'country_code' => 'CR',
+                    'plate_number' => 'BUS-101',
+                    'unit_number' => 'UNIT-101',
+                    'capacity' => $capacity,
+                ],
+            );
+
+            $this->fail('Expected a validation exception.');
+        } catch (ValidationException $exception) {
+            expect($exception->errors())->toHaveKey('capacity');
+
+            $this->assertDatabaseMissing('buses', [
+                'company_id' => $company->getKey(),
+                'unit_number' => 'UNIT-101',
+            ]);
+        }
+    })->with([
+        'zero' => [0],
+        'negative' => [-1],
+        'above maximum' => [32768],
+        'fractional' => [40.5],
+        'non-numeric' => ['invalid'],
+        'null' => [null],
+    ]);
 });
