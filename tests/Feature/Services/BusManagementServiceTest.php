@@ -3,6 +3,7 @@
 use App\Enums\UserRole;
 use App\Models\CompanyUser;
 use App\Services\BusManagementService;
+use illuminate\Auth\Access\AuthorizationException;
 
 describe('Bus Creation', function (): void {
     test('creates a bus for an authorized company admin without a Filament tenant', function (): void {
@@ -38,5 +39,34 @@ describe('Bus Creation', function (): void {
             'capacity' => 40,
             'is_active' => true,
         ]);
+    });
+    test('rejects bus creation when the company admin lacks permission', function (): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+
+        CompanyUser::create([
+            'company_id' => $company->getKey(),
+            'user_id' => $actor->getKey(),
+        ]);
+
+        try {
+            app(BusManagementService::class)->create(
+                $actor,
+                $company,
+                [
+                    'country_code' => 'CR',
+                    'plate_number' => 'BUS-101',
+                    'unit_number' => 'UNIT-101',
+                    'capacity' => 40,
+                ],
+            );
+
+            $this->fail('Expected an authorization exception.');
+        } catch (AuthorizationException $exception) {
+            $this->assertDatabaseMissing('buses', [
+                'company_id' => $company->getKey(),
+                'plate_number' => 'BUS-101',
+            ]);
+        }
     });
 });
