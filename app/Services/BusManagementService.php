@@ -48,14 +48,25 @@ class BusManagementService
             ])->validate();
 
             $normalized = [
-                'country_code' => strtoupper(trim($data['country_code'])),
-                'plate_number' => strtoupper(trim($data['plate_number'])),
-                'unit_number' => trim($data['unit_number']),
-                'capacity' => $data['capacity'],
+                'country_code' => isset($data['country_code'])
+                    && is_string($data['country_code'])
+                        ? strtoupper(trim($data['country_code']))
+                        : ($data['country_code'] ?? null),
+                'plate_number' => isset($data['plate_number'])
+                    && is_string($data['plate_number'])
+                        ? strtoupper(trim($data['plate_number']))
+                        : ($data['plate_number'] ?? null),
+                'unit_number' => isset($data['unit_number'])
+                    && is_string($data['unit_number'])
+                        ? trim($data['unit_number'])
+                        : ($data['unit_number'] ?? null),
+                'capacity' => $data['capacity'] ?? null,
             ];
 
             Validator::make($normalized, [
+                'country_code' => ['required', 'string', 'size:2'],
                 'plate_number' => ['required', 'string', 'max:30'],
+                'unit_number' => ['required', 'string', 'max:50'],
                 'capacity' => ['required', 'integer', 'between:1,32767'],
             ])->validate();
 
