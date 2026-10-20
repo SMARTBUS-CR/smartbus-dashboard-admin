@@ -160,6 +160,13 @@ return [
     'url' => 'The :attribute field must be a valid URL.',
     'uuid' => 'The :attribute field must be a valid UUID.',
     'attributes' => [
+        'plate_number' => 'plate number',
+        'unit_number' => 'unit number',
+        'country_code' => 'registration country',
+        'capacity' => 'capacity',
+        'brand' => 'brand',
+        'model' => 'model',
+        'company_id' => 'company',
         'address' => 'address',
         'affiliate_url' => 'affiliate URL',
         'age' => 'age',

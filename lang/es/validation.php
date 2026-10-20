@@ -160,6 +160,13 @@ return [
     'url' => 'El campo :attribute debe ser una URL válida.',
     'uuid' => 'El campo :attribute debe ser un UUID válido.',
     'attributes' => [
+        'plate_number' => 'matrícula',
+        'unit_number' => 'número de unidad',
+        'country_code' => 'país de registro',
+        'capacity' => 'capacidad',
+        'brand' => 'marca',
+        'model' => 'modelo',
+        'company_id' => 'empresa',
         'address' => 'dirección',
         'affiliate_url' => 'URL de afiliado',
         'age' => 'edad',
