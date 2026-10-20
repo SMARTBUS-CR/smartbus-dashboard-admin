@@ -6,11 +6,144 @@ use App\Models\Company;
 use App\Models\CompanyUser;
 use App\Services\BusManagementService;
 use illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use illuminate\validation\ValidationException;
 
 describe('Bus Creation', function (): void {
+    test('rejects actors outside the bus creation authorization matrix', function (string $scenario): void {
+        [$company, $otherCompany] = createTenantPair();
+        $actorCompany = $scenario === 'foreign admin' ? $otherCompany : $company;
+        $role = match ($scenario) {
+            'driver' => UserRole::Driver,
+            'passenger' => UserRole::Passenger,
+            default => UserRole::Admin,
+        };
+        $actor = createUserWithRole($role, $actorCompany);
+
+        $membership = CompanyUser::create([
+            'company_id' => $actorCompany->getKey(),
+            'user_id' => $actor->getKey(),
+        ]);
+
+        grantShield($actor, ['Create:Bus'], $actorCompany);
+
+        if ($scenario === 'archived membership') {
+            $membership->delete();
+        }
+
+        if ($scenario === 'archived actor') {
+            $actor->delete();
+        }
+
+        try {
+            app(BusManagementService::class)->create($actor, $company, [
+                'country_code' => 'CR',
+                'plate_number' => 'BUS-101',
+                'unit_number' => 'UNIT-101',
+                'capacity' => 40,
+            ]);
+
+            $this->fail('Expected an authorization exception.');
+        } catch (AuthorizationException $exception) {
+            $this->assertDatabaseCount('buses', 0);
+        }
+    })->with([
+        'another company administrator' => ['foreign admin'],
+        'driver even with permission' => ['driver'],
+        'passenger even with permission' => ['passenger'],
+        'archived membership' => ['archived membership'],
+        'archived actor' => ['archived actor'],
+    ]);
+
+    test('restores the previous permission context after bus creation', function (string $outcome): void {
+        [$company, $previousCompany] = createTenantPair();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+        CompanyUser::create([
+            'company_id' => $company->getKey(),
+            'user_id' => $actor->getKey(),
+        ]);
+
+        if ($outcome !== 'authorization failure') {
+            grantShield($actor, ['Create:Bus'], $company);
+        }
+
+        $originalTeam = getPermissionsTeamId();
+        setPermissionsTeamId($previousCompany->getKey());
+        $actor->load('roles', 'permissions');
+
+        try {
+            try {
+                $bus = app(BusManagementService::class)->create($actor, $company, [
+                    'country_code' => 'CR',
+                    'plate_number' => 'BUS-101',
+                    'unit_number' => 'UNIT-101',
+                    'capacity' => $outcome === 'validation failure' ? 0 : 40,
+                ]);
+
+                expect($outcome)->toBe('success');
+                $this->assertModelExists($bus);
+            } catch (AuthorizationException $exception) {
+                expect($outcome)->toBe('authorization failure');
+                $this->assertDatabaseCount('buses', 0);
+            } catch (ValidationException $exception) {
+                expect($outcome)->toBe('validation failure');
+                expect($exception->errors())->toHaveKey('capacity');
+                $this->assertDatabaseCount('buses', 0);
+            }
+
+            expect(getPermissionsTeamId())->toBe($previousCompany->getKey())
+                ->and($actor->relationLoaded('roles'))->toBeFalse()
+                ->and($actor->relationLoaded('permissions'))->toBeFalse();
+        } finally {
+            setPermissionsTeamId($originalTeam);
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+        }
+    })->with([
+        'successful creation' => ['success'],
+        'authorization exception' => ['authorization failure'],
+        'validation exception' => ['validation failure'],
+    ]);
+
+    test('does not translate unrelated unique constraint failures into identity errors', function (): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+        $service = app(BusManagementService::class);
+        $existing = $service->create($actor, $company, [
+            'country_code' => 'CR',
+            'plate_number' => 'BUS-101',
+            'unit_number' => 'UNIT-101',
+            'capacity' => 40,
+        ]);
+
+        $this->assertModelExists($existing);
+        $dispatcher = Bus::getEventDispatcher();
+        Bus::setEventDispatcher(clone $dispatcher);
+
+        try {
+            Bus::creating(function (Bus $bus) use ($existing): void {
+                $bus->id = $existing->getKey();
+            });
+
+            expect(fn () => $service->create($actor, $company, [
+                'country_code' => 'CR',
+                'plate_number' => 'BUS-102',
+                'unit_number' => 'UNIT-102',
+                'capacity' => 40,
+            ]))->toThrow(UniqueConstraintViolationException::class);
+        } finally {
+            Bus::setEventDispatcher($dispatcher);
+        }
+
+        $this->assertDatabaseCount('buses', 1);
+        $this->assertDatabaseHas('buses', [
+            'id' => $existing->getKey(),
+            'plate_number' => 'BUS-101',
+            'unit_number' => 'UNIT-101',
+        ]);
+    });
+
     test('maps identity conflicts raised after validation to field errors', function (string $field): void {
         $company = createCompany();
         $actor = createUserWithRole(UserRole::SuperAdmin);
