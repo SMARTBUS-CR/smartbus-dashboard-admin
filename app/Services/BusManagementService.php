@@ -6,6 +6,7 @@ use App\Enums\CompanyStatus;
 use App\Models\Bus;
 use App\Models\Company;
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -86,10 +87,41 @@ class BusManagementService
                 'year' => ['nullable', 'integer', 'between:1900,'.(now()->year + 1)],
             ])->validate();
 
-            return Bus::query()->create([
-                'company_id' => $company->getKey(),
-                ...$normalized,
-            ]);
+            Validator::make($normalized, [
+                'plate_number' => [
+                    Rule::unique(Bus::class, 'plate_number')
+                        ->where('country_code', $normalized['country_code']),
+                ],
+                'unit_number' => [
+                    Rule::unique(Bus::class, 'unit_number')
+                        ->where('company_id', $company->getKey()),
+                ],
+            ])->validate();
+
+            try {
+                return (new Bus)->getConnection()->transaction(fn (): Bus => Bus::query()->create([
+                    'company_id' => $company->getKey(),
+                    ...$normalized,
+                ]));
+            } catch (UniqueConstraintViolationException $exception) {
+                $detail = $exception->errorInfo[2] ?? '';
+
+                $field = match (true) {
+                    str_contains($detail, '"buses_country_code_plate_number_unique"') => 'plate_number',
+                    str_contains($detail, '"buses_company_id_unit_number_unique"') => 'unit_number',
+                    default => null,
+                };
+
+                if ($field === null) {
+                    throw $exception;
+                }
+
+                throw ValidationException::withMessages([
+                    $field => __('validation.unique', [
+                        'attribute' => __('validation.attributes.'.$field),
+                    ]),
+                ]);
+            }
         } finally {
             setPermissionsTeamId($previousTeam);
 

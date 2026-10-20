@@ -1,13 +1,159 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Models\Bus;
 use App\Models\Company;
 use App\Models\CompanyUser;
 use App\Services\BusManagementService;
 use illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use illuminate\validation\ValidationException;
 
 describe('Bus Creation', function (): void {
+    test('maps identity conflicts raised after validation to field errors', function (string $field): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+        $dispatcher = Bus::getEventDispatcher();
+        Bus::setEventDispatcher(clone $dispatcher);
+
+        try {
+            Bus::creating(function (Bus $bus) use ($field): void {
+                DB::table('buses')->insert([
+                    'id' => (string) Str::uuid(),
+                    'company_id' => $bus->company_id,
+                    'country_code' => $bus->country_code,
+                    'plate_number' => $field === 'plate_number' ? $bus->plate_number : 'OTHER-PLATE',
+                    'unit_number' => $field === 'unit_number' ? $bus->unit_number : 'OTHER-UNIT',
+                    'capacity' => 40,
+                ]);
+            });
+
+            try {
+                app(BusManagementService::class)->create($actor, $company, [
+                    'country_code' => 'CR',
+                    'plate_number' => 'BUS-101',
+                    'unit_number' => 'UNIT-101',
+                    'capacity' => 40,
+                ]);
+
+                $this->fail('Expected a validation exception.');
+            } catch (ValidationException $exception) {
+                expect($exception->errors())->toHaveKey($field);
+            }
+        } finally {
+            Bus::setEventDispatcher($dispatcher);
+        }
+
+        $this->assertDatabaseCount('buses', 0);
+    })->with([
+        'plate conflict' => ['plate_number'],
+        'unit conflict' => ['unit_number'],
+    ]);
+
+    test('allows identifiers reused outside their uniqueness scope', function (bool $differentCompany): void {
+        $company = createCompany();
+        $targetCompany = $differentCompany ? createCompany() : $company;
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+        $service = app(BusManagementService::class);
+
+        $existing = $service->create($actor, $company, [
+            'country_code' => 'CR',
+            'plate_number' => 'BUS-101',
+            'unit_number' => 'UNIT-101',
+            'capacity' => 40,
+        ]);
+
+        $this->assertModelExists($existing);
+
+        $bus = $service->create($actor, $targetCompany, [
+            'country_code' => $differentCompany ? 'CR' : 'PA',
+            'plate_number' => $differentCompany ? 'BUS-102' : 'BUS-101',
+            'unit_number' => $differentCompany ? 'UNIT-101' : 'UNIT-102',
+            'capacity' => 40,
+        ]);
+
+        $this->assertDatabaseHas('buses', [
+            'id' => $bus->getKey(),
+            'company_id' => $targetCompany->getKey(),
+            'country_code' => $differentCompany ? 'CR' : 'PA',
+            'plate_number' => $differentCompany ? 'BUS-102' : 'BUS-101',
+            'unit_number' => $differentCompany ? 'UNIT-101' : 'UNIT-102',
+        ]);
+        $this->assertDatabaseCount('buses', 2);
+    })->with([
+        'same plate in another country' => [false],
+        'same unit in another company' => [true],
+    ]);
+
+    test('rejects the same country and plate registered by another company', function (): void {
+        [$company, $otherCompany] = createTenantPair();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+        $service = app(BusManagementService::class);
+
+        $existing = $service->create($actor, $company, [
+            'country_code' => 'CR',
+            'plate_number' => 'BUS-101',
+            'unit_number' => 'UNIT-101',
+            'capacity' => 40,
+        ]);
+
+        $this->assertModelExists($existing);
+
+        try {
+            $service->create($actor, $otherCompany, [
+                'country_code' => 'CR',
+                'plate_number' => 'BUS-101',
+                'unit_number' => 'UNIT-102',
+                'capacity' => 40,
+            ]);
+
+            $this->fail('Expected a validation exception.');
+        } catch (ValidationException $exception) {
+            expect($exception->errors())->toHaveKey('plate_number');
+            $this->assertDatabaseMissing('buses', ['company_id' => $otherCompany->getKey()]);
+            $this->assertDatabaseCount('buses', 1);
+        }
+    });
+
+    test('rejects reserved bus identifiers including archived buses', function (string $field, bool $archived): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+        $service = app(BusManagementService::class);
+        $existing = $service->create($actor, $company, [
+            'country_code' => 'CR',
+            'plate_number' => 'BUS-101',
+            'unit_number' => 'UNIT-101',
+            'capacity' => 40,
+        ]);
+
+        $this->assertModelExists($existing);
+
+        if ($archived) {
+            $existing->delete();
+            $this->assertSoftDeleted($existing);
+        }
+
+        try {
+            $service->create($actor, $company, [
+                'country_code' => 'CR',
+                'plate_number' => $field === 'plate_number' ? ' bus-101 ' : 'BUS-102',
+                'unit_number' => $field === 'unit_number' ? ' UNIT-101 ' : 'UNIT-102',
+                'capacity' => 40,
+            ]);
+
+            $this->fail('Expected a validation exception.');
+        } catch (ValidationException $exception) {
+            expect($exception->errors())->toHaveKey($field);
+            $this->assertDatabaseCount('buses', 1);
+        }
+    })->with([
+        'existing plate' => ['plate_number', false],
+        'archived plate' => ['plate_number', true],
+        'existing unit' => ['unit_number', false],
+        'archived unit' => ['unit_number', true],
+    ]);
+
     test('rejects invalid optional bus details without persisting a bus', function (string $field, mixed $value): void {
         $this->travelTo(new DateTimeImmutable('2026-10-19 12:00:00'));
 
