@@ -7,6 +7,7 @@ use App\Models\Bus;
 use App\Models\Company;
 use App\Models\User;
 use Closure;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
@@ -15,6 +16,47 @@ use Illuminate\Validation\ValidationException;
 
 class BusManagementService
 {
+    /**
+     * @return Collection<int, Bus>
+     */
+    public function listFor(User $actor, Company $company): Collection
+    {
+        $previousTeam = getPermissionsTeamId();
+
+        try {
+            setPermissionsTeamId($company->getKey());
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+            Gate::forUser($actor)->authorize('viewAny', [Bus::class, $company]);
+            $this->ensureActiveCompany($company);
+
+            return Bus::query()->where('company_id', $company->getKey())
+                ->orderBy('unit_number')->orderBy('id')->get();
+        } finally {
+            setPermissionsTeamId($previousTeam);
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+        }
+    }
+
+    public function findFor(User $actor, Company $company, string $busId): Bus
+    {
+        $previousTeam = getPermissionsTeamId();
+
+        try {
+            setPermissionsTeamId($company->getKey());
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+            Gate::forUser($actor)->authorize('view', [Bus::class, $company]);
+            $this->ensureActiveCompany($company);
+
+            $bus = Bus::withTrashed()->where('company_id', $company->getKey())->findOrFail($busId);
+            Gate::forUser($actor)->authorize('view', [Bus::class, $company, $bus]);
+
+            return $bus;
+        } finally {
+            setPermissionsTeamId($previousTeam);
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+        }
+    }
+
     /**
      * @param  array<string, mixed>  $data
      */
