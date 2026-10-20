@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Validation\ValidationException;
 
 #[Fillable([
     'company_id',
@@ -22,6 +23,17 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Bus extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
+
+    protected static function booted(): void
+    {
+        static::updating(function (Bus $bus): void {
+            if ($bus->isDirty('company_id')) {
+                throw ValidationException::withMessages([
+                    'company_id' => __('Bus ownership cannot be changed.'),
+                ]);
+            }
+        });
+    }
 
     /**
      * @return array<string, string>

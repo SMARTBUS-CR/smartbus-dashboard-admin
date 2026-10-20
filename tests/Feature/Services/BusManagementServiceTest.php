@@ -12,6 +12,68 @@ use Illuminate\Support\Str;
 use illuminate\validation\ValidationException;
 
 describe('Bus Creation', function (): void {
+    test('rejects creation for an archived company even for a super admin', function (): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+        $company->delete();
+
+        try {
+            app(BusManagementService::class)->create($actor, $company, [
+                'country_code' => 'CR', 'plate_number' => 'BUS-101',
+                'unit_number' => 'UNIT-101', 'capacity' => 40,
+            ]);
+            $this->fail('Expected a validation exception.');
+        } catch (ValidationException $exception) {
+            expect($exception->errors())->toHaveKey('company');
+            $this->assertDatabaseCount('buses', 0);
+        }
+    });
+
+    test('rejects unknown creation fields', function (): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+
+        try {
+            app(BusManagementService::class)->create($actor, $company, [
+                'country_code' => 'CR', 'plate_number' => 'BUS-101',
+                'unit_number' => 'UNIT-101', 'capacity' => 40, 'unexpected' => null,
+            ]);
+            $this->fail('Expected a validation exception.');
+        } catch (ValidationException $exception) {
+            expect($exception->errors())->toHaveKey('unexpected');
+            $this->assertDatabaseCount('buses', 0);
+        }
+    });
+
+    test('returns localized identity conflict messages', function (string $locale, string $field, string $message): void {
+        app()->setLocale($locale);
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+        $service = app(BusManagementService::class);
+        $service->create($actor, $company, [
+            'country_code' => 'CR', 'plate_number' => 'BUS-101',
+            'unit_number' => 'UNIT-101', 'capacity' => 40,
+        ]);
+
+        try {
+            $service->create($actor, $company, [
+                'country_code' => 'CR',
+                'plate_number' => $field === 'plate_number' ? 'BUS-101' : 'BUS-102',
+                'unit_number' => $field === 'unit_number' ? 'UNIT-101' : 'UNIT-102',
+                'capacity' => 40,
+            ]);
+            $this->fail('Expected a validation exception.');
+        } catch (ValidationException $exception) {
+            expect($exception->errors()[$field])->toBe([$message]);
+            $this->assertDatabaseCount('buses', 1);
+        }
+    })->with([
+        'English plate' => ['en', 'plate_number', 'The plate number has already been taken.'],
+        'Spanish plate' => ['es', 'plate_number', 'El campo matrícula ya ha sido registrado.'],
+        'English unit' => ['en', 'unit_number', 'The unit number has already been taken.'],
+        'Spanish unit' => ['es', 'unit_number', 'El campo número de unidad ya ha sido registrado.'],
+    ]);
+
     test('rejects actors outside the bus creation authorization matrix', function (string $scenario): void {
         [$company, $otherCompany] = createTenantPair();
         $actorCompany = $scenario === 'foreign admin' ? $otherCompany : $company;

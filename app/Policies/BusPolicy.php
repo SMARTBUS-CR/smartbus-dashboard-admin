@@ -2,11 +2,19 @@
 
 namespace App\Policies;
 
+use App\Models\Bus;
 use App\Models\Company;
 use App\Models\User;
 
 class BusPolicy
 {
+    public function update(User $user, Company $company, ?Bus $bus = null): bool
+    {
+        return $user->canAccessTenant($company)
+            && $user->can('Update:Bus')
+            && ($bus === null || (string) $bus->company_id === (string) $company->getKey());
+    }
+
     public function create(User $user, Company $company): bool
     {
         return $user->canAccessTenant($company)
