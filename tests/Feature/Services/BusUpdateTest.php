@@ -12,6 +12,38 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 describe('Bus Update', function (): void {
+    test('clears the stored year when updated with a blank value', function (string $year): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+        $service = app(BusManagementService::class);
+
+        $bus = $service->create($actor, $company, [
+            'country_code' => 'CR',
+            'plate_number' => 'BUS-101',
+            'unit_number' => 'UNIT-101',
+            'capacity' => 40,
+            'year' => 2025,
+        ]);
+
+        $this->assertDatabaseHas('buses', [
+            'id' => $bus->getKey(),
+            'year' => 2025,
+        ]);
+
+        $updated = $service->update($actor, $company, $bus->getKey(), [
+            'year' => $year,
+        ]);
+
+        expect($updated->year)->toBeNull();
+
+        $this->assertDatabaseHas('buses', [
+            'id' => $bus->getKey(),
+            'year' => null,
+        ]);
+    })->with([
+        'empty string' => [''],
+        'whitespace' => [" \t\n "],
+    ]);
     test('keeps its own identifiers and clears optional details explicitly', function (): void {
         $company = createCompany();
         $actor = createUserWithRole(UserRole::SuperAdmin);

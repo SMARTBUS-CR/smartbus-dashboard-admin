@@ -86,7 +86,7 @@ class BusManagementService
             return $this->persist(fn (): Bus => Bus::query()->create([
                 'company_id' => $company->getKey(),
                 ...$normalized,
-            ]));
+            ])->refresh());
         } finally {
             setPermissionsTeamId($previousTeam);
 
@@ -173,7 +173,10 @@ class BusManagementService
             'model' => isset($data['model']) && is_string($data['model'])
                 ? trim($data['model'])
                 : ($data['model'] ?? null),
-            'year' => $data['year'] ?? null,
+            'year' => is_string($data['year'] ?? null)
+                && trim($data['year']) === ''
+                    ? null
+                    : ($data['year'] ?? null),
         ];
 
         Validator::make($normalized, [

@@ -12,6 +12,46 @@ use Illuminate\Support\Str;
 use illuminate\validation\ValidationException;
 
 describe('Bus Creation', function (): void {
+    test('returns the persisted default active state immediately after creation', function (): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+
+        $bus = app(BusManagementService::class)->create($actor, $company, [
+            'country_code' => 'CR',
+            'plate_number' => 'BUS-101',
+            'unit_number' => 'UNIT-101',
+            'capacity' => 40,
+        ]);
+
+        expect($bus->is_active)->toBeTrue();
+
+        $this->assertDatabaseHas('buses', [
+            'id' => $bus->getKey(),
+            'is_active' => true,
+        ]);
+    });
+    test('persists blank optional years as null during creation', function (string $year): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+
+        $bus = app(BusManagementService::class)->create($actor, $company, [
+            'country_code' => 'CR',
+            'plate_number' => 'BUS-101',
+            'unit_number' => 'UNIT-101',
+            'capacity' => 40,
+            'year' => $year,
+        ]);
+
+        expect($bus->year)->toBeNull();
+
+        $this->assertDatabaseHas('buses', [
+            'id' => $bus->getKey(),
+            'year' => null,
+        ]);
+    })->with([
+        'empty string' => [''],
+        'whitespace' => [" \t\n "],
+    ]);
     test('rejects creation for an archived company even for a super admin', function (): void {
         $company = createCompany();
         $actor = createUserWithRole(UserRole::SuperAdmin);
