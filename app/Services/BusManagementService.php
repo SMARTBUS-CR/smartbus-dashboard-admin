@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class BusManagementService
@@ -64,7 +65,12 @@ class BusManagementService
             ];
 
             Validator::make($normalized, [
-                'country_code' => ['required', 'string', 'size:2'],
+                'country_code' => [
+                    'required',
+                    'string',
+                    'size:2',
+                    Rule::in(array_keys(config('countries'))),
+                ],
                 'plate_number' => ['required', 'string', 'max:30'],
                 'unit_number' => ['required', 'string', 'max:50'],
                 'capacity' => ['required', 'integer', 'between:1,32767'],

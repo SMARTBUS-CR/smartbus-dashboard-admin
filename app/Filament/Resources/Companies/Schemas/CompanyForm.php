@@ -19,16 +19,6 @@ use Ysfkaya\FilamentPhoneInput\PhoneInputNumberType;
 
 class CompanyForm
 {
-    private const COUNTRIES = [
-        'BZ' => 'Belize',
-        'CR' => 'Costa Rica',
-        'SV' => 'El Salvador',
-        'GT' => 'Guatemala',
-        'HN' => 'Honduras',
-        'NI' => 'Nicaragua',
-        'PA' => 'Panama',
-    ];
-
     private const COUNTRY_TIMEZONES = [
         'BZ' => 'America/Belize',
         'CR' => 'America/Costa_Rica',
@@ -124,7 +114,7 @@ class CompanyForm
                             ->prefixIcon(Heroicon::OutlinedGlobeAmericas)
                             ->options(fn (): array => array_map(
                                 fn (string $name): string => __($name),
-                                self::COUNTRIES,
+                                config('countries'),
                             ))
                             ->required()
                             ->searchable()
@@ -132,7 +122,7 @@ class CompanyForm
                             ->rules([
                                 'string',
                                 'size:2',
-                                Rule::in(array_keys(self::COUNTRIES)),
+                                Rule::in(array_keys(config('countries'))),
                             ])
                             ->mutateStateForValidationUsing(
                                 fn (?string $state): ?string => $state !== null
