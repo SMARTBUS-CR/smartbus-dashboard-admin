@@ -62,6 +62,13 @@ class BusManagementService
                         ? trim($data['unit_number'])
                         : ($data['unit_number'] ?? null),
                 'capacity' => $data['capacity'] ?? null,
+                'brand' => isset($data['brand']) && is_string($data['brand'])
+                    ? trim($data['brand'])
+                    : ($data['brand'] ?? null),
+                'model' => isset($data['model']) && is_string($data['model'])
+                    ? trim($data['model'])
+                    : ($data['model'] ?? null),
+                'year' => $data['year'] ?? null,
             ];
 
             Validator::make($normalized, [
@@ -74,6 +81,9 @@ class BusManagementService
                 'plate_number' => ['required', 'string', 'max:30'],
                 'unit_number' => ['required', 'string', 'max:50'],
                 'capacity' => ['required', 'integer', 'between:1,32767'],
+                'brand' => ['nullable', 'string', 'max:100'],
+                'model' => ['nullable', 'string', 'max:100'],
+                'year' => ['nullable', 'integer', 'between:1900,'.(now()->year + 1)],
             ])->validate();
 
             return Bus::query()->create([

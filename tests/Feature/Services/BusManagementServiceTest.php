@@ -8,6 +8,130 @@ use illuminate\Auth\Access\AuthorizationException;
 use illuminate\validation\ValidationException;
 
 describe('Bus Creation', function (): void {
+    test('rejects invalid optional bus details without persisting a bus', function (string $field, mixed $value): void {
+        $this->travelTo(new DateTimeImmutable('2026-10-19 12:00:00'));
+
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+
+        try {
+            app(BusManagementService::class)->create($actor, $company, [
+                'country_code' => 'CR',
+                'plate_number' => 'BUS-101',
+                'unit_number' => 'UNIT-101',
+                'capacity' => 40,
+                $field => $value,
+            ]);
+
+            $this->fail('Expected a validation exception.');
+        } catch (ValidationException $exception) {
+            expect($exception->errors())->toHaveKey($field);
+
+            $this->assertDatabaseMissing('buses', ['company_id' => $company->getKey()]);
+        }
+    })->with([
+        'brand too long' => ['brand', str_repeat('A', 101)],
+        'non-string brand' => ['brand', 123],
+        'model too long' => ['model', str_repeat('A', 101)],
+        'non-string model' => ['model', 123],
+        'year below minimum' => ['year', 1899],
+        'year above maximum' => ['year', 2028],
+        'fractional year' => ['year', 2025.5],
+        'non-numeric year' => ['year', 'invalid'],
+    ]);
+
+    test('accepts optional bus details at valid boundaries', function (?int $year, ?string $brand, ?string $model): void {
+        $this->travelTo(new DateTimeImmutable('2026-10-19 12:00:00'));
+
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+
+        $bus = app(BusManagementService::class)->create($actor, $company, [
+            'country_code' => 'CR',
+            'plate_number' => 'BUS-101',
+            'unit_number' => 'UNIT-101',
+            'capacity' => 40,
+            'year' => $year,
+            'brand' => $brand,
+            'model' => $model,
+        ]);
+
+        $this->assertDatabaseHas('buses', [
+            'id' => $bus->getKey(),
+            'year' => $year,
+            'brand' => $brand,
+            'model' => $model,
+        ]);
+    })->with([
+        'minimum year and maximum lengths' => [1900, str_repeat('A', 100), str_repeat('B', 100)],
+        'next year' => [2027, 'Mercedes-Benz', 'O 500'],
+        'explicit nulls' => [null, null, null],
+    ]);
+
+    test('persists normalized optional bus details', function (): void {
+        $this->travelTo(new DateTimeImmutable('2026-10-19 12:00:00'));
+
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+
+        CompanyUser::create([
+            'company_id' => $company->getKey(),
+            'user_id' => $actor->getKey(),
+        ]);
+
+        grantShield($actor, ['Create:Bus'], $company);
+
+        $bus = app(BusManagementService::class)->create(
+            $actor,
+            $company,
+            [
+                'country_code' => 'CR',
+                'plate_number' => 'BUS-101',
+                'unit_number' => 'UNIT-101',
+                'capacity' => 40,
+                'brand' => ' Mercedes-Benz ',
+                'model' => ' O 500 ',
+                'year' => 2025,
+            ],
+        );
+
+        $this->assertDatabaseHas('buses', [
+            'id' => $bus->getKey(),
+            'brand' => 'Mercedes-Benz',
+            'model' => 'O 500',
+            'year' => 2025,
+        ]);
+    });
+
+    test('allows a supported registration country different from the company country', function (): void {
+        $company = Company::factory()->forCountry('CR')->create();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+
+        CompanyUser::create([
+            'company_id' => $company->getKey(),
+            'user_id' => $actor->getKey(),
+        ]);
+
+        grantShield($actor, ['Create:Bus'], $company);
+
+        $bus = app(BusManagementService::class)->create(
+            $actor,
+            $company,
+            [
+                'country_code' => 'PA',
+                'plate_number' => 'BUS-101',
+                'unit_number' => 'UNIT-101',
+                'capacity' => 40,
+            ],
+        );
+
+        $this->assertDatabaseHas('buses', [
+            'id' => $bus->getKey(),
+            'company_id' => $company->getKey(),
+            'country_code' => 'PA',
+        ]);
+    });
+
     test('creates a bus for an authorized company admin without a Filament tenant', function (): void {
         $company = createCompany();
         $actor = createUserWithRole(UserRole::Admin, $company);
