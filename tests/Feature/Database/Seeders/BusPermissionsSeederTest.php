@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Models\Bus;
 use App\Models\CompanyUser;
 use App\Models\Permission;
 use App\Models\Role;
@@ -8,12 +9,38 @@ use App\Services\BusManagementService;
 use Database\Seeders\BusPermissionsSeeder;
 
 describe('Bus Permissions Seeder', function (): void {
-    test('creates exactly the four web permissions required by this story', function (): void {
+    test('makes seeded lifecycle permissions usable without granting unrelated abilities', function (bool $restore): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+        CompanyUser::create(['company_id' => $company->getKey(), 'user_id' => $actor->getKey()]);
+        $this->seed(BusPermissionsSeeder::class);
+        $role = Role::withoutGlobalScopes()->where('company_id', $company->getKey())
+            ->where('name', UserRole::Admin->value)->where('guard_name', 'web')->sole();
+        $role->givePermissionTo(Permission::findByName($restore ? 'Restore:Bus' : 'Delete:Bus', 'web'));
+        $actor->unsetRelation('roles')->unsetRelation('permissions');
+        $factory = Bus::factory()->for($company);
+        $bus = ($restore ? $factory->archived() : $factory)->create();
+
+        $service = app(BusManagementService::class);
+        $result = $restore
+            ? $service->restore($actor, $company, $bus->getKey())
+            : $service->archive($actor, $company, $bus->getKey());
+
+        expect($result->getKey())->toBe($bus->getKey())
+            ->and($result->trashed())->toBe(! $restore)
+            ->and($role->hasPermissionTo('Update:Bus'))->toBeFalse()
+            ->and($role->hasPermissionTo($restore ? 'Delete:Bus' : 'Restore:Bus'))->toBeFalse();
+        $this->assertDatabaseHas('buses', ['id' => $bus->getKey(), 'company_id' => $company->getKey()]);
+    })->with(['archive' => [false], 'restore' => [true]]);
+
+    test('creates exactly the six web permissions required for bus management', function (): void {
         $this->seed(BusPermissionsSeeder::class);
 
         expect(Permission::query()->where('name', 'like', '%:Bus')->orderBy('name')
             ->get(['name', 'guard_name'])->toArray())->toBe([
                 ['name' => 'Create:Bus', 'guard_name' => 'web'],
+                ['name' => 'Delete:Bus', 'guard_name' => 'web'],
+                ['name' => 'Restore:Bus', 'guard_name' => 'web'],
                 ['name' => 'Update:Bus', 'guard_name' => 'web'],
                 ['name' => 'View:Bus', 'guard_name' => 'web'],
                 ['name' => 'ViewAny:Bus', 'guard_name' => 'web'],

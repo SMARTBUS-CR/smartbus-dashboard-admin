@@ -19,7 +19,7 @@ class BusPermissionsSeeder extends Seeder
 
         try {
             DB::connection('mysql')->transaction(function (): void {
-                foreach (['ViewAny:Bus', 'View:Bus', 'Create:Bus', 'Update:Bus'] as $name) {
+                foreach (['ViewAny:Bus', 'View:Bus', 'Create:Bus', 'Update:Bus', 'Delete:Bus', 'Restore:Bus'] as $name) {
                     Permission::findOrCreate($name, 'web');
                 }
             });
