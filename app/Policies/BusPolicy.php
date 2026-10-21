@@ -33,4 +33,17 @@ class BusPolicy
         return $user->canAccessTenant($company)
             && $user->can('Create:Bus');
     }
+
+    public function delete(
+        User $user,
+        Company $company,
+        ?Bus $bus = null,
+    ): bool {
+        return $user->canAccessTenant($company)
+            && $user->can('Delete:Bus')
+            && ($bus === null || (
+                (string) $bus->company_id === (string) $company->getKey()
+                && ! $bus->trashed()
+            ));
+    }
 }

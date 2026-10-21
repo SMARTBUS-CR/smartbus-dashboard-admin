@@ -176,6 +176,51 @@ class BusManagementService
         }
     }
 
+    public function archive(
+        User $actor,
+        Company $company,
+        string $busId,
+    ): Bus {
+        $previousTeam = getPermissionsTeamId();
+
+        try {
+            setPermissionsTeamId($company->getKey());
+
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+
+            Gate::forUser($actor)->authorize(
+                'delete',
+                [Bus::class, $company],
+            );
+
+            $this->ensureActiveCompany($company);
+
+            return $this->persist(function () use (
+                $actor,
+                $company,
+                $busId,
+            ): Bus {
+                $bus = Bus::query()
+                    ->where('company_id', $company->getKey())
+                    ->lockForUpdate()
+                    ->findOrFail($busId);
+
+                Gate::forUser($actor)->authorize(
+                    'delete',
+                    [Bus::class, $company, $bus],
+                );
+
+                $bus->delete();
+
+                return $bus;
+            });
+        } finally {
+            setPermissionsTeamId($previousTeam);
+
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+        }
+    }
+
     private function ensureActiveCompany(Company $company): void
     {
         $current = Company::query()->find($company->getKey());
