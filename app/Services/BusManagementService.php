@@ -128,6 +128,54 @@ class BusManagementService
         }
     }
 
+    public function setActive(
+        User $actor,
+        Company $company,
+        string $busId,
+        bool $active,
+    ): Bus {
+        $previousTeam = getPermissionsTeamId();
+
+        try {
+            setPermissionsTeamId($company->getKey());
+
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+
+            Gate::forUser($actor)->authorize(
+                'update',
+                [Bus::class, $company],
+            );
+
+            $this->ensureActiveCompany($company);
+
+            return $this->persist(function () use (
+                $actor,
+                $company,
+                $busId,
+                $active,
+            ): Bus {
+                $bus = Bus::query()
+                    ->where('company_id', $company->getKey())
+                    ->lockForUpdate()
+                    ->findOrFail($busId);
+
+                Gate::forUser($actor)->authorize(
+                    'update',
+                    [Bus::class, $company, $bus],
+                );
+
+                $bus->is_active = $active;
+                $bus->save();
+
+                return $bus->refresh();
+            });
+        } finally {
+            setPermissionsTeamId($previousTeam);
+
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+        }
+    }
+
     private function ensureActiveCompany(Company $company): void
     {
         $current = Company::query()->find($company->getKey());
