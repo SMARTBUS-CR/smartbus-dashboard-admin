@@ -10,6 +10,179 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
 
 describe('Bus Lifecycle', function (): void {
+    test('rejects restoration outside the company authorization matrix', function (string $scenario): void {
+        [$company, $otherCompany] = createTenantPair();
+        $actorCompany = $scenario === 'foreign admin' ? $otherCompany : $company;
+        $role = match ($scenario) {
+            'driver' => UserRole::Driver,
+            'passenger' => UserRole::Passenger,
+            default => UserRole::Admin,
+        };
+        $actor = createUserWithRole($role, $actorCompany);
+        if ($scenario !== 'missing membership') {
+            $membership = CompanyUser::create([
+                'company_id' => $actorCompany->getKey(), 'user_id' => $actor->getKey(),
+            ]);
+        }
+        if ($scenario !== 'missing permission') {
+            grantShield($actor, ['Restore:Bus'], $actorCompany);
+        }
+        if ($scenario === 'archived membership') {
+            $membership->delete();
+        }
+        if ($scenario === 'archived actor') {
+            $actor->delete();
+        }
+        $bus = Bus::factory()->for($company)->archived()->create();
+        $before = $bus->fresh()->getAttributes();
+
+        expect(fn () => app(BusManagementService::class)->restore($actor, $company, $bus->getKey()))
+            ->toThrow(AuthorizationException::class);
+        expect($bus->fresh()->getAttributes())->toBe($before);
+    })->with([
+        'missing permission', 'missing membership', 'foreign admin', 'driver', 'passenger',
+        'archived membership', 'archived actor',
+    ]);
+
+    test('hides foreign archived buses during restoration even from a super admin', function (): void {
+        [$company, $otherCompany] = createTenantPair();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+        $bus = Bus::factory()->for($otherCompany)->archived()->create();
+        $before = $bus->fresh()->getAttributes();
+
+        expect(fn () => app(BusManagementService::class)->restore($actor, $company, $bus->getKey()))
+            ->toThrow(ModelNotFoundException::class);
+        expect($bus->fresh()->getAttributes())->toBe($before);
+    });
+
+    test('rejects restoration for nonoperational companies even with a stale company object', function (bool $archived): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+        $bus = Bus::factory()->for($company)->archived()->create();
+        $before = $bus->fresh()->getAttributes();
+        $changedCompany = $company->fresh();
+        if ($archived) {
+            $changedCompany->delete();
+        } else {
+            $changedCompany->update(['status' => CompanyStatus::INACTIVE]);
+        }
+
+        try {
+            app(BusManagementService::class)->restore($actor, $company, $bus->getKey());
+            $this->fail('Expected a validation exception.');
+        } catch (ValidationException $exception) {
+            expect($exception->errors())->toHaveKey('company');
+            expect($bus->fresh()->getAttributes())->toBe($before);
+        }
+    })->with(['inactive' => [false], 'archived' => [true]]);
+
+    test('does not restore missing or unarchived buses', function (bool $missing): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+        $bus = Bus::factory()->for($company)->create();
+        $before = $bus->fresh()->getAttributes();
+        $id = $missing ? '00000000-0000-4000-8000-000000000001' : $bus->getKey();
+
+        expect(fn () => app(BusManagementService::class)->restore($actor, $company, $id))
+            ->toThrow(ModelNotFoundException::class);
+        expect($bus->fresh()->getAttributes())->toBe($before);
+    })->with(['missing' => [true], 'unarchived' => [false]]);
+
+    test('restores permission context after restoration outcomes', function (string $outcome): void {
+        [$company, $previousCompany] = createTenantPair();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+        CompanyUser::create(['company_id' => $company->getKey(), 'user_id' => $actor->getKey()]);
+        if ($outcome !== 'denied') {
+            grantShield($actor, ['Restore:Bus'], $company);
+        }
+        $bus = Bus::factory()->for($outcome === 'foreign' ? $previousCompany : $company)->archived()->create();
+        $before = $bus->fresh()->getAttributes();
+        if ($outcome === 'inactive company') {
+            $company->update(['status' => CompanyStatus::INACTIVE]);
+        }
+        $originalTeam = getPermissionsTeamId();
+        setPermissionsTeamId($previousCompany->getKey());
+        $actor->load('roles', 'permissions');
+
+        try {
+            try {
+                $id = $outcome === 'missing' ? '00000000-0000-4000-8000-000000000001' : $bus->getKey();
+                $restored = app(BusManagementService::class)->restore($actor, $company, $id);
+                expect($outcome)->toBe('success')->and($restored->trashed())->toBeFalse();
+            } catch (AuthorizationException $exception) {
+                expect($outcome)->toBe('denied');
+            } catch (ValidationException $exception) {
+                expect($outcome)->toBe('inactive company');
+            } catch (ModelNotFoundException $exception) {
+                expect($outcome)->toBeIn(['missing', 'foreign']);
+            }
+
+            expect(getPermissionsTeamId())->toBe($previousCompany->getKey())
+                ->and($actor->relationLoaded('roles'))->toBeFalse()
+                ->and($actor->relationLoaded('permissions'))->toBeFalse();
+            if ($outcome !== 'success') {
+                expect($bus->fresh()->getAttributes())->toBe($before);
+            }
+        } finally {
+            setPermissionsTeamId($originalTeam);
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+        }
+    })->with(['success', 'denied', 'inactive company', 'missing', 'foreign']);
+
+    test('rolls back restoration side effects and restores context when restoring fails', function (): void {
+        [$company, $previousCompany] = createTenantPair();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+        $bus = Bus::factory()->for($company)->archived()->create();
+        $before = $bus->fresh()->getAttributes();
+        $dispatcher = Bus::getEventDispatcher();
+        Bus::setEventDispatcher(clone $dispatcher);
+        $originalTeam = getPermissionsTeamId();
+        setPermissionsTeamId($previousCompany->getKey());
+
+        try {
+            Bus::restoring(function (Bus $record): void {
+                $record->capacity = 99;
+                $record->save();
+                throw new RuntimeException('Restoration interrupted.');
+            });
+
+            expect(fn () => app(BusManagementService::class)->restore($actor, $company, $bus->getKey()))
+                ->toThrow(RuntimeException::class, 'Restoration interrupted.');
+            expect($bus->fresh()->getAttributes())->toBe($before);
+            expect(getPermissionsTeamId())->toBe($previousCompany->getKey());
+        } finally {
+            Bus::setEventDispatcher($dispatcher);
+            setPermissionsTeamId($originalTeam);
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+        }
+    });
+
+    test('restores an archived bus for an authorized administrator without changing its details', function (bool $active): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+        CompanyUser::create([
+            'company_id' => $company->getKey(), 'user_id' => $actor->getKey(),
+        ]);
+        grantShield($actor, ['Restore:Bus'], $company);
+        $factory = Bus::factory()->for($company);
+        $bus = ($active ? $factory->active() : $factory->inactive())->archived()->create([
+            'brand' => 'Mercedes-Benz', 'model' => 'O 500', 'year' => 2025, 'capacity' => 55,
+        ]);
+        $this->assertSoftDeleted($bus);
+        $before = $bus->fresh()->getAttributes();
+
+        $restored = app(BusManagementService::class)->restore($actor, $company, $bus->getKey());
+
+        expect($restored->getKey())->toBe($bus->getKey())
+            ->and($restored->is_active)->toBe($active)
+            ->and($restored->trashed())->toBeFalse();
+        $unchanged = array_diff_key($before, array_flip(['deleted_at', 'updated_at']));
+        expect(array_diff_key($restored->fresh()->getAttributes(), array_flip(['deleted_at', 'updated_at'])))
+            ->toBe($unchanged);
+        $this->assertDatabaseHas('buses', ['id' => $bus->getKey(), 'deleted_at' => null]);
+        $this->assertDatabaseCount('buses', 1);
+    })->with(['previously active' => [true], 'previously inactive' => [false]]);
+
     test('rejects archival outside the company authorization matrix', function (string $scenario): void {
         [$company, $otherCompany] = createTenantPair();
         $actorCompany = $scenario === 'foreign admin' ? $otherCompany : $company;

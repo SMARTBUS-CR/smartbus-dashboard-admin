@@ -8,6 +8,16 @@ use App\Models\User;
 
 class BusPolicy
 {
+    public function restore(User $user, Company $company, ?Bus $bus = null): bool
+    {
+        return $user->canAccessTenant($company)
+            && $user->can('Restore:Bus')
+            && ($bus === null || (
+                (string) $bus->company_id === (string) $company->getKey()
+                && $bus->trashed()
+            ));
+    }
+
     public function viewAny(User $user, Company $company): bool
     {
         return $user->canAccessTenant($company)

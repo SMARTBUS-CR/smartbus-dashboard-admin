@@ -221,6 +221,34 @@ class BusManagementService
         }
     }
 
+    public function restore(User $actor, Company $company, string $busId): Bus
+    {
+        $previousTeam = getPermissionsTeamId();
+
+        try {
+            setPermissionsTeamId($company->getKey());
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+            Gate::forUser($actor)->authorize('restore', [Bus::class, $company]);
+            $this->ensureActiveCompany($company);
+
+            return $this->persist(function () use ($actor, $company, $busId): Bus {
+                $bus = Bus::onlyTrashed()->where('company_id', $company->getKey())
+                    ->lockForUpdate()->findOrFail($busId);
+
+                Gate::forUser($actor)->authorize('restore', [Bus::class, $company, $bus]);
+                $this->validateIdentity($company, $bus->only([
+                    'country_code', 'plate_number', 'unit_number',
+                ]), $bus);
+                $bus->restore();
+
+                return $bus->refresh();
+            });
+        } finally {
+            setPermissionsTeamId($previousTeam);
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+        }
+    }
+
     private function ensureActiveCompany(Company $company): void
     {
         $current = Company::query()->find($company->getKey());
@@ -287,6 +315,14 @@ class BusManagementService
             'year' => ['nullable', 'integer', 'between:1900,'.(now()->year + 1)],
         ])->validate();
 
+        $this->validateIdentity($company, $normalized, $bus);
+
+        return $normalized;
+    }
+
+    /** @param array<string, mixed> $normalized */
+    private function validateIdentity(Company $company, array $normalized, ?Bus $bus = null): void
+    {
         Validator::make($normalized, [
             'plate_number' => [
                 Rule::unique(Bus::class, 'plate_number')
@@ -300,7 +336,6 @@ class BusManagementService
             ],
         ])->validate();
 
-        return $normalized;
     }
 
     /** @param Closure(): Bus $operation */
