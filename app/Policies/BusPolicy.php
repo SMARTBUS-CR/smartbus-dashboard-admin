@@ -8,6 +8,16 @@ use App\Models\User;
 
 class BusPolicy
 {
+    public function forceDelete(User $user, Company $company, ?Bus $bus = null): bool
+    {
+        return false;
+    }
+
+    public function forceDeleteAny(User $user, ?Company $company = null): bool
+    {
+        return false;
+    }
+
     public function restore(User $user, Company $company, ?Bus $bus = null): bool
     {
         return $user->canAccessTenant($company)

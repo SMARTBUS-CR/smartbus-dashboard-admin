@@ -541,5 +541,6 @@
     "The calculation does not include the segment details needed to detect considerable detours. Review the suggested route on the map.": "El cálculo no incluye el detalle de los tramos necesario para detectar desvíos considerables. Revisa el trazado sugerido en el mapa.",
     "Route leg distances must be finite non-negative numbers.": "Las distancias de los tramos deben ser números finitos mayores o iguales a cero.",
     "Locate segment": "Localizar tramo",
-    "Review the suggested route": "Revisa el trazado sugerido"
+    "Review the suggested route": "Revisa el trazado sugerido",
+    "Permanent bus deletion is disabled. Archive the bus instead.": "La eliminación permanente de autobuses está deshabilitada. Archiva el autobús en su lugar."
 }

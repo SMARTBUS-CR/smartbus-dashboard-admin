@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Auth\ExternalUserProvider;
 use App\Auth\SessionGuard;
 use App\Enums\UserRole;
+use App\Models\Bus;
 use App\Models\Company;
 use App\Models\Permission;
 use App\Models\Role;
@@ -66,6 +67,8 @@ class AppServiceProvider extends ServiceProvider
 
             $isProtectedOperationalModel = $record instanceof Company
                 || $record === Company::class
+                || $record instanceof Bus
+                || $record === Bus::class
                 || $record instanceof Route
                 || $record === Route::class;
 

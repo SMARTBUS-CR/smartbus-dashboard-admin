@@ -508,5 +508,6 @@
     "The calculation does not include the segment details needed to detect considerable detours. Review the suggested route on the map.": "The calculation does not include the segment details needed to detect considerable detours. Review the suggested route on the map.",
     "Route leg distances must be finite non-negative numbers.": "Route leg distances must be finite non-negative numbers.",
     "Locate segment": "Locate segment",
-    "Review the suggested route": "Review the suggested route"
+    "Review the suggested route": "Review the suggested route",
+    "Permanent bus deletion is disabled. Archive the bus instead.": "Permanent bus deletion is disabled. Archive the bus instead."
 }
