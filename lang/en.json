@@ -509,5 +509,6 @@
     "Route leg distances must be finite non-negative numbers.": "Route leg distances must be finite non-negative numbers.",
     "Locate segment": "Locate segment",
     "Review the suggested route": "Review the suggested route",
-    "Permanent bus deletion is disabled. Archive the bus instead.": "Permanent bus deletion is disabled. Archive the bus instead."
+    "Permanent bus deletion is disabled. Archive the bus instead.": "Permanent bus deletion is disabled. Archive the bus instead.",
+    "Buses with scheduled or in-progress trips cannot be deactivated or archived.": "Buses with scheduled or in-progress trips cannot be deactivated or archived."
 }

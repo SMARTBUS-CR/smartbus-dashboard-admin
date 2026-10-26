@@ -542,5 +542,6 @@
     "Route leg distances must be finite non-negative numbers.": "Las distancias de los tramos deben ser números finitos mayores o iguales a cero.",
     "Locate segment": "Localizar tramo",
     "Review the suggested route": "Revisa el trazado sugerido",
-    "Permanent bus deletion is disabled. Archive the bus instead.": "La eliminación permanente de autobuses está deshabilitada. Archiva el autobús en su lugar."
+    "Permanent bus deletion is disabled. Archive the bus instead.": "La eliminación permanente de autobuses está deshabilitada. Archiva el autobús en su lugar.",
+    "Buses with scheduled or in-progress trips cannot be deactivated or archived.": "No se pueden desactivar ni archivar autobuses con viajes programados o en curso."
 }

@@ -164,6 +164,10 @@ class BusManagementService
                     [Bus::class, $company, $bus],
                 );
 
+                if (! $active) {
+                    $this->ensureNoActiveTrips($bus);
+                }
+
                 $bus->is_active = $active;
                 $bus->save();
 
@@ -210,6 +214,8 @@ class BusManagementService
                     [Bus::class, $company, $bus],
                 );
 
+                $this->ensureNoActiveTrips($bus);
+
                 $bus->delete();
 
                 return $bus;
@@ -246,6 +252,21 @@ class BusManagementService
         } finally {
             setPermissionsTeamId($previousTeam);
             $actor->unsetRelation('roles')->unsetRelation('permissions');
+        }
+    }
+
+    private function ensureNoActiveTrips(Bus $bus): void
+    {
+        $hasActiveTrips = $bus->getConnection()->table('trips')
+            ->where('company_id', $bus->company_id)
+            ->where('bus_id', $bus->getKey())
+            ->whereIn('status', ['scheduled', 'in_progress'])
+            ->exists();
+
+        if ($hasActiveTrips) {
+            throw ValidationException::withMessages([
+                'bus' => __('Buses with scheduled or in-progress trips cannot be deactivated or archived.'),
+            ]);
         }
     }
 
