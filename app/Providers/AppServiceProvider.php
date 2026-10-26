@@ -4,11 +4,13 @@ namespace App\Providers;
 
 use App\Auth\ExternalUserProvider;
 use App\Auth\SessionGuard;
+use App\Enums\TripStatus;
 use App\Enums\UserRole;
 use App\Models\Company;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Route;
+use App\Models\Trip;
 use App\Models\User;
 use App\Services\AuthService;
 use BezhanSalleh\LanguageSwitch\Enums\TriggerStyle;
@@ -63,6 +65,23 @@ class AppServiceProvider extends ServiceProvider
         // Enforce protected deletion rules before granting global administrator access.
         Gate::before(function (User $user, string $ability, array $arguments): ?bool {
             $record = $arguments[0] ?? null;
+
+            if ($record instanceof Trip || $record === Trip::class) {
+                if (in_array($ability, ['delete', 'deleteAny', 'forceDelete', 'forceDeleteAny'], true)) {
+                    return false;
+                }
+
+                $trip = $record instanceof Trip ? $record : ($arguments[2] ?? null);
+                if ($ability === 'update' && $trip instanceof Trip) {
+                    $company = $arguments[1] ?? null;
+                    if (
+                        $trip->status !== TripStatus::SCHEDULED
+                        || ($company instanceof Company && (string) $trip->company_id !== (string) $company->getKey())
+                    ) {
+                        return false;
+                    }
+                }
+            }
 
             $isProtectedOperationalModel = $record instanceof Company
                 || $record === Company::class

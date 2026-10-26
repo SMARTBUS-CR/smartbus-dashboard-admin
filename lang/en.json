@@ -508,5 +508,12 @@
     "The calculation does not include the segment details needed to detect considerable detours. Review the suggested route on the map.": "The calculation does not include the segment details needed to detect considerable detours. Review the suggested route on the map.",
     "Route leg distances must be finite non-negative numbers.": "Route leg distances must be finite non-negative numbers.",
     "Locate segment": "Locate segment",
-    "Review the suggested route": "Review the suggested route"
+    "Review the suggested route": "Review the suggested route",
+    "Scheduled": "Scheduled",
+    "In progress": "In progress",
+    "Completed": "Completed",
+    "Cancelled": "Cancelled",
+    "Trip history cannot be changed directly.": "Trip history cannot be changed directly.",
+    "New trips must be scheduled without execution data.": "New trips must be scheduled without execution data.",
+    "Trip deletion is disabled. Preserve the trip history.": "Trip deletion is disabled. Preserve the trip history."
 }
