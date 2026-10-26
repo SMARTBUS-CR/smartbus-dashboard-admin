@@ -515,5 +515,14 @@
     "Cancelled": "Cancelled",
     "Trip history cannot be changed directly.": "Trip history cannot be changed directly.",
     "New trips must be scheduled without execution data.": "New trips must be scheduled without execution data.",
-    "Trip deletion is disabled. Preserve the trip history.": "Trip deletion is disabled. Preserve the trip history."
+    "Trip deletion is disabled. Preserve the trip history.": "Trip deletion is disabled. Preserve the trip history.",
+    "This field cannot be supplied when preparing a trip plan.": "This field cannot be supplied when preparing a trip plan.",
+    "The selected schedule does not belong to the available route pattern.": "The selected schedule does not belong to the available route pattern.",
+    "The selected bus is unavailable.": "The selected bus is unavailable.",
+    "The selected schedule does not operate on this local service date.": "The selected schedule does not operate on this local service date.",
+    "Arrival must be explicitly later than departure.": "Arrival must be explicitly later than departure.",
+    "The scheduled departure does not exist in the company timezone.": "The scheduled departure does not exist in the company timezone.",
+    "An explicit valid UTC offset is required for this departure.": "An explicit valid UTC offset is required for this departure.",
+    "Arrival must include a valid local date, time and UTC offset for the company timezone.": "Arrival must include a valid local date, time and UTC offset for the company timezone.",
+    "The saved route plan is incomplete or outdated. Calculate and save the route before planning.": "The saved route plan is incomplete or outdated. Calculate and save the route before planning."
 }

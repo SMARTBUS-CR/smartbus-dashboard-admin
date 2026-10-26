@@ -548,5 +548,14 @@
     "Cancelled": "Cancelado",
     "Trip history cannot be changed directly.": "El historial del viaje no se puede modificar directamente.",
     "New trips must be scheduled without execution data.": "Los viajes nuevos deben estar programados y sin datos de ejecución.",
-    "Trip deletion is disabled. Preserve the trip history.": "La eliminación de viajes está deshabilitada. Conserva el historial del viaje."
+    "Trip deletion is disabled. Preserve the trip history.": "La eliminación de viajes está deshabilitada. Conserva el historial del viaje.",
+    "This field cannot be supplied when preparing a trip plan.": "Este campo no se puede proporcionar al preparar el plan de un viaje.",
+    "The selected schedule does not belong to the available route pattern.": "El horario seleccionado no pertenece al patrón de ruta disponible.",
+    "The selected bus is unavailable.": "El autobús seleccionado no está disponible.",
+    "The selected schedule does not operate on this local service date.": "El horario seleccionado no opera en esta fecha local de servicio.",
+    "Arrival must be explicitly later than departure.": "La llegada debe ser explícitamente posterior a la salida.",
+    "The scheduled departure does not exist in the company timezone.": "La hora de salida programada no existe en la zona horaria de la empresa.",
+    "An explicit valid UTC offset is required for this departure.": "Se requiere un desplazamiento UTC explícito y válido para esta salida.",
+    "Arrival must include a valid local date, time and UTC offset for the company timezone.": "La llegada debe incluir una fecha local, hora y desplazamiento UTC válidos para la zona horaria de la empresa.",
+    "The saved route plan is incomplete or outdated. Calculate and save the route before planning.": "El trazado guardado está incompleto o desactualizado. Calcula y guarda la ruta antes de planificar."
 }
