@@ -540,5 +540,13 @@
     "The calculation does not include the segment details needed to detect considerable detours. Review the suggested route on the map.": "El cálculo no incluye el detalle de los tramos necesario para detectar desvíos considerables. Revisa el trazado sugerido en el mapa.",
     "Route leg distances must be finite non-negative numbers.": "Las distancias de los tramos deben ser números finitos mayores o iguales a cero.",
     "Locate segment": "Localizar tramo",
-    "Review the suggested route": "Revisa el trazado sugerido"
+    "Review the suggested route": "Revisa el trazado sugerido",
+    "Salary amounts must be provided as decimal strings or integers.": "Los salarios deben proporcionarse como cadenas decimales o números enteros.",
+    "A driver employment cannot be reassigned to another company or user.": "Un empleo de conductor no puede reasignarse a otra compañía ni a otro usuario.",
+    "The selected company is unavailable.": "La compañía seleccionada no está disponible.",
+    "The selected user is unavailable.": "El usuario seleccionado no está disponible.",
+    "Permanent driver deletion is disabled. Archive the driver instead.": "La eliminación definitiva de conductores está deshabilitada. Archiva el conductor en su lugar.",
+    "A global system admin cannot be registered as a driver.": "Un administrador global del sistema no puede registrarse como conductor.",
+    "A driver employment already exists for this user in this company, including archived records.": "Ya existe un empleo de conductor para este usuario en esta compañía, incluidos los registros archivados.",
+    "This license is already reserved by a driver in this company.": "Esta licencia ya está reservada por un conductor de esta compañía."
 }
