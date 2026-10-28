@@ -63,6 +63,33 @@ class Driver extends Model
         );
     }
 
+    protected function licenseExpiresAt(): Attribute
+    {
+        return Attribute::make(set: fn (mixed $value): ?string => $this->validatedDateForStorage('license_expires_at', $value));
+    }
+
+    protected function employmentStartsOn(): Attribute
+    {
+        return Attribute::make(set: fn (mixed $value): ?string => $this->validatedDateForStorage('employment_starts_on', $value));
+    }
+
+    protected function employmentEndsOn(): Attribute
+    {
+        return Attribute::make(set: fn (mixed $value): ?string => $this->validatedDateForStorage('employment_ends_on', $value));
+    }
+
+    /** Validate original calendar values before formatting them for storage. */
+    private function validatedDateForStorage(string $field, mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        Validator::make([$field => $value], [$field => ['required', 'date']])->validate();
+
+        return $this->fromDateTime($value);
+    }
+
     protected static function booted(): void
     {
         static::saving(function (Driver $driver): void {
@@ -93,7 +120,7 @@ class Driver extends Model
                 ],
                 'salary_currency' => ['required', Rule::in(self::SUPPORTED_CURRENCIES)],
                 'salary_period' => ['required', Rule::in(['monthly'])],
-                'status' => ['required', Rule::enum(DriverStatus::class)],
+                'status' => ['required'],
             ])->validate();
 
             if (! $driver->exists) {
