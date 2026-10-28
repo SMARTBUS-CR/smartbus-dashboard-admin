@@ -507,5 +507,13 @@
     "The calculation does not include the segment details needed to detect considerable detours. Review the suggested route on the map.": "The calculation does not include the segment details needed to detect considerable detours. Review the suggested route on the map.",
     "Route leg distances must be finite non-negative numbers.": "Route leg distances must be finite non-negative numbers.",
     "Locate segment": "Locate segment",
-    "Review the suggested route": "Review the suggested route"
+    "Review the suggested route": "Review the suggested route",
+    "Salary amounts must be provided as decimal strings or integers.": "Salary amounts must be provided as decimal strings or integers.",
+    "A driver employment cannot be reassigned to another company or user.": "A driver employment cannot be reassigned to another company or user.",
+    "The selected company is unavailable.": "The selected company is unavailable.",
+    "The selected user is unavailable.": "The selected user is unavailable.",
+    "Permanent driver deletion is disabled. Archive the driver instead.": "Permanent driver deletion is disabled. Archive the driver instead.",
+    "A global system admin cannot be registered as a driver.": "A global system admin cannot be registered as a driver.",
+    "A driver employment already exists for this user in this company, including archived records.": "A driver employment already exists for this user in this company, including archived records.",
+    "This license is already reserved by a driver in this company.": "This license is already reserved by a driver in this company."
 }
