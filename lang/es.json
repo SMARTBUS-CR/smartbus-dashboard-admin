@@ -1,4 +1,7 @@
 {
+    "This field cannot be changed through employment updates.": "Este campo no puede modificarse mediante actualizaciones del empleo.",
+    "Restore the archived driver before changing employment.": "Restaura el conductor archivado antes de modificar su empleo.",
+    "The employment operation was cancelled.": "La operación del empleo fue cancelada.",
     "Bus ownership cannot be changed.": "No se puede cambiar la empresa propietaria del autobús.",
     "(and :count more error)": "(y :count error más)",
     "(and :count more errors)": "(y :count error más)|(y :count errores más)|(y :count errores más)",
