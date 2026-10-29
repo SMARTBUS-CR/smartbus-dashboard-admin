@@ -11,6 +11,7 @@ use App\Models\Driver;
 use App\Models\Role;
 use App\Models\User;
 use Closure;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -102,6 +103,8 @@ class DriverManagementService
     /**
      * Commit employment first, then identity. Any exception compensates the
      * operation's recorded deltas after rolling back its open transactions.
+     * Acquire the Company row lock before any User write or row lock, matching
+     * company-access removal. A shared lock permits parallel registrations.
      *
      * @param  Closure(DriverRegistrationOperation): Driver  $callback
      */
@@ -115,6 +118,13 @@ class DriverManagementService
         try {
             $mysql->beginTransaction();
             $pgsql->beginTransaction();
+            $lockedCompany = Company::query()->whereKey($company->getKey())
+                ->where('status', CompanyStatus::ACTIVE)->sharedLock()->first();
+
+            if ($lockedCompany === null) {
+                throw ValidationException::withMessages(['company_id' => __('The selected company is unavailable.')]);
+            }
+
             $driver = $callback($operation);
             $this->permissions->forgetCachedPermissions();
             $pgsql->commit();
@@ -140,6 +150,15 @@ class DriverManagementService
 
             if ($recoveryFailures !== []) {
                 throw new DriverRegistrationCompensationException($operation, $recoveryFailures, $failure);
+            }
+
+            if ($failure instanceof UniqueConstraintViolationException
+                && $failure->getConnectionName() === 'pgsql'
+                && ($failure->errorInfo[0] ?? null) === '23505'
+                && str_contains($failure->errorInfo[2] ?? '', '"drivers_company_id_license_unique"')) {
+                throw ValidationException::withMessages([
+                    'license' => __('This license is already reserved by a driver in this company.'),
+                ]);
             }
 
             throw $failure;
