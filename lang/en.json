@@ -1,4 +1,14 @@
 {
+    "Availability interval endpoints must use UTC.": "Availability interval endpoints must use UTC.",
+    "The end of the availability interval must be after its start.": "The end of the availability interval must be after its start.",
+    "The availability interval does not match its overnight flag.": "The availability interval does not match its overnight flag.",
+    "A driver schedule cannot be reassigned or given a different identity.": "A driver schedule cannot be reassigned or given a different identity.",
+    "This field cannot be changed through availability operations.": "This field cannot be changed through availability operations.",
+    "This availability overlaps an existing schedule for the driver.": "This availability overlaps an existing schedule for the driver.",
+    "The availability operation was cancelled.": "The availability operation was cancelled.",
+    "This field cannot be changed through employment updates.": "This field cannot be changed through employment updates.",
+    "Restore the archived driver before changing employment.": "Restore the archived driver before changing employment.",
+    "The employment operation was cancelled.": "The employment operation was cancelled.",
     "Bus ownership cannot be changed.": "Bus ownership cannot be changed.",
     "(and :count more error)": "(and :count more error)",
     "(and :count more errors)": "(and :count more error)|(and :count more errors)|(and :count more errors)",
@@ -530,5 +540,8 @@
     "The selected company is unavailable.": "The selected company is unavailable.",
     "The selected user is unavailable.": "The selected user is unavailable.",
     "Permanent driver deletion is disabled. Archive the driver instead.": "Permanent driver deletion is disabled. Archive the driver instead.",
-    "The selected driver is unavailable or ineligible for the planned dates.": "The selected driver is unavailable or ineligible for the planned dates."
+    "The selected driver is unavailable or ineligible for the planned dates.": "The selected driver is unavailable or ineligible for the planned dates.",
+    "A global system admin cannot be registered as a driver.": "A global system admin cannot be registered as a driver.",
+    "A driver employment already exists for this user in this company, including archived records.": "A driver employment already exists for this user in this company, including archived records.",
+    "This license is already reserved by a driver in this company.": "This license is already reserved by a driver in this company."
 }

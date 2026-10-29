@@ -7,6 +7,8 @@ use App\Auth\SessionGuard;
 use App\Enums\TripStatus;
 use App\Enums\UserRole;
 use App\Models\Company;
+use App\Models\Driver;
+use App\Models\DriverSchedule;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Route;
@@ -81,6 +83,13 @@ class AppServiceProvider extends ServiceProvider
                         return false;
                     }
                 }
+            }
+
+            // Workforce policies validate company boundaries before checking
+            // permissions through this same Gate, including global access.
+            if ($record instanceof Driver || $record === Driver::class
+                || $record instanceof DriverSchedule || $record === DriverSchedule::class) {
+                return null;
             }
 
             $isProtectedOperationalModel = $record instanceof Company
