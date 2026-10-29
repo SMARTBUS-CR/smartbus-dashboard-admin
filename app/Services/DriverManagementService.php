@@ -10,6 +10,7 @@ use App\Models\Driver;
 use App\Models\Role;
 use App\Models\User;
 use Closure;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -36,7 +37,7 @@ class DriverManagementService
     public function register(User $actor, Company $company, array $identity, array $employment): Driver
     {
         return $this->withCompanyContext($actor, $company, function (Company $company) use ($actor, $identity, $employment): Driver {
-            return $this->inRegistrationTransactions(function () use ($actor, $company, $identity, $employment): Driver {
+            return $this->inRegistrationTransactions($company, function () use ($actor, $company, $identity, $employment): Driver {
                 $user = $this->users->createDriverIdentity($actor, $company, $identity);
 
                 return $this->provisionEmployment($company, $user, $employment);
@@ -58,7 +59,7 @@ class DriverManagementService
     public function createForExistingUser(User $actor, Company $company, User $user, array $employment): Driver
     {
         return $this->withCompanyContext($actor, $company, function (Company $company) use ($user, $employment): Driver {
-            return $this->inRegistrationTransactions(function () use ($company, $user, $employment): Driver {
+            return $this->inRegistrationTransactions($company, function () use ($company, $user, $employment): Driver {
                 $identity = User::query()->whereKey($user->getKey())->lockForUpdate()->first();
 
                 if ($identity === null) {
@@ -98,14 +99,37 @@ class DriverManagementService
     /**
      * Connection-local rollbacks do not provide atomic cross-database commits.
      * Commit failure compensation is deferred to Subtask 03.
+     * Acquire the Company row lock before any User write or row lock, matching
+     * company-access removal. A shared lock permits parallel registrations.
      *
      * @param  Closure(): Driver  $operation
      */
-    private function inRegistrationTransactions(Closure $operation): Driver
+    private function inRegistrationTransactions(Company $company, Closure $operation): Driver
     {
-        return DB::connection('mysql')->transaction(
-            fn (): Driver => DB::connection('pgsql')->transaction($operation),
-        );
+        try {
+            return DB::connection('mysql')->transaction(
+                fn (): Driver => DB::connection('pgsql')->transaction(function () use ($company, $operation): Driver {
+                    $lockedCompany = Company::query()->whereKey($company->getKey())
+                        ->where('status', CompanyStatus::ACTIVE)->sharedLock()->first();
+
+                    if ($lockedCompany === null) {
+                        throw ValidationException::withMessages(['company_id' => __('The selected company is unavailable.')]);
+                    }
+
+                    return $operation();
+                }),
+            );
+        } catch (UniqueConstraintViolationException $exception) {
+            if ($exception->getConnectionName() !== 'pgsql'
+                || ($exception->errorInfo[0] ?? null) !== '23505'
+                || ! str_contains($exception->errorInfo[2] ?? '', '"drivers_company_id_license_unique"')) {
+                throw $exception;
+            }
+
+            throw ValidationException::withMessages([
+                'license' => __('This license is already reserved by a driver in this company.'),
+            ]);
+        }
     }
 
     /** @param array<string, mixed> $employment */
