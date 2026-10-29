@@ -1,4 +1,7 @@
 {
+    "This field cannot be changed through employment updates.": "This field cannot be changed through employment updates.",
+    "Restore the archived driver before changing employment.": "Restore the archived driver before changing employment.",
+    "The employment operation was cancelled.": "The employment operation was cancelled.",
     "Bus ownership cannot be changed.": "Bus ownership cannot be changed.",
     "(and :count more error)": "(and :count more error)",
     "(and :count more errors)": "(and :count more error)|(and :count more errors)|(and :count more errors)",
