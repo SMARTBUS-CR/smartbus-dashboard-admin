@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\CompanyStatus;
 use App\Enums\UserRole;
 use App\Models\Company;
 use App\Models\CompanyUser;
+use App\Models\Driver;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -24,6 +27,33 @@ use Throwable;
 
 class UserManagementService
 {
+    /**
+     * Create an approved Dashboard identity for the dedicated driver workflow.
+     * Ownership and role provisioning remain with DriverManagementService.
+     *
+     * @param  array{name: string, email: string, password: string, password_confirmation: string}  $data
+     */
+    public function createDriverIdentity(User $actor, Company $company, array $data): User
+    {
+        if (! Company::query()->whereKey($company->getKey())->where('status', CompanyStatus::ACTIVE)->exists()) {
+            throw ValidationException::withMessages(['company_id' => __('The selected company is unavailable.')]);
+        }
+
+        Gate::forUser($actor)->authorize('create', [Driver::class, $company]);
+
+        $validated = Validator::make($data, [
+            ...$this->newIdentityRules(),
+            'company_id' => ['missing'],
+            'email_verified_at' => ['missing'],
+            'role' => ['missing'],
+            'roles' => ['missing'],
+            'guard_name' => ['missing'],
+            'id' => ['missing'],
+        ])->validate();
+
+        return $this->persistNewIdentity($validated);
+    }
+
     /**
      * @param  array<string, mixed>  $data
      */
@@ -256,22 +286,7 @@ class UserManagementService
             Gate::forUser($actor)->authorize('create', User::class);
 
             $validated = Validator::make($data, [
-                'name' => ['required', 'string', 'max:100'],
-                'email' => [
-                    'required',
-                    'email',
-                    'max:100',
-                    Rule::unique('mysql.users', 'email'),
-                ],
-                'password' => [
-                    'required',
-                    'confirmed',
-                    Password::min(8)
-                        ->mixedCase()
-                        ->numbers()
-                        ->symbols()
-                        ->uncompromised(),
-                ],
+                ...$this->newIdentityRules(),
                 'company_id' => ['missing'],
                 'email_verified_at' => ['missing'],
                 'role' => ['missing'],
@@ -321,21 +336,7 @@ class UserManagementService
 
                         $this->authorizeCompanyRoleAssignment($actor, $roles);
 
-                        $user = new User([
-                            'name' => $validated['name'],
-                            'email' => $validated['email'],
-                            'password' => $validated['password'],
-                        ]);
-
-                        $user->id = $userId;
-
-                        if (! $user->save()) {
-                            throw new RuntimeException('User creation was cancelled.');
-                        }
-
-                        if (! $user->markEmailAsVerified()) {
-                            throw new RuntimeException('Email approval was cancelled.');
-                        }
+                        $user = $this->persistNewIdentity($validated, $userId);
 
                         $user->assignRole(...$roles->all());
 
@@ -830,6 +831,39 @@ class UserManagementService
                 );
             }
         );
+    }
+
+    /** @return array<string, array<int, mixed>> */
+    private function newIdentityRules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'email', 'max:100', Rule::unique('mysql.users', 'email')],
+            'password' => [
+                'required', 'confirmed',
+                Password::min(8)->mixedCase()->numbers()->symbols()->uncompromised(),
+            ],
+        ];
+    }
+
+    /** @param array<string, mixed> $validated */
+    private function persistNewIdentity(array $validated, ?string $userId = null): User
+    {
+        $user = new User(Arr::only($validated, ['name', 'email', 'password']));
+
+        if ($userId !== null) {
+            $user->id = $userId;
+        }
+
+        if (! $user->save()) {
+            throw new RuntimeException('User creation was cancelled.');
+        }
+
+        if (! $user->markEmailAsVerified()) {
+            throw new RuntimeException('Email approval was cancelled.');
+        }
+
+        return $user;
     }
 
     private function hasOtherActiveCompanyAdmin(
