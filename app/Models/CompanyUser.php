@@ -2,19 +2,47 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Database\Factories\CompanyUserFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class CompanyUser extends Model
+#[Table('company_users')]
+#[Fillable(['company_id', 'user_id'])]
+class CompanyUser extends Pivot
 {
-    use SoftDeletes;
+    /** @use HasFactory<CompanyUserFactory> */
+    use HasFactory, HasUuids, SoftDeletes;
 
-    protected $connection = 'pgsql';
+    /**
+     * Keep pivot queries on PostgreSQL even when Eloquent assigns the parent's MySQL connection.
+     */
+    public function getConnectionName(): string
+    {
+        return 'pgsql';
+    }
 
-    protected $table = 'company_user';
+    /**
+     * Get the company that this pivot belongs to.
+     *
+     * @return BelongsTo<Company, CompanyUser>
+     */
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
 
-    protected $fillable = [
-        'company_id',
-        'user_id',
-    ];
+    /**
+     * Get the user that this pivot belongs to.
+     *
+     * @return BelongsTo<User, CompanyUser>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 }

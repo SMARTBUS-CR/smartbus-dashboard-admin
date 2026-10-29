@@ -1,0 +1,135 @@
+# Worked example: the user's original ci-cd.yml (lint -> sqlite tests),
+# updated to run against real Postgres + MySQL *_testing services instead
+# of SQLite. All existing steps (checkout, setup-php, composer, node,
+# permissions, ci bootstrap) are UNCHANGED — only the job-level `env:` and
+# the new `services:` block were added/changed, plus one `run` step tweak.
+# Diff this against the project's real, current workflow file before
+# applying — don't blindly overwrite it, and don't drop steps that exist
+# there but not here (this is illustrative, not necessarily complete).
+
+name: CI/CD Pipeline
+
+on:
+    push:
+        branches: ["main", "dev", "feature/*", "hotfix/*"]
+    pull_request:
+        branches: ["main", "dev"]
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    # ==========================================
+    # STEP 1: LINTING (Laravel Pint) — unchanged
+    # ==========================================
+    lint:
+        name: Fix Code Style
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: true
+            matrix:
+                php: [8.4]
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v5
+              with:
+                  ref: ${{ github.head_ref || github.ref }}
+
+            - name: Setup PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: ${{ matrix.php }}
+                  tools: pint
+
+            - name: Run Pint
+              run: pint
+
+    # ==========================================
+    # STEP 2: TESTING (Laravel Pest) — now against real DBs
+    # ==========================================
+    laravel-tests:
+        name: Run Laravel Tests
+        runs-on: ubuntu-latest
+        needs: [lint]
+
+        # Both databases as services, with health checks so the test step
+        # waits for them instead of racing a cold start. Match the image
+        # versions the project already uses in Docker/dev if possible.
+        services:
+            postgres:
+                image: postgis/postgis:16-3.4 # plain postgres:<version> if no PostGIS needed
+                env:
+                    POSTGRES_USER: postgres
+                    POSTGRES_PASSWORD: postgres
+                    POSTGRES_DB: app_testing # must match phpunit.xml's DB_PGSQL_DATABASE
+                ports: ["5432:5432"]
+                options: >-
+                    --health-cmd "pg_isready -U postgres"
+                    --health-interval 5s --health-timeout 5s --health-retries 10
+
+            mysql:
+                image: mysql:8.4
+                env:
+                    MYSQL_ROOT_PASSWORD: root
+                    MYSQL_DATABASE: app_users_testing # must match phpunit.xml's DB_MYSQL_DATABASE
+                ports: ["3306:3306"]
+                options: >-
+                    --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+                    --health-interval 5s --health-timeout 5s --health-retries 10
+
+        # Host/user/password only — phpunit.xml's <env> block still decides
+        # the DATABASE NAMES, so there's exactly one place that owns that.
+        # These real env vars take precedence over phpunit.xml's <env>.
+        env:
+            DB_PGSQL_HOST: 127.0.0.1
+            DB_PGSQL_PORT: 5432
+            DB_PGSQL_USERNAME: postgres
+            DB_PGSQL_PASSWORD: postgres
+            DB_MYSQL_HOST: 127.0.0.1
+            DB_MYSQL_PORT: 3306
+            DB_MYSQL_USERNAME: root
+            DB_MYSQL_PASSWORD: root
+            # REMOVED: APP_ENV/DB_CONNECTION=sqlite/DB_DATABASE=...sqlite
+            # that lived here in the original workflow — phpunit.xml now
+            # owns APP_ENV=testing and the real DB_CONNECTION value.
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  ref: ${{ github.head_ref || github.ref }}
+
+            - name: Setup PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: 8.4
+                  extensions: pdo_pgsql, pdo_mysql, mbstring, intl, bcmath
+                  coverage: xdebug
+
+            - name: Install Dependencies
+              run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+
+            - name: Setup Node
+              uses: actions/setup-node@v6
+              with:
+                  node-version: lts/*
+                  cache: "npm"
+                  cache-dependency-path: package-lock.json
+
+            - name: Directory Permissions
+              run: chmod -R 777 storage bootstrap/cache
+
+            - name: Run CI Bootstrap
+              run: composer run ci
+
+            - name: Run Tests
+              # NOTE on --parallel: Pest's parallel runner creates suffixed
+              # databases (e.g. app_testing_test_1), which fails a guard
+              # that does an exact str_ends_with(..., '_testing') check
+              # (see TestCase.php.snippet). Either drop --parallel for the
+              # database-touching suite, or relax the guard to
+              # str_contains(..., '_testing') — this is a deliberate
+              # decision, not a default; confirm with the user which they
+              # want before changing either side.
+              run: php artisan test --ci --compact

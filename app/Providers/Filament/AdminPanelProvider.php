@@ -2,10 +2,13 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Pages\Auth\RequestPasswordReset;
+use App\Filament\Auth\Login;
+use App\Filament\Auth\RequestPasswordReset;
 use App\Filament\Pages\Dashboard;
-use App\Filament\Pages\Tenancy\RegisterCompany;
+use App\Http\Middleware\EnsureExternalTokenIsValid;
+use App\Http\Middleware\SyncSpatieTeam;
 use App\Models\Company;
+use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -31,9 +34,11 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->spa(hasPrefetching: true)
-            ->authGuard('external')
-            ->login()
-            ->passwordReset(RequestPasswordReset::class)
+            ->login(Login::class)
+            ->passwordReset(
+                requestAction: RequestPasswordReset::class,
+                resetAction: null,
+            )
             ->colors([
                 'primary' => Color::Indigo,
             ])
@@ -60,8 +65,22 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                EnsureExternalTokenIsValid::class,
+            ], isPersistent: true)
+            ->plugins([
+                FilamentShieldPlugin::make()
+                    ->scopeToTenant(true)
+                    ->localizePermissionLabels()
+                    ->tenantRelationshipName('roles')
+                    ->tenantOwnershipRelationshipName('company')
+                    ->globallySearchable(true)
+                    ->globalSearchResultsLimit(50)
+                    ->forceGlobalSearchCaseInsensitive(true)
+                    ->splitGlobalSearchTerms(false),
             ])
-            ->tenant(Company::class, slugAttribute: 'slug')
-            ->tenantRegistration(RegisterCompany::class);
+            ->tenantMiddleware([SyncSpatieTeam::class], isPersistent: true)
+            ->tenant(model: Company::class, slugAttribute: 'slug')
+            ->searchableTenantMenu()
+            ->tenantMenu();
     }
 }

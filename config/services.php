@@ -43,4 +43,20 @@ return [
         ],
     ],
 
+    'photon' => [
+        'url' => env('PHOTON_URL', 'https://photon.komoot.io'),
+        'timeout' => 8,
+        'cache_ttl' => 3600,
+    ],
+
+    'osrm' => [
+        'url' => env('OSRM_URL', 'https://router.project-osrm.org'),
+        'timeout' => 10,
+        'cache_ttl' => 3600,
+        'user_agent' => 'SmartBus Dashboard University Project',
+        'detour' => [
+            'minimum_ratio' => 3,
+            'minimum_excess_meters' => 10000,
+        ],
+    ],
 ];

@@ -11,7 +11,14 @@ class Dashboard extends BaseDashboard
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHome;
 
+    protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::Home;
+
     public function getTitle(): string|Htmlable
+    {
+        return __('Home');
+    }
+
+    public static function getNavigationLabel(): string
     {
         return __('Home');
     }
