@@ -524,5 +524,10 @@
     "The scheduled departure does not exist in the company timezone.": "The scheduled departure does not exist in the company timezone.",
     "An explicit valid UTC offset is required for this departure.": "An explicit valid UTC offset is required for this departure.",
     "Arrival must include a valid local date, time and UTC offset for the company timezone.": "Arrival must include a valid local date, time and UTC offset for the company timezone.",
-    "The saved route plan is incomplete or outdated. Calculate and save the route before planning.": "The saved route plan is incomplete or outdated. Calculate and save the route before planning."
+    "The saved route plan is incomplete or outdated. Calculate and save the route before planning.": "The saved route plan is incomplete or outdated. Calculate and save the route before planning.",
+    "Salary amounts must be provided as decimal strings or integers.": "Salary amounts must be provided as decimal strings or integers.",
+    "A driver employment cannot be reassigned to another company or user.": "A driver employment cannot be reassigned to another company or user.",
+    "The selected company is unavailable.": "The selected company is unavailable.",
+    "The selected user is unavailable.": "The selected user is unavailable.",
+    "Permanent driver deletion is disabled. Archive the driver instead.": "Permanent driver deletion is disabled. Archive the driver instead."
 }

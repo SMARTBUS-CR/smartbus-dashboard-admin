@@ -557,5 +557,17 @@
     "The scheduled departure does not exist in the company timezone.": "La hora de salida programada no existe en la zona horaria de la empresa.",
     "An explicit valid UTC offset is required for this departure.": "Se requiere un desplazamiento UTC explícito y válido para esta salida.",
     "Arrival must include a valid local date, time and UTC offset for the company timezone.": "La llegada debe incluir una fecha local, hora y desplazamiento UTC válidos para la zona horaria de la empresa.",
-    "The saved route plan is incomplete or outdated. Calculate and save the route before planning.": "El trazado guardado está incompleto o desactualizado. Calcula y guarda la ruta antes de planificar."
+    "The saved route plan is incomplete or outdated. Calculate and save the route before planning.": "El trazado guardado está incompleto o desactualizado. Calcula y guarda la ruta antes de planificar.",
+    "Salary amounts must be provided as decimal strings or integers.": "Los salarios deben proporcionarse como cadenas decimales o números enteros.",
+    "A driver employment cannot be reassigned to another company or user.": "Un empleo de conductor no puede reasignarse a otra compañía ni a otro usuario.",
+    "The selected company is unavailable.": "La compañía seleccionada no está disponible.",
+    "The selected user is unavailable.": "El usuario seleccionado no está disponible.",
+    "Permanent driver deletion is disabled. Archive the driver instead.": "La eliminación definitiva de conductores está deshabilitada. Archiva el conductor en su lugar.",
+    "Reset Code": "Código de recuperación",
+    "New Password": "Nueva contraseña",
+    "Confirm New Password": "Confirmar nueva contraseña",
+    "Send Reset Code": "Enviar código de recuperación",
+    "Reset Code Sent": "Código de recuperación enviado",
+    "Password Updated": "Contraseña actualizada",
+    "Password Recovery Failed": "No se pudo completar la recuperación de contraseña"
 }
