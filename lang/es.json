@@ -569,5 +569,6 @@
     "Send Reset Code": "Enviar código de recuperación",
     "Reset Code Sent": "Código de recuperación enviado",
     "Password Updated": "Contraseña actualizada",
-    "Password Recovery Failed": "No se pudo completar la recuperación de contraseña"
+    "Password Recovery Failed": "No se pudo completar la recuperación de contraseña",
+    "The selected driver is unavailable or ineligible for the planned dates.": "El conductor seleccionado no está disponible o no cumple los requisitos para las fechas planificadas."
 }

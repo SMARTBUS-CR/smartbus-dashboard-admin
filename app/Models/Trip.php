@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\TripStatus;
+use Database\Factories\TripFactory;
 use Illuminate\Database\Eloquent\Attributes\DateFormat;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -18,6 +19,7 @@ use Illuminate\Validation\ValidationException;
 ])]
 class Trip extends Model
 {
+    /** @use HasFactory<TripFactory> */
     use HasFactory, HasUuids;
 
     /** @param array<string, mixed> $options */
@@ -99,5 +101,11 @@ class Trip extends Model
     public function bus(): BelongsTo
     {
         return $this->belongsTo(Bus::class)->withTrashed();
+    }
+
+    /** @return BelongsTo<Driver, $this> */
+    public function driver(): BelongsTo
+    {
+        return $this->belongsTo(Driver::class)->withTrashed();
     }
 }

@@ -529,5 +529,6 @@
     "A driver employment cannot be reassigned to another company or user.": "A driver employment cannot be reassigned to another company or user.",
     "The selected company is unavailable.": "The selected company is unavailable.",
     "The selected user is unavailable.": "The selected user is unavailable.",
-    "Permanent driver deletion is disabled. Archive the driver instead.": "Permanent driver deletion is disabled. Archive the driver instead."
+    "Permanent driver deletion is disabled. Archive the driver instead.": "Permanent driver deletion is disabled. Archive the driver instead.",
+    "The selected driver is unavailable or ineligible for the planned dates.": "The selected driver is unavailable or ineligible for the planned dates."
 }

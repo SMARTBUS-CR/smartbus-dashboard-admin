@@ -3,11 +3,10 @@
 use App\Enums\TripStatus;
 use App\Enums\UserRole;
 use App\Models\Bus;
+use App\Models\Driver;
 use App\Models\RoutePattern;
 use App\Models\RouteSchedule;
 use App\Models\Trip;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /** @return array<string, mixed> */
@@ -18,16 +17,14 @@ function planningTripAttributes(): array
     $schedule = RouteSchedule::factory()->for($pattern, 'pattern')->create();
     $bus = Bus::factory()->for($company)->create();
     $user = createUserWithRole(UserRole::Driver, $company);
-    $driverId = (string) Str::uuid();
-    DB::table('drivers')->insert([
-        'id' => $driverId, 'company_id' => $company->getKey(), 'user_id' => $user->getKey(),
+    $driver = Driver::factory()->for($company)->for($user)->create([
         'license' => 'LICENSE-001', 'license_expires_at' => '2030-01-01',
         'employment_starts_on' => '2026-01-01', 'salary_amount' => 600000, 'salary_currency' => 'CRC',
     ]);
 
     return [
         'company_id' => $company->getKey(), 'route_pattern_id' => $pattern->getKey(),
-        'route_schedule_id' => $schedule->getKey(), 'bus_id' => $bus->getKey(), 'driver_id' => $driverId,
+        'route_schedule_id' => $schedule->getKey(), 'bus_id' => $bus->getKey(), 'driver_id' => $driver->getKey(),
         'service_date' => '2026-10-26', 'scheduled_departure_at' => '2026-10-26 12:00:00+00',
         'scheduled_arrival_at' => '2026-10-26 13:00:00+00',
         'planned_route_snapshot' => ['schema_version' => 1, 'pattern_id' => $pattern->getKey()],
@@ -54,6 +51,19 @@ test('persists scheduled trips with UUID casts and existing historical relations
     $this->assertSoftDeleted($trip->company);
     $this->assertSoftDeleted($trip->pattern);
     $this->assertSoftDeleted($trip->bus);
+    $this->assertModelExists($trip);
+});
+
+test('retains the real driver relationship after the employment is archived', function (): void {
+    $trip = Trip::query()->create(planningTripAttributes())->refresh();
+    $driver = Driver::query()->findOrFail($trip->driver_id);
+
+    expect($trip->driver->is($driver))->toBeTrue();
+    $driver->delete();
+    $trip->unsetRelations();
+
+    $this->assertSoftDeleted($trip->driver);
+    expect($trip->driver->getKey())->toBe($driver->getKey());
     $this->assertModelExists($trip);
 });
 
