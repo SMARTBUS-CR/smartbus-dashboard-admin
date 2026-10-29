@@ -34,6 +34,15 @@ class DriverReadService
         return $driver->toArray();
     }
 
+    /** @return array<string, mixed> */
+    public function findArchivedFor(User $actor, Company $company, string $driverId): array
+    {
+        $driver = Driver::onlyTrashed()->where('company_id', $company->getKey())->findOrFail($driverId, self::PROFILE_FIELDS);
+        Gate::forUser($actor)->authorize('view', [Driver::class, $company, $driver]);
+
+        return $driver->toArray();
+    }
+
     /** @return array{salary_amount: string, salary_currency: string, salary_period: string} */
     public function salaryFor(User $actor, Company $company, string $driverId): array
     {
