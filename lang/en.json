@@ -1,4 +1,6 @@
 {
+    "Availability interval endpoints must use UTC.": "Availability interval endpoints must use UTC.",
+    "The end of the availability interval must be after its start.": "The end of the availability interval must be after its start.",
     "The availability interval does not match its overnight flag.": "The availability interval does not match its overnight flag.",
     "A driver schedule cannot be reassigned or given a different identity.": "A driver schedule cannot be reassigned or given a different identity.",
     "This field cannot be changed through availability operations.": "This field cannot be changed through availability operations.",
