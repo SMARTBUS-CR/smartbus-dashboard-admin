@@ -48,6 +48,10 @@ trait WithDriverConcurrency
             $process->close();
         }
 
+        DB::connection('pgsql')->table('driver_schedules')->whereIn('driver_id',
+            DB::connection('pgsql')->table('drivers')->select('id')->whereIn('company_id', $this->concurrentCompanyIds)
+        )->delete();
+
         foreach (['drivers', 'company_users', 'companies'] as $table) {
             DB::connection('pgsql')->table($table)
                 ->whereIn($table === 'companies' ? 'id' : 'company_id', $this->concurrentCompanyIds)->delete();
