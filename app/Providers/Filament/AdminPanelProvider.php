@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Auth\Login;
+use App\Filament\Auth\RequestPasswordReset;
 use App\Filament\Pages\Dashboard;
 use App\Http\Middleware\EnsureExternalTokenIsValid;
 use App\Http\Middleware\SyncSpatieTeam;
@@ -34,6 +35,10 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->spa(hasPrefetching: true)
             ->login(Login::class)
+            ->passwordReset(
+                requestAction: RequestPasswordReset::class,
+                resetAction: null,
+            )
             ->colors([
                 'primary' => Color::Indigo,
             ])

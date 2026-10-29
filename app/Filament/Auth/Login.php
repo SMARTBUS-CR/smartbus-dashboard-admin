@@ -7,11 +7,21 @@ use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Auth\Pages\Login as BaseLogin;
 use Filament\Notifications\Notification;
 
+use function is_string;
+
 class Login extends BaseLogin
 {
     public function mount(): void
     {
         parent::mount();
+
+        $email = session()->pull('password_reset_email');
+
+        if (is_string($email) && filled($email)) {
+            $this->form->fill([
+                'email' => $email,
+            ]);
+        }
 
         $reason = session()->get('auth_notice');
 

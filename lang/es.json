@@ -540,5 +540,12 @@
     "The calculation does not include the segment details needed to detect considerable detours. Review the suggested route on the map.": "El cálculo no incluye el detalle de los tramos necesario para detectar desvíos considerables. Revisa el trazado sugerido en el mapa.",
     "Route leg distances must be finite non-negative numbers.": "Las distancias de los tramos deben ser números finitos mayores o iguales a cero.",
     "Locate segment": "Localizar tramo",
-    "Review the suggested route": "Revisa el trazado sugerido"
+    "Review the suggested route": "Revisa el trazado sugerido",
+    "Reset Code": "Código de recuperación",
+    "New Password": "Nueva contraseña",
+    "Confirm New Password": "Confirmar nueva contraseña",
+    "Send Reset Code": "Enviar código de recuperación",
+    "Reset Code Sent": "Código de recuperación enviado",
+    "Password Updated": "Contraseña actualizada",
+    "Password Recovery Failed": "No se pudo completar la recuperación de contraseña"
 }
