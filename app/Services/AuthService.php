@@ -10,6 +10,7 @@ use Illuminate\Http\Client\ConnectionException;
 use RuntimeException;
 use Throwable;
 
+use function is_array;
 use function is_scalar;
 use function is_string;
 
@@ -395,7 +396,7 @@ class AuthService
     protected function extractGatewayErrors(array $payload): array
     {
         $errors = data_get($payload, 'errors');
-        if (! is_array($errors)) {
+        if (! is_array($errors) || array_is_list($errors)) {
             return [];
         }
 
@@ -420,10 +421,16 @@ class AuthService
      */
     protected function extractGatewayMessage(array $payload, string $fallback): string
     {
-        $message = data_get($payload, 'meta.message') ?? data_get($payload, 'message');
+        foreach ([
+            data_get($payload, 'meta.message'),
+            data_get($payload, 'message'),
+            data_get($payload, 'errors.0.detail'),
+        ] as $message) {
+            if (is_string($message) && filled($message)) {
+                return $message;
+            }
+        }
 
-        return is_string($message) && filled($message)
-            ? $message
-            : $fallback;
+        return $fallback;
     }
 }
