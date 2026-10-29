@@ -126,6 +126,14 @@ class Company extends Model implements HasCurrentTenantLabel, HasName
     }
 
     /**
+     * @return HasMany<Bus, $this>
+     */
+    public function buses(): HasMany
+    {
+        return $this->hasMany(Bus::class);
+    }
+
+    /**
      * Generate a unique slug for the company based on the provided name.
      */
     public static function generateUniqueSlug(string $name): string

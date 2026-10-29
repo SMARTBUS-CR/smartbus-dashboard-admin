@@ -1,4 +1,5 @@
 {
+    "Bus ownership cannot be changed.": "No se puede cambiar la empresa propietaria del autobús.",
     "(and :count more error)": "(y :count error más)",
     "(and :count more errors)": "(y :count error más)|(y :count errores más)|(y :count errores más)",
     "A decryption key is required.": "Se requiere una clave de descifrado.",
@@ -548,5 +549,12 @@
     "Permanent driver deletion is disabled. Archive the driver instead.": "La eliminación definitiva de conductores está deshabilitada. Archiva el conductor en su lugar.",
     "A global system admin cannot be registered as a driver.": "Un administrador global del sistema no puede registrarse como conductor.",
     "A driver employment already exists for this user in this company, including archived records.": "Ya existe un empleo de conductor para este usuario en esta compañía, incluidos los registros archivados.",
-    "This license is already reserved by a driver in this company.": "Esta licencia ya está reservada por un conductor de esta compañía."
+    "This license is already reserved by a driver in this company.": "Esta licencia ya está reservada por un conductor de esta compañía.",
+    "Reset Code": "Código de recuperación",
+    "New Password": "Nueva contraseña",
+    "Confirm New Password": "Confirmar nueva contraseña",
+    "Send Reset Code": "Enviar código de recuperación",
+    "Reset Code Sent": "Código de recuperación enviado",
+    "Password Updated": "Contraseña actualizada",
+    "Password Recovery Failed": "No se pudo completar la recuperación de contraseña"
 }
