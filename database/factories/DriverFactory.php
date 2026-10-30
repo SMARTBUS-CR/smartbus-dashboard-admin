@@ -2,7 +2,9 @@
 
 namespace Database\Factories;
 
+use App\Enums\DriverStatus;
 use App\Models\Company;
+use App\Models\CompanyUser;
 use App\Models\Driver;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -30,5 +32,32 @@ class DriverFactory extends Factory
             'salary_amount' => '650000.00',
             'salary_currency' => 'CRC',
         ];
+    }
+
+    public function active(): static
+    {
+        return $this->state(fn (array $attributes): array => ['status' => DriverStatus::ACTIVE]);
+    }
+
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes): array => ['status' => DriverStatus::INACTIVE]);
+    }
+
+    public function archived(): static
+    {
+        return $this->afterCreating(function (Driver $driver): void {
+            $driver->delete();
+        });
+    }
+
+    /** Opt in to membership fixtures without granting permissions or restoring access. */
+    public function withMembership(): static
+    {
+        return $this->afterCreating(function (Driver $driver): void {
+            if (! CompanyUser::withTrashed()->where('company_id', $driver->company_id)->where('user_id', $driver->user_id)->exists()) {
+                CompanyUser::factory()->create(['company_id' => $driver->company_id, 'user_id' => $driver->user_id]);
+            }
+        });
     }
 }
