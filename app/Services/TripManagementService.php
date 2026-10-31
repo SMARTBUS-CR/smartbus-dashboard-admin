@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\CompanyStatus;
+use App\Enums\TripStatus;
 use App\Models\Bus;
 use App\Models\Company;
 use App\Models\Driver;
@@ -33,6 +34,26 @@ class TripManagementService
      */
     public function schedule(User $actor, Company $company, array $data): Trip
     {
+        return $this->plan($actor, $company, $data);
+    }
+
+    /**
+     * Replace a complete scheduled plan; identity and execution history are immutable.
+     * The input contract is identical to schedule(), including an explicit arrival.
+     *
+     * @param array{
+     *     route_pattern_id: string, route_schedule_id: string, bus_id: string, driver_id: string,
+     *     service_date: string, arrival_at: string, departure_utc_offset?: string
+     * } $data
+     */
+    public function replan(User $actor, Company $company, string $tripId, array $data): Trip
+    {
+        return $this->plan($actor, $company, $data, $tripId);
+    }
+
+    /** @param array<string, mixed> $data */
+    private function plan(User $actor, Company $company, array $data, ?string $tripId = null): Trip
+    {
         $previousTeam = getPermissionsTeamId();
         $persistedActor = null;
         try {
@@ -42,14 +63,24 @@ class TripManagementService
                 throw new AuthorizationException;
             }
             setPermissionsTeamId($company->getKey());
-            Gate::forUser($persistedActor)->authorize('create', [Trip::class, $company]);
-            $this->validatePayload($data);
+            $ability = $tripId === null ? 'create' : 'update';
+            Gate::forUser($persistedActor)->authorize($ability, [Trip::class, $company]);
+            if ($tripId !== null) {
+                Validator::make(['trip_id' => $tripId], ['trip_id' => ['required', 'uuid']])->validate();
+            }
 
-            return (new Trip)->getConnection()->transaction(function () use ($company, $data): Trip {
+            return (new Trip)->getConnection()->transaction(function () use ($persistedActor, $company, $data, $tripId): Trip {
                 $company = Company::query()->whereKey($company->getKey())->lockForUpdate()->first();
                 if (! $company || $company->status !== CompanyStatus::ACTIVE) {
                     $this->reject('company', 'An active company context is required.');
                 }
+
+                $trip = null;
+                if ($tripId !== null) {
+                    $trip = Trip::query()->where('company_id', $company->getKey())->whereKey($tripId)->lockForUpdate()->firstOrFail();
+                    Gate::forUser($persistedActor)->authorize('update', [Trip::class, $company, $trip]);
+                }
+                $this->validatePayload($data);
 
                 $bus = Bus::query()->where('company_id', $company->getKey())->whereKey($data['bus_id'])->lockForUpdate()->first();
                 if (! $bus || ! $bus->is_active) {
@@ -63,14 +94,18 @@ class TripManagementService
                 $plan = $this->snapshots->prepare($company, Arr::except($data, ['driver_id']));
                 $driver = $this->drivers->validateForPlan($company, $driver->getKey(), $plan);
 
-                return Trip::query()->create([
-                    'company_id' => $company->getKey(),
+                $attributes = [
                     'route_pattern_id' => $plan['pattern']->getKey(), 'route_schedule_id' => $plan['schedule']->getKey(),
                     'bus_id' => $bus->getKey(), 'driver_id' => $driver->getKey(),
                     'service_date' => $plan['service_date'],
                     'scheduled_departure_at' => $plan['departure_at'], 'scheduled_arrival_at' => $plan['arrival_at'],
                     'planned_route_snapshot' => $plan['planned_route_snapshot'],
-                ])->refresh();
+                ];
+                if ($trip === null) {
+                    return Trip::query()->create(['company_id' => $company->getKey(), ...$attributes])->refresh();
+                }
+
+                return $this->persistReplan($trip, $attributes);
             });
         } catch (QueryException $exception) {
             $detail = $exception->errorInfo[2] ?? '';
@@ -90,6 +125,24 @@ class TripManagementService
             $actor->unsetRelation('roles')->unsetRelation('permissions');
             $persistedActor?->unsetRelation('roles')->unsetRelation('permissions');
         }
+    }
+
+    /**
+     * The authorized transaction updates only validated plan columns. Using the
+     * builder here deliberately preserves the model's blanket direct-save guard.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function persistReplan(Trip $trip, array $attributes): Trip
+    {
+        $storedAttributes = (new Trip($attributes))->getAttributes();
+        $updated = Trip::query()->whereKey($trip->getKey())->where('company_id', $trip->company_id)
+            ->where('status', TripStatus::SCHEDULED)->update($storedAttributes);
+        if ($updated !== 1) {
+            throw new AuthorizationException;
+        }
+
+        return $trip->refresh();
     }
 
     /** @param array<string, mixed> $data */
