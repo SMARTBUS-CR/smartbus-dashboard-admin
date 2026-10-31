@@ -1,4 +1,7 @@
 {
+    "This field cannot be supplied when planning a trip.": "Este campo no se puede proporcionar al planificar un viaje.",
+    "The selected departure or resource conflicts with an existing trip.": "La salida o el recurso seleccionado entra en conflicto con un viaje existente.",
+    "The selected driver does not cover the complete planned interval.": "El conductor seleccionado no tiene disponibilidad para todo el intervalo planificado.",
     "Availability interval endpoints must use UTC.": "Los extremos del intervalo de disponibilidad deben estar en UTC.",
     "The end of the availability interval must be after its start.": "El fin del intervalo de disponibilidad debe ser posterior a su inicio.",
     "The availability interval does not match its overnight flag.": "El intervalo de disponibilidad no corresponde con su indicador de turno nocturno.",

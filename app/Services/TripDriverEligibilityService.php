@@ -8,11 +8,32 @@ use App\Enums\UserRole;
 use App\Models\Company;
 use App\Models\CompanyUser;
 use App\Models\Driver;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class TripDriverEligibilityService
 {
+    public function __construct(private readonly DriverAvailabilityService $availability) {}
+
+    /**
+     * Validate a trusted prepared plan after actor authorization and resource locks.
+     * This read-only check does not create a reservation or coordinate cross-profile conflicts.
+     *
+     * @param  array{departure_at: CarbonImmutable, arrival_at: CarbonImmutable, local_dates: list<string>}  $plan
+     */
+    public function validateForPlan(Company $company, string $driverId, array $plan): Driver
+    {
+        $driver = $this->validate($company, $driverId, $plan['local_dates']);
+        if (! $this->availability->covers($driver, $plan['departure_at'], $plan['arrival_at'])) {
+            throw ValidationException::withMessages([
+                'driver_id' => __('The selected driver does not cover the complete planned interval.'),
+            ]);
+        }
+
+        return $driver;
+    }
+
     /**
      * Internal planning check, after actor authorization and before persistence.
      * Dates must come from TripPlanPreparationService's half-open local window.

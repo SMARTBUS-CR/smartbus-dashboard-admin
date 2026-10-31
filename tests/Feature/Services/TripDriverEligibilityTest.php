@@ -6,8 +6,10 @@ use App\Enums\UserRole;
 use App\Models\Company;
 use App\Models\CompanyUser;
 use App\Models\Driver;
+use App\Models\DriverSchedule;
 use App\Models\Role;
 use App\Services\TripDriverEligibilityService;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 
@@ -134,3 +136,43 @@ test('rejects a malformed driver identifier before querying PostgreSQL', functio
         $this->assertDatabaseCount('trips', 0);
     }
 });
+
+test('requires real complete availability for the prepared half open interval', function (string $scenario, bool $covered): void {
+    Http::preventStrayRequests();
+    [$company, $driver] = eligiblePlanningDriver();
+    $slots = match ($scenario) {
+        'complete' => [['08:00', '12:00', false]],
+        'adjacent' => [['08:00', '10:00', false], ['10:00', '12:00', false]],
+        'gap' => [['08:00', '09:59', false], ['10:00', '12:00', false]],
+        'midnight' => [['08:00', '00:00', true]],
+        'overnight' => [['20:00', '02:00', true]],
+        default => [],
+    };
+    foreach ($slots as [$start, $end, $nextDay]) {
+        DriverSchedule::factory()->for($driver)->create([
+            'day_of_week' => 1, 'start_time' => $start, 'end_time' => $end, 'ends_next_day' => $nextDay,
+        ]);
+    }
+    $plan = [
+        'departure_at' => CarbonImmutable::parse($scenario === 'overnight' ? '2026-10-27T02:00:00Z' : '2026-10-26T14:00:00Z'),
+        'arrival_at' => CarbonImmutable::parse(match ($scenario) {
+            'midnight' => '2026-10-27T06:00:00Z',
+            'overnight' => '2026-10-27T07:00:00Z',
+            default => '2026-10-26T18:00:00Z',
+        }),
+        'local_dates' => $scenario === 'overnight' ? ['2026-10-26', '2026-10-27'] : ['2026-10-26'],
+    ];
+
+    if ($covered) {
+        expect(app(TripDriverEligibilityService::class)->validateForPlan($company, $driver->getKey(), $plan)->is($driver))->toBeTrue();
+    } else {
+        expect(fn () => app(TripDriverEligibilityService::class)->validateForPlan($company, $driver->getKey(), $plan))
+            ->toThrow(function (ValidationException $exception): void {
+                expect($exception->errors())->toBe(['driver_id' => [__('The selected driver does not cover the complete planned interval.')]]);
+            });
+    }
+    $this->assertDatabaseCount('trips', 0);
+    Http::assertNothingSent();
+})->with([
+    ['complete', true], ['adjacent', true], ['gap', false], ['missing', false], ['midnight', true], ['overnight', true],
+]);
