@@ -7,6 +7,7 @@ use App\Models\Bus;
 use App\Models\Company;
 use App\Models\CompanyUser;
 use App\Models\Driver;
+use App\Models\DriverSchedule;
 use App\Models\Role;
 use App\Models\Route;
 use App\Models\RoutePattern;
@@ -82,5 +83,22 @@ class TripFactory extends Factory
                 return $driver->getKey();
             },
         ]);
+    }
+
+    /** Include eligible identity and dated availability for the touched local dates, without reservation guarantees. */
+    public function withDriverAvailability(): static
+    {
+        return $this->withEligibleDriver()->afterMaking(function (Trip $trip): void {
+            $timezone = Company::query()->findOrFail($trip->company_id)->timezone;
+            for ($day = $trip->scheduled_departure_at->setTimezone($timezone)->startOfDay();
+                $day < $trip->scheduled_arrival_at;
+                $day = $day->addDay()->startOfDay()) {
+                DriverSchedule::factory()->create([
+                    'driver_id' => $trip->driver_id, 'day_of_week' => $day->dayOfWeek,
+                    'start_time' => '00:00:00', 'end_time' => '00:00:00', 'ends_next_day' => true,
+                    'valid_from' => $day->toDateString(), 'valid_until' => $day->toDateString(),
+                ]);
+            }
+        });
     }
 }

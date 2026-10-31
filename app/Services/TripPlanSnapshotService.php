@@ -17,13 +17,14 @@ class TripPlanSnapshotService
     public function __construct(private readonly TripPlanPreparationService $preparation) {}
 
     /**
-     * Build the proposed schema-v1 historical contract from persisted catalogue data.
+     * Build the agreed schema-v1 historical contract from persisted catalogue data.
      * This preparation step does not authorize an actor, validate a driver or create a trip.
      *
      * Metrics use decimal strings with two positions and stop coordinates use seven.
      * Geometry and nullable numeric leg lists retain their persisted values; occurrences
      * retain travel order, repeated stops and nullable timing estimates. No user or driver
-     * data is projected. Team agreement is still required before operational consumption.
+     * data is projected. This representation and revision hash are agreed with the
+     * consuming contributors. Operational use remains pending reservation and lifecycle safeguards.
      *
      * @param array{
      *     route_pattern_id: string, route_schedule_id: string, bus_id: string,

@@ -2,7 +2,9 @@
 
 use App\Enums\TripStatus;
 use App\Models\CompanyUser;
+use App\Models\DriverSchedule;
 use App\Models\Trip;
+use App\Services\DriverAvailabilityService;
 use App\Services\TripDriverEligibilityService;
 use App\Services\TripPlanPreparationService;
 use App\Services\TripPlanSnapshotService;
@@ -76,5 +78,40 @@ test('retains the persisted factory snapshot and times after catalogue edits', f
     expect($trip->planned_route_snapshot)->toBe($snapshot);
     expect($trip->scheduled_departure_at->equalTo($departure))->toBeTrue();
     expect($trip->scheduled_arrival_at->equalTo($arrival))->toBeTrue();
+    Http::assertNothingSent();
+});
+
+test('explicit availability fixtures cover the real local window without changing the default factory', function (string $arrival, array $dates): void {
+    Http::preventStrayRequests();
+    $company = createCompany(['timezone' => 'America/Costa_Rica']);
+    $team = createCompany()->getKey();
+    setPermissionsTeamId($team);
+
+    $trip = Trip::factory()->for($company)->withDriverAvailability()->create(['scheduled_arrival_at' => $arrival])->refresh();
+
+    $slots = DriverSchedule::query()->where('driver_id', $trip->driver_id)->orderBy('valid_from')->get();
+    expect($slots->pluck('valid_from')->map->toDateString()->all())->toBe($dates);
+    expect($slots->pluck('valid_until')->map->toDateString()->all())->toBe($dates);
+    expect(app(DriverAvailabilityService::class)->covers($trip->driver, $trip->scheduled_departure_at->utc(), $trip->scheduled_arrival_at->utc()))->toBeTrue();
+    $plan = app(TripPlanPreparationService::class)->prepare($company, [
+        'route_pattern_id' => $trip->route_pattern_id, 'route_schedule_id' => $trip->route_schedule_id,
+        'bus_id' => $trip->bus_id, 'service_date' => $trip->service_date->toDateString(),
+        'arrival_at' => $trip->scheduled_arrival_at->setTimezone($company->timezone)->format('Y-m-d\TH:i:sP'),
+    ]);
+    expect(app(TripDriverEligibilityService::class)->validateForPlan($company, $trip->driver_id, $plan)->getKey())->toBe($trip->driver_id);
+    expect(getPermissionsTeamId())->toBe($team);
+    Http::assertNothingSent();
+})->with([
+    ['2026-10-26T13:30:00Z', ['2026-10-26']],
+    ['2026-10-27T06:00:00Z', ['2026-10-26']],
+    ['2026-10-27T06:01:00Z', ['2026-10-26', '2026-10-27']],
+]);
+
+test('default trip fixtures do not create driver availability', function (): void {
+    Http::preventStrayRequests();
+
+    Trip::factory()->create();
+
+    $this->assertDatabaseCount('driver_schedules', 0);
     Http::assertNothingSent();
 });

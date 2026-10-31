@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             CompanySeeder::class,
             SarapiquiRoutesSeeder::class,
             BusSeeder::class,
+            TripSeeder::class,
         ]);
     }
 }
