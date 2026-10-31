@@ -46,7 +46,7 @@ describe('Database Seeding', function (): void {
         expect($demoCompany->buses()->count())->toBe(3)
             ->and(Permission::query()->where('guard_name', 'web')->where('name', 'like', '%:Bus')
                 ->orderBy('name')->pluck('name')->all())->toBe([
-                    'Create:Bus', 'Update:Bus', 'View:Bus', 'ViewAny:Bus',
+                    'Create:Bus', 'Delete:Bus', 'Restore:Bus', 'Update:Bus', 'View:Bus', 'ViewAny:Bus',
                 ]);
 
         $edited = $demoCompany->buses()->where('unit_number', 'DEMO-001')->sole();

@@ -6,6 +6,7 @@ use App\Auth\ExternalUserProvider;
 use App\Auth\SessionGuard;
 use App\Enums\TripStatus;
 use App\Enums\UserRole;
+use App\Models\Bus;
 use App\Models\Company;
 use App\Models\Driver;
 use App\Models\DriverSchedule;
@@ -94,6 +95,8 @@ class AppServiceProvider extends ServiceProvider
 
             $isProtectedOperationalModel = $record instanceof Company
                 || $record === Company::class
+                || $record instanceof Bus
+                || $record === Bus::class
                 || $record instanceof Route
                 || $record === Route::class;
 

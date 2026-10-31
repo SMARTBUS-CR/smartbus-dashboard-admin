@@ -546,5 +546,7 @@
     "The selected driver is unavailable or ineligible for the planned dates.": "The selected driver is unavailable or ineligible for the planned dates.",
     "A global system admin cannot be registered as a driver.": "A global system admin cannot be registered as a driver.",
     "A driver employment already exists for this user in this company, including archived records.": "A driver employment already exists for this user in this company, including archived records.",
-    "This license is already reserved by a driver in this company.": "This license is already reserved by a driver in this company."
+    "This license is already reserved by a driver in this company.": "This license is already reserved by a driver in this company.",
+    "Permanent bus deletion is disabled. Archive the bus instead.": "Permanent bus deletion is disabled. Archive the bus instead.",
+    "Buses with scheduled or in-progress trips cannot be deactivated or archived.": "Buses with scheduled or in-progress trips cannot be deactivated or archived."
 }
