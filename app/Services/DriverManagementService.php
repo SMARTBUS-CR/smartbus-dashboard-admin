@@ -96,10 +96,13 @@ class DriverManagementService
     }
 
     /**
-     * Subtask 09 will add real Trip assignment checks here. Called inside the
+     * Check real Trip assignments inside the
      * PostgreSQL transaction with a locked employment and its proposed values.
      */
-    protected function ensureLifecycleOperationAllowed(Company $company, Driver $driver, string $operation): void {}
+    protected function ensureLifecycleOperationAllowed(Company $company, Driver $driver, string $operation): void
+    {
+        app(TripReservationService::class)->ensureEmploymentAllowed($company, $driver, $operation);
+    }
 
     private function ensureEmploymentIsNotArchived(Driver $driver): void
     {
@@ -119,6 +122,8 @@ class DriverManagementService
 
             return DB::connection('pgsql')->transaction(function () use ($actor, $company, $driver, $ability, $operation): Driver {
                 $persistedCompany = Company::query()->whereKey($company->getKey())->sharedLock()->firstOrFail();
+                $identity = Driver::withTrashed()->where('company_id', $persistedCompany->getKey())->findOrFail($driver->getKey());
+                app(TripReservationService::class)->lockPeople([$identity->user_id]);
                 $employment = Driver::withTrashed()->where('company_id', $persistedCompany->getKey())
                     ->whereKey($driver->getKey())->lockForUpdate()->firstOrFail();
                 Gate::forUser($actor)->authorize($ability, [Driver::class, $persistedCompany, $employment]);

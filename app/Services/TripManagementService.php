@@ -24,8 +24,8 @@ class TripManagementService
     ) {}
 
     /**
-     * Internal planning entry point. Operational consumption remains pending the
-     * shared reservation protocol and bus/workforce assignment safeguards.
+     * Internal planning entry point. Operational consumption remains gated on
+     * completed HU #36/#38 integration and verification.
      *
      * @param array{
      *     route_pattern_id: string, route_schedule_id: string, bus_id: string, driver_id: string,
@@ -70,7 +70,7 @@ class TripManagementService
             }
 
             return (new Trip)->getConnection()->transaction(function () use ($persistedActor, $company, $data, $tripId): Trip {
-                $company = Company::query()->whereKey($company->getKey())->lockForUpdate()->first();
+                $company = Company::query()->whereKey($company->getKey())->sharedLock()->first();
                 if (! $company || $company->status !== CompanyStatus::ACTIVE) {
                     $this->reject('company', 'An active company context is required.');
                 }
@@ -82,17 +82,28 @@ class TripManagementService
                 }
                 $this->validatePayload($data);
 
-                $bus = Bus::query()->where('company_id', $company->getKey())->whereKey($data['bus_id'])->lockForUpdate()->first();
-                if (! $bus || ! $bus->is_active) {
+                $proposedDriver = Driver::query()->where('company_id', $company->getKey())->find($data['driver_id']);
+                if (! $proposedDriver) {
+                    $this->reject('driver_id', 'The selected driver is unavailable or ineligible for the planned dates.');
+                }
+                $driverIds = array_values(array_unique(array_filter([$trip?->driver_id, $proposedDriver->getKey()])));
+                $reservations = app(TripReservationService::class);
+                $reservations->lockPeople(Driver::withTrashed()->whereIn('id', $driverIds)->pluck('user_id')->all());
+                $buses = Bus::withTrashed()->whereIn('id', array_filter([$trip?->bus_id, $data['bus_id']]))->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+                $drivers = Driver::withTrashed()->whereIn('id', $driverIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+
+                $bus = $buses->get($data['bus_id']);
+                if (! $bus || $bus->company_id !== $company->getKey() || $bus->trashed() || ! $bus->is_active) {
                     $this->reject('bus_id', 'The selected bus is unavailable.');
                 }
-                $driver = Driver::query()->where('company_id', $company->getKey())->whereKey($data['driver_id'])->lockForUpdate()->first();
-                if (! $driver) {
+                $driver = $drivers->get($data['driver_id']);
+                if (! $driver || $driver->company_id !== $company->getKey() || $driver->trashed()) {
                     $this->reject('driver_id', 'The selected driver is unavailable or ineligible for the planned dates.');
                 }
 
                 $plan = $this->snapshots->prepare($company, Arr::except($data, ['driver_id']));
                 $driver = $this->drivers->validateForPlan($company, $driver->getKey(), $plan);
+                $reservations->ensurePersonAvailable($driver, $plan['departure_at'], $plan['arrival_at'], $trip?->getKey());
 
                 $attributes = [
                     'route_pattern_id' => $plan['pattern']->getKey(), 'route_schedule_id' => $plan['schedule']->getKey(),
