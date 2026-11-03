@@ -9,12 +9,14 @@ use App\Services\DriverManagementService;
 use App\Services\DriverScheduleService;
 use App\Services\TripManagementService;
 use App\Services\UserManagementService;
+use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Validation\UncompromisedVerifier;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\QueryException;
+use Illuminate\Foundation\Testing\Concerns\InteractsWithTime;
 use Illuminate\Support\ConfigurationUrlParser;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -99,6 +101,12 @@ try {
     DB::connection('pgsql')->statement("SET lock_timeout = '8s'");
     DB::connection('mysql')->statement('SET SESSION innodb_lock_wait_timeout = 4');
     app()->setLocale($input['locale'] ?? 'en');
+    if (isset($input['instant'])) {
+        (new class
+        {
+            use InteractsWithTime;
+        })->travelTo(CarbonImmutable::parse($input['instant']));
+    }
     $company = Company::query()->findOrFail($input['company_id']);
     $actor = User::query()->findOrFail($input['actor_id']);
     $target = isset($input['user_id']) ? User::query()->findOrFail($input['user_id']) : null;
@@ -112,7 +120,10 @@ try {
             return;
         }
 
-        if ($input['barrier_at'] === 'trip_written' && str_starts_with($query->sql, 'insert into "trips"')) {
+        if ($input['barrier_at'] === 'trip_locked' && str_contains($query->sql, '"trips"') && str_contains($query->sql, 'for update')) {
+            $paused = true;
+            $pause('trip_locked');
+        } elseif ($input['barrier_at'] === 'trip_written' && str_starts_with($query->sql, 'insert into "trips"')) {
             $paused = true;
             $pause('trip_written');
         } elseif ($input['barrier_at'] === 'person_locked' && str_contains($query->sql, 'pg_advisory_xact_lock')) {
@@ -134,6 +145,10 @@ try {
     });
 
     DB::connection('pgsql')->beforeExecuting(static function (string $sql, array $bindings, Connection $connection) use ($input, $pause, &$paused): void {
+        if (! $paused && $input['barrier_at'] === 'trip_lock_attempt' && str_contains($sql, '"trips"') && str_contains($sql, 'for update')) {
+            $paused = true;
+            $pause('trip_lock_attempt');
+        }
         if (! $paused && $input['barrier_at'] === 'trip_write_attempt' && str_starts_with($sql, 'insert into "trips"')) {
             $paused = true;
             $pause('trip_write_attempt');
@@ -164,7 +179,10 @@ try {
     $result = [];
 
     try {
-        if ($input['operation'] === 'trip_schedule' || $input['operation'] === 'trip_replan') {
+        if ($input['operation'] === 'trip_start') {
+            $trip = app(TripManagementService::class)->start($actor, $company, $input['trip_id']);
+            $result = ['trip_id' => $trip->id, 'actual_departure_at' => $trip->actual_departure_at->utc()->format('Y-m-d H:i:s.uP')];
+        } elseif ($input['operation'] === 'trip_schedule' || $input['operation'] === 'trip_replan') {
             $service = app(TripManagementService::class);
             $trip = $input['operation'] === 'trip_schedule'
                 ? $service->schedule($actor, $company, $input['plan'])

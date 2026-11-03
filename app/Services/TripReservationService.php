@@ -65,6 +65,19 @@ class TripReservationService
         }
     }
 
+    public function ensureNoOtherTripInProgress(Trip $trip, Driver $driver): void
+    {
+        $conflict = Trip::query()->whereKeyNot($trip->getKey())->where('status', TripStatus::IN_PROGRESS)
+            ->where(function (Builder $query) use ($trip, $driver): void {
+                $query->where('bus_id', $trip->bus_id)
+                    ->orWhereIn('driver_id', Driver::withTrashed()->select('id')->where('user_id', $driver->user_id));
+            })->first(['bus_id']);
+        if ($conflict !== null) {
+            $field = $conflict->bus_id === $trip->bus_id ? 'bus_id' : 'driver_id';
+            throw ValidationException::withMessages([$field => __('The selected departure or resource conflicts with an existing trip.')]);
+        }
+    }
+
     /** Check persisted proposed changes inside the transaction; rejection rolls them back. */
     public function ensureAvailabilityAllowed(Driver $driver): void
     {

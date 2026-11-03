@@ -9,11 +9,14 @@ use App\Models\Trip;
 use Database\Seeders\TripPermissionsSeeder;
 use Illuminate\Support\Facades\Gate;
 
-test('creates only the two web permissions needed for trip planning', function (): void {
+test('creates the web permissions needed for trip planning and execution', function (): void {
     $this->seed(TripPermissionsSeeder::class);
 
     expect(Permission::query()->orderBy('name')->get(['name', 'guard_name'])->toArray())->toBe([
+        ['name' => 'Cancel:Trip', 'guard_name' => 'web'],
+        ['name' => 'Complete:Trip', 'guard_name' => 'web'],
         ['name' => 'Create:Trip', 'guard_name' => 'web'],
+        ['name' => 'Start:Trip', 'guard_name' => 'web'],
         ['name' => 'Update:Trip', 'guard_name' => 'web'],
     ]);
     $this->assertDatabaseCount('trips', 0);

@@ -549,5 +549,8 @@
     "This license is already reserved by a driver in this company.": "This license is already reserved by a driver in this company.",
     "Permanent bus deletion is disabled. Archive the bus instead.": "Permanent bus deletion is disabled. Archive the bus instead.",
     "Buses with scheduled or in-progress trips cannot be deactivated or archived.": "Buses with scheduled or in-progress trips cannot be deactivated or archived.",
-    "This change would invalidate an assigned trip.": "This change would invalidate an assigned trip."
+    "This change would invalidate an assigned trip.": "This change would invalidate an assigned trip.",
+    "Only scheduled trips can be started.": "Only scheduled trips can be started.",
+    "The assigned driver is unavailable at the actual start instant.": "The assigned driver is unavailable at the actual start instant.",
+    "The selected departure is currently suspended.": "The selected departure is currently suspended."
 }

@@ -36,7 +36,7 @@ class TripDriverEligibilityService
 
     /**
      * Internal planning check, after actor authorization and before persistence.
-     * Dates must come from TripPlanPreparationService's half-open local window.
+     * Dates come from a trusted planning window or the actual company-local start date.
      * Availability, locking and reservation checks belong to the management flow.
      *
      * @param  list<string>  $localDates
