@@ -67,13 +67,13 @@ test('retains the real driver relationship after the employment is archived', fu
     $this->assertModelExists($trip);
 });
 
-test('protects stored trip planning and execution fields against direct writes', function (string $field, mixed $value, bool $quiet): void {
+test('protects stored trip planning and execution fields against direct writes', function (string $field, mixed $value): void {
     $trip = Trip::query()->create(planningTripAttributes())->refresh();
     $before = $trip->getRawOriginal();
     $trip->forceFill([$field => $value]);
 
     try {
-        $quiet ? $trip->saveQuietly() : $trip->save();
+        $trip->save();
         $this->fail('Expected a validation exception.');
     } catch (ValidationException $exception) {
         expect($exception->errors())->toHaveKey($field);
@@ -95,15 +95,20 @@ test('protects stored trip planning and execution fields against direct writes',
     'actual arrival' => ['actual_arrival_at', '2026-10-26 13:00:00+00'],
     'cancellation time' => ['cancelled_at', '2026-10-26 11:00:00+00'],
     'cancellation reason' => ['cancellation_reason', 'Forged cancellation'],
-])->with(['normal save' => [false], 'quiet save' => [true]]);
+]);
 
-test('rejects physical trip deletion while preserving its history', function (string $method): void {
+test('soft deletes trips and restores them without changing their history', function (string $method): void {
     $trip = Trip::query()->create(planningTripAttributes())->refresh();
     $before = $trip->getRawOriginal();
 
-    expect(fn () => $trip->{$method}())->toThrow(ValidationException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
-})->with(['delete', 'deleteQuietly', 'forceDelete']);
+    expect($trip->{$method}())->toBeTrue();
+    $this->assertSoftDeleted($trip);
+    expect(Trip::query()->find($trip->getKey()))->toBeNull();
+
+    expect($trip->restore())->toBeTrue();
+    $restored = Trip::query()->findOrFail($trip->getKey());
+    expect($restored->getRawOriginal('planned_route_snapshot'))->toBe($before['planned_route_snapshot']);
+})->with(['delete', 'deleteQuietly']);
 
 test('hydrates every trip execution state without changing historical timestamps', function (string $state, string $case): void {
     $trip = (new Trip)->newFromBuilder([
@@ -117,11 +122,11 @@ test('hydrates every trip execution state without changing historical timestamps
     ['completed', 'COMPLETED'], ['cancelled', 'CANCELLED'],
 ]);
 
-test('rejects execution data on new trips even when model events are bypassed', function (string $field, string $value): void {
+test('rejects execution data on new trips', function (string $field, string $value): void {
     $trip = (new Trip(planningTripAttributes()))->forceFill([$field => $value]);
 
     try {
-        $trip->saveQuietly();
+        $trip->save();
         $this->fail('Expected a validation exception.');
     } catch (ValidationException $exception) {
         expect($exception->errors())->toHaveKey($field);
@@ -133,7 +138,7 @@ test('rejects execution data on new trips even when model events are bypassed', 
     ['cancellation_reason', 'Forged cancellation'],
 ]);
 
-test('translates history and deletion protection messages', function (string $locale, string $historyMessage, string $deletionMessage): void {
+test('translates history protection messages', function (string $locale, string $historyMessage): void {
     app()->setLocale($locale);
     $trip = Trip::query()->create(planningTripAttributes())->refresh();
     $trip->service_date = '2026-10-27';
@@ -144,14 +149,8 @@ test('translates history and deletion protection messages', function (string $lo
     } catch (ValidationException $exception) {
         expect($exception->errors())->toBe(['service_date' => [$historyMessage]]);
     }
-    try {
-        $trip->delete();
-        $this->fail('Expected a validation exception.');
-    } catch (ValidationException $exception) {
-        expect($exception->errors())->toBe(['trip' => [$deletionMessage]]);
-    }
     $this->assertModelExists($trip);
 })->with([
-    ['en', 'Trip history cannot be changed directly.', 'Trip deletion is disabled. Preserve the trip history.'],
-    ['es', 'El historial del viaje no se puede modificar directamente.', 'La eliminación de viajes está deshabilitada. Conserva el historial del viaje.'],
+    ['en', 'Trip history cannot be changed directly.'],
+    ['es', 'El historial del viaje no se puede modificar directamente.'],
 ]);

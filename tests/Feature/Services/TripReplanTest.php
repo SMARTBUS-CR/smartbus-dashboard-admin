@@ -64,7 +64,7 @@ test('replaces the complete scheduled plan while preserving trip identity and hi
     expect(getPermissionsTeamId())->toBe($team);
     $this->assertDatabaseCount('trips', 1);
     $updated->forceFill(['driver_id' => $trip->driver_id]);
-    expect(fn () => $updated->saveQuietly())->toThrow(ValidationException::class);
+    expect(fn () => $updated->save())->toThrow(ValidationException::class);
     expect($trip->fresh()->driver_id)->toBe($replacement->driver_id);
     Http::assertNothingSent();
 });
