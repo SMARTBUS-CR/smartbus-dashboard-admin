@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\CompanyStatus;
 use App\Enums\UserRole;
+use App\Exceptions\DriverRegistrationCompensationException;
 use App\Models\Company;
 use App\Models\CompanyUser;
 use App\Models\Driver;
@@ -17,10 +18,12 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Spatie\Permission\PermissionRegistrar;
+use Throwable;
 
 class DriverManagementService
 {
-    public function __construct(private readonly UserManagementService $users) {}
+    public function __construct(private readonly UserManagementService $users, private readonly PermissionRegistrar $permissions) {}
 
     /**
      * @param  array{name: string, email: string, password: string, password_confirmation: string}  $identity
@@ -37,10 +40,11 @@ class DriverManagementService
     public function register(User $actor, Company $company, array $identity, array $employment): Driver
     {
         return $this->withCompanyContext($actor, $company, function (Company $company) use ($actor, $identity, $employment): Driver {
-            return $this->inRegistrationTransactions($company, function () use ($actor, $company, $identity, $employment): Driver {
+            return $this->inRegistrationTransactions($company, function (DriverRegistrationOperation $operation) use ($actor, $company, $identity, $employment): Driver {
                 $user = $this->users->createDriverIdentity($actor, $company, $identity);
+                $operation->newUserId = $user->getKey();
 
-                return $this->provisionEmployment($company, $user, $employment);
+                return $this->provisionEmployment($company, $user, $employment, $operation);
             });
         });
     }
@@ -59,14 +63,14 @@ class DriverManagementService
     public function createForExistingUser(User $actor, Company $company, User $user, array $employment): Driver
     {
         return $this->withCompanyContext($actor, $company, function (Company $company) use ($user, $employment): Driver {
-            return $this->inRegistrationTransactions($company, function () use ($company, $user, $employment): Driver {
+            return $this->inRegistrationTransactions($company, function (DriverRegistrationOperation $operation) use ($company, $user, $employment): Driver {
                 $identity = User::query()->whereKey($user->getKey())->lockForUpdate()->first();
 
                 if ($identity === null) {
                     throw ValidationException::withMessages(['user_id' => __('The selected user is unavailable.')]);
                 }
 
-                return $this->provisionEmployment($company, $identity, $employment);
+                return $this->provisionEmployment($company, $identity, $employment, $operation);
             });
         }, $user);
     }
@@ -97,49 +101,81 @@ class DriverManagementService
     }
 
     /**
-     * Connection-local rollbacks do not provide atomic cross-database commits.
-     * Commit failure compensation is deferred to Subtask 03.
+     * Commit employment first, then identity. Any exception compensates the
+     * operation's recorded deltas after rolling back its open transactions.
      * Acquire the Company row lock before any User write or row lock, matching
      * company-access removal. A shared lock permits parallel registrations.
      *
-     * @param  Closure(): Driver  $operation
+     * @param  Closure(DriverRegistrationOperation): Driver  $callback
      */
-    private function inRegistrationTransactions(Company $company, Closure $operation): Driver
+    private function inRegistrationTransactions(Company $company, Closure $callback): Driver
     {
+        $operation = new DriverRegistrationOperation($company->getKey(), $this->permissions);
+        $mysql = DB::connection('mysql');
+        $pgsql = DB::connection('pgsql');
+        $levels = ['pgsql' => $pgsql->transactionLevel(), 'mysql' => $mysql->transactionLevel()];
+
         try {
-            return DB::connection('mysql')->transaction(
-                fn (): Driver => DB::connection('pgsql')->transaction(function () use ($company, $operation): Driver {
-                    $lockedCompany = Company::query()->whereKey($company->getKey())
-                        ->where('status', CompanyStatus::ACTIVE)->sharedLock()->first();
+            $mysql->beginTransaction();
+            $pgsql->beginTransaction();
+            $lockedCompany = Company::query()->whereKey($company->getKey())
+                ->where('status', CompanyStatus::ACTIVE)->sharedLock()->first();
 
-                    if ($lockedCompany === null) {
-                        throw ValidationException::withMessages(['company_id' => __('The selected company is unavailable.')]);
-                    }
-
-                    return $operation();
-                }),
-            );
-        } catch (UniqueConstraintViolationException $exception) {
-            if ($exception->getConnectionName() !== 'pgsql'
-                || ($exception->errorInfo[0] ?? null) !== '23505'
-                || ! str_contains($exception->errorInfo[2] ?? '', '"drivers_company_id_license_unique"')) {
-                throw $exception;
+            if ($lockedCompany === null) {
+                throw ValidationException::withMessages(['company_id' => __('The selected company is unavailable.')]);
             }
 
-            throw ValidationException::withMessages([
-                'license' => __('This license is already reserved by a driver in this company.'),
-            ]);
+            $driver = $callback($operation);
+            $this->permissions->forgetCachedPermissions();
+            $pgsql->commit();
+            $mysql->commit();
+
+            return $driver;
+        } catch (Throwable $failure) {
+            $recoveryFailures = [];
+
+            foreach (['pgsql', 'mysql'] as $name) {
+                try {
+                    DB::connection($name)->rollBack($levels[$name]);
+                } catch (Throwable $rollbackFailure) {
+                    $recoveryFailures[] = $rollbackFailure;
+                }
+            }
+
+            try {
+                $operation->compensate();
+            } catch (Throwable $compensationFailure) {
+                $recoveryFailures[] = $compensationFailure;
+            }
+
+            if ($recoveryFailures !== []) {
+                throw new DriverRegistrationCompensationException($operation, $recoveryFailures, $failure);
+            }
+
+            if ($failure instanceof UniqueConstraintViolationException
+                && $failure->getConnectionName() === 'pgsql'
+                && ($failure->errorInfo[0] ?? null) === '23505'
+                && str_contains($failure->errorInfo[2] ?? '', '"drivers_company_id_license_unique"')) {
+                throw ValidationException::withMessages([
+                    'license' => __('This license is already reserved by a driver in this company.'),
+                ]);
+            }
+
+            throw $failure;
         }
     }
 
     /** @param array<string, mixed> $employment */
-    private function provisionEmployment(Company $company, User $user, array $employment): Driver
+    private function provisionEmployment(Company $company, User $user, array $employment, DriverRegistrationOperation $operation): Driver
     {
         if ($user->isSuperAdmin()) {
             throw ValidationException::withMessages([
                 'user_id' => __('A global system admin cannot be registered as a driver.'),
             ]);
         }
+
+        $operation->userId = $user->getKey();
+        $operation->modelType = $user->getMorphClass();
 
         Validator::make($employment, [
             ...array_fill_keys([
@@ -163,6 +199,7 @@ class DriverManagementService
         ]));
         $driver->company_id = $company->getKey();
         $driver->user_id = $user->getKey();
+        $driver->id = $operation->driverId = $driver->newUniqueId();
 
         if (is_string($driver->license) && Driver::withTrashed()->where('company_id', $company->getKey())->where('license', $driver->license)->exists()) {
             throw ValidationException::withMessages([
@@ -179,17 +216,27 @@ class DriverManagementService
 
         if ($membership === null) {
             $membership = new CompanyUser(['company_id' => $company->getKey(), 'user_id' => $user->getKey()]);
+            $membership->id = $operation->newMembershipId = $membership->newUniqueId();
 
             if (! $membership->save()) {
                 throw new RuntimeException('Company membership creation was cancelled.');
             }
-        } elseif ($membership->trashed() && ! $membership->restore()) {
-            throw new RuntimeException('Company membership restoration was cancelled.');
+        } elseif ($membership->trashed()) {
+            $operation->restoredMembership = Arr::only($membership->getRawOriginal(), ['id', 'deleted_at', 'updated_at']);
+
+            if (! $membership->restore()) {
+                throw new RuntimeException('Company membership restoration was cancelled.');
+            }
         }
 
         $role = Role::withoutEvents(fn (): Role => Role::withoutGlobalScopes()->firstOrCreate([
             'company_id' => $company->getKey(), 'name' => UserRole::Driver->value, 'guard_name' => 'web',
         ], ['color' => Role::generateColor()]));
+        $operation->roleId = $role->getKey();
+        $operation->roleCreated = $role->wasRecentlyCreated;
+        $operation->roleAssigned = ! DB::connection('mysql')->table('model_has_roles')
+            ->where('role_id', $role->getKey())->where('model_uuid', $user->getKey())
+            ->where('model_type', $user->getMorphClass())->where('company_id', $company->getKey())->exists();
 
         $user->unsetRelation('roles')->unsetRelation('permissions');
         $user->assignRole($role);
