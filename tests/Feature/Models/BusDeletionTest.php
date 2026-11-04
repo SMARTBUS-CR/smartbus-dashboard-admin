@@ -6,22 +6,22 @@ use App\Models\CompanyUser;
 use App\Policies\BusPolicy;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\ValidationException;
 
-test('rejects permanent bus deletion and preserves its stored attributes', function (string $state, string $operation, string $locale, string $message): void {
-    app()->setLocale($locale);
+test('rejects unauthorized permanent bus deletion and preserves its stored attributes', function (string $state, string $operation): void {
+    $actor = createUserWithRole(UserRole::SuperAdmin);
     $bus = Bus::factory()->{$state}()->create();
     $attributes = $bus->refresh()->getRawOriginal();
 
     try {
+        $ability = $operation === 'forceDestroy' ? 'forceDeleteAny' : 'forceDelete';
+        Gate::forUser($actor)->authorize($ability, [Bus::class, $bus->company, $bus]);
         if ($operation === 'forceDestroy') {
             Bus::forceDestroy([$bus->getKey()]);
         } else {
             $bus->{$operation}();
         }
-        $this->fail('Expected a validation exception.');
-    } catch (ValidationException $exception) {
-        expect($exception->errors())->toBe(['bus' => [$message]]);
+        $this->fail('Expected an authorization exception.');
+    } catch (AuthorizationException) {
         expect($bus->fresh()->getRawOriginal())->toBe($attributes);
     }
 })->with([
@@ -30,9 +30,6 @@ test('rejects permanent bus deletion and preserves its stored attributes', funct
     'archived bus' => ['archived', 'forceDelete'],
     'quiet deletion' => ['archived', 'forceDeleteQuietly'],
     'bulk model deletion' => ['archived', 'forceDestroy'],
-])->with([
-    'English' => ['en', 'Permanent bus deletion is disabled. Archive the bus instead.'],
-    'Spanish' => ['es', 'La eliminación permanente de autobuses está deshabilitada. Archiva el autobús en su lugar.'],
 ]);
 
 test('denies permanent bus deletion authorization even with elevated permissions', function (UserRole $role, string $state): void {

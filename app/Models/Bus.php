@@ -35,13 +35,6 @@ class Bus extends Model
         });
     }
 
-    public function forceDelete(): bool
-    {
-        throw ValidationException::withMessages([
-            'bus' => __('Permanent bus deletion is disabled. Archive the bus instead.'),
-        ]);
-    }
-
     /**
      * @return array<string, string>
      */

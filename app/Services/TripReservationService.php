@@ -14,6 +14,11 @@ use Illuminate\Validation\ValidationException;
 
 class TripReservationService
 {
+    public function __construct(
+        private readonly TripDriverEligibilityService $eligibility,
+        private readonly DriverAvailabilityService $availability,
+    ) {}
+
     /** @param list<string> $userIds */
     public function lockPeople(array $userIds): void
     {
@@ -46,21 +51,20 @@ class TripReservationService
     public function ensureEmploymentAllowed(Company $company, Driver $driver, string $operation): void
     {
         if ($operation === 'restore' || ($operation === 'setActive' && $driver->status === DriverStatus::ACTIVE)
-            || ($operation === 'updateEmployment' && ! $driver->isDirty(['employment_starts_on', 'employment_ends_on', 'license_expires_at']))) {
+            || ($operation === 'updateEmployment' && ! $driver->isDirty(['license', 'employment_starts_on', 'employment_ends_on', 'license_expires_at']))) {
             return;
         }
         foreach ($this->assignments($driver)->get() as $trip) {
             if ($operation === 'archive' || $driver->status !== DriverStatus::ACTIVE) {
                 $this->rejectAssignment();
             }
+            $dates = [];
             $end = $trip->scheduled_arrival_at->setTimezone($company->timezone);
-            for ($day = $trip->scheduled_departure_at->setTimezone($company->timezone)->startOfDay(); $day < $end; $day = $day->addDay()) {
-                $date = $day->toDateString();
-                if ($driver->employment_starts_on->toDateString() > $date
-                    || ($driver->employment_ends_on !== null && $driver->employment_ends_on->toDateString() < $date)
-                    || $driver->license_expires_at->toDateString() < $date) {
-                    $this->rejectAssignment();
-                }
+            for ($day = $trip->scheduled_departure_at->setTimezone($company->timezone)->startOfDay(); $day < $end; $day = $day->addDay()->startOfDay()) {
+                $dates[] = $day->toDateString();
+            }
+            if (! $this->eligibility->isEligibleForDates($company, $driver, $dates)) {
+                $this->rejectAssignment();
             }
         }
     }
@@ -69,7 +73,7 @@ class TripReservationService
     public function ensureAvailabilityAllowed(Driver $driver): void
     {
         foreach ($this->assignments($driver)->get() as $trip) {
-            if (! app(DriverAvailabilityService::class)->covers($driver, $trip->scheduled_departure_at->utc(), $trip->scheduled_arrival_at->utc())) {
+            if (! $this->availability->covers($driver, $trip->scheduled_departure_at->utc(), $trip->scheduled_arrival_at->utc())) {
                 $this->rejectAssignment();
             }
         }
