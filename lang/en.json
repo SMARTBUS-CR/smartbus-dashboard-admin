@@ -513,5 +513,8 @@
     "A driver employment cannot be reassigned to another company or user.": "A driver employment cannot be reassigned to another company or user.",
     "The selected company is unavailable.": "The selected company is unavailable.",
     "The selected user is unavailable.": "The selected user is unavailable.",
-    "Permanent driver deletion is disabled. Archive the driver instead.": "Permanent driver deletion is disabled. Archive the driver instead."
+    "Permanent driver deletion is disabled. Archive the driver instead.": "Permanent driver deletion is disabled. Archive the driver instead.",
+    "A global system admin cannot be registered as a driver.": "A global system admin cannot be registered as a driver.",
+    "A driver employment already exists for this user in this company, including archived records.": "A driver employment already exists for this user in this company, including archived records.",
+    "This license is already reserved by a driver in this company.": "This license is already reserved by a driver in this company."
 }
