@@ -24,11 +24,15 @@ function reservationInputs(): array
     ]];
 }
 
-test('rejects another profile of the same person across companies without revealing the conflicting trip', function (string $locale): void {
+test('rejects another profile of the same person across companies without revealing the conflicting trip', function (string $locale, bool $archived): void {
     [$actor, $candidate, $data] = reservationInputs();
     $other = createCompany(['timezone' => 'America/Costa_Rica']);
     $profile = Driver::factory()->for($other)->create(['user_id' => $candidate->driver->user_id]);
     $existing = Trip::factory()->for($other)->for($profile, 'driver')->create()->refresh();
+    if ($archived) {
+        $existing->delete();
+        $existing->refresh();
+    }
     $before = $existing->getRawOriginal();
     app()->setLocale($locale);
 
@@ -38,11 +42,14 @@ test('rejects another profile of the same person across companies without reveal
         });
     expect($existing->fresh()->getRawOriginal())->toBe($before);
     $this->assertDatabaseCount('trips', 1);
-})->with(['en', 'es']);
+})->with(['en', 'es'])->with(['visible trip' => false, 'archived trip' => true]);
 
-test('preserves assigned trips when employment changes would make the driver ineligible', function (string $operation): void {
+test('preserves assigned trips when employment changes would make the driver ineligible', function (string $operation, bool $archived): void {
     [$actor, $fixture, $data] = reservationInputs();
     $trip = app(TripManagementService::class)->schedule($actor, $fixture->company, $data);
+    if ($archived) {
+        $trip->delete();
+    }
     $driver = $trip->driver->refresh();
     $driver->update(['employment_starts_on' => '2026-10-01']);
     $driver->refresh();
@@ -59,11 +66,14 @@ test('preserves assigned trips when employment changes would make the driver ine
 
     expect($driver->fresh()->getRawOriginal())->toBe($before);
     $this->assertModelExists($trip);
-})->with(['deactivate', 'archive', 'license_expires_at', 'employment_ends_on']);
+})->with(['deactivate', 'archive', 'license_expires_at', 'employment_ends_on'])->with(['visible trip' => false, 'archived trip' => true]);
 
-test('rolls back an availability mutation that would uncover an assigned trip', function (string $operation): void {
+test('rolls back an availability mutation that would uncover an assigned trip', function (string $operation, bool $archived): void {
     [$actor, $fixture, $data] = reservationInputs();
     $trip = app(TripManagementService::class)->schedule($actor, $fixture->company, $data);
+    if ($archived) {
+        $trip->delete();
+    }
     $schedule = DriverSchedule::query()->where('driver_id', $trip->driver_id)->firstOrFail();
     $before = $schedule->getRawOriginal();
     $service = app(DriverScheduleService::class);
@@ -75,7 +85,7 @@ test('rolls back an availability mutation that would uncover an assigned trip', 
 
     expect($schedule->fresh()->getRawOriginal())->toBe($before);
     $this->assertModelExists($trip);
-})->with(['delete', 'update']);
+})->with(['delete', 'update'])->with(['visible trip' => false, 'archived trip' => true]);
 
 test('allows salary and availability changes that preserve assigned coverage', function (): void {
     [$actor, $fixture, $data] = reservationInputs();

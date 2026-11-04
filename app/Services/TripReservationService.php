@@ -32,7 +32,7 @@ class TripReservationService
 
     public function ensurePersonAvailable(Driver $driver, CarbonImmutable $start, CarbonImmutable $end, ?string $exceptTripId): void
     {
-        $conflict = Trip::query()->whereIn('driver_id', Driver::withTrashed()->select('id')
+        $conflict = Trip::withTrashed()->whereIn('driver_id', Driver::withTrashed()->select('id')
             ->where('user_id', $driver->user_id)->whereKeyNot($driver->getKey()))
             ->whereIn('status', [TripStatus::SCHEDULED, TripStatus::IN_PROGRESS])
             ->when($exceptTripId !== null, fn (Builder $query) => $query->whereKeyNot($exceptTripId))
@@ -78,7 +78,7 @@ class TripReservationService
     /** @return Builder<Trip> */
     private function assignments(Driver $driver): Builder
     {
-        return Trip::query()->select(['id', 'scheduled_departure_at', 'scheduled_arrival_at'])
+        return Trip::withTrashed()->select(['id', 'scheduled_departure_at', 'scheduled_arrival_at'])
             ->where('driver_id', $driver->getKey())->whereIn('status', [TripStatus::SCHEDULED, TripStatus::IN_PROGRESS]);
     }
 
