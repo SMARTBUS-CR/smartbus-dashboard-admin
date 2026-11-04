@@ -74,8 +74,12 @@ the reservation through the persisted state change.
 Scope and authorize before resolving retries. Equivalent retries preserve the
 first server timestamps and cancellation reason; cancellation retries still
 validate the supplied reason. Replan cannot change started or terminal Trips.
-Normal and quiet model writes and model deletion remain prohibited; only the
-trusted service transitions may modify execution history. Factory/seeder
+Normal and quiet direct model history writes and permanent deletion remain
+prohibited; only the trusted service transitions may modify execution history.
+Soft deletion does not cancel or complete a Trip: scheduled/in-progress Trips
+retain their reservations and in-progress occupancy even when soft deleted.
+Restoration may clear `deleted_at` without changing any other historical field.
+Factory/seeder
 execution examples are explicit development fixtures, not operational transitions.
 
 Preserve private bilingual field errors for known constraint conflicts.

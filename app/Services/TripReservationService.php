@@ -71,7 +71,7 @@ class TripReservationService
 
     public function ensureNoOtherTripInProgress(Trip $trip, Driver $driver): void
     {
-        $conflict = Trip::query()->whereKeyNot($trip->getKey())->where('status', TripStatus::IN_PROGRESS)
+        $conflict = Trip::withTrashed()->whereKeyNot($trip->getKey())->where('status', TripStatus::IN_PROGRESS)
             ->where(function (Builder $query) use ($trip, $driver): void {
                 $query->where('bus_id', $trip->bus_id)
                     ->orWhereIn('driver_id', Driver::withTrashed()->select('id')->where('user_id', $driver->user_id));

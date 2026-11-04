@@ -154,7 +154,7 @@ test('scopes trip lookup to the selected company even for a super administrator'
     expect($trip->fresh()->status)->toBe(TripStatus::SCHEDULED);
 });
 
-test('rejects another in-progress trip even after its planned interval has elapsed', function (string $resource): void {
+test('rejects another in-progress trip even after its planned interval has elapsed', function (string $resource, bool $archived): void {
     [$trip, $actor] = tripStartInputs();
     $this->travelTo(CarbonImmutable::parse('2026-10-26T12:45:00Z'));
     if ($resource === 'bus') {
@@ -165,6 +165,9 @@ test('rejects another in-progress trip even after its planned interval has elaps
         $other = Trip::factory()->for($company)->for($profile, 'driver')->create(['service_date' => '2026-10-19']);
     }
     Trip::query()->whereKey($other->id)->update(['status' => TripStatus::IN_PROGRESS, 'actual_departure_at' => '2026-10-19 12:30:00+00']);
+    if ($archived) {
+        $other->delete();
+    }
     $before = $trip->getRawOriginal();
 
     expect(fn () => app(TripManagementService::class)->start($actor, $trip->company, $trip->id))
@@ -172,8 +175,8 @@ test('rejects another in-progress trip even after its planned interval has elaps
             expect($exception->errors())->toBe([$resource === 'bus' ? 'bus_id' : 'driver_id' => [__('The selected departure or resource conflicts with an existing trip.')]]);
         });
     expect($trip->fresh()->getRawOriginal())->toBe($before);
-    expect($other->fresh()->status)->toBe(TripStatus::IN_PROGRESS);
-})->with(['bus', 'person']);
+    expect(Trip::withTrashed()->findOrFail($other->id)->status)->toBe(TripStatus::IN_PROGRESS);
+})->with(['bus', 'person'])->with(['visible' => [false], 'soft deleted' => [true]]);
 
 test('rejects started-trip retries after current actor authorization is revoked', function (string $revoked): void {
     [$trip] = tripStartInputs();
