@@ -2,35 +2,52 @@
 
 namespace App\Policies;
 
-use App\Enums\CompanyStatus;
 use App\Models\Company;
-use App\Models\CompanyUser;
+use App\Models\Driver;
 use App\Models\User;
+use App\Traits\AuthorizesDriverWorkforce;
 
 class DriverPolicy
 {
+    use AuthorizesDriverWorkforce;
+
+    public function viewAny(User $actor, Company $company): bool
+    {
+        return $this->allowsWorkforce($actor, $company, 'ViewAny:Driver');
+    }
+
     public function create(User $actor, Company $company): bool
     {
-        $persistedActor = User::query()->find($actor->getKey());
+        return $this->allowsWorkforce($actor, $company, 'Create:Driver');
+    }
 
-        if ($persistedActor === null || ! Company::query()->whereKey($company->getKey())->where('status', CompanyStatus::ACTIVE)->exists()) {
-            return false;
-        }
+    public function view(User $actor, Company $company, Driver $driver): bool
+    {
+        return $this->allowsWorkforce($actor, $company, 'View:Driver') && $this->driverInCompany($company, $driver);
+    }
 
-        if (! CompanyUser::query()->where('company_id', $company->getKey())->where('user_id', $persistedActor->getKey())->exists()) {
-            return false;
-        }
+    public function update(User $actor, Company $company, Driver $driver): bool
+    {
+        return $this->allowsWorkforce($actor, $company, 'Update:Driver') && $this->driverInCompany($company, $driver);
+    }
 
-        $previousTeam = getPermissionsTeamId();
+    public function delete(User $actor, Company $company, Driver $driver): bool
+    {
+        return $this->allowsWorkforce($actor, $company, 'Delete:Driver') && $this->driverInCompany($company, $driver);
+    }
 
-        try {
-            setPermissionsTeamId($company->getKey());
-            $persistedActor->unsetRelation('roles')->unsetRelation('permissions');
+    public function restore(User $actor, Company $company, Driver $driver): bool
+    {
+        return $this->allowsWorkforce($actor, $company, 'Restore:Driver') && $this->driverInCompany($company, $driver);
+    }
 
-            return $persistedActor->can('Create:Driver');
-        } finally {
-            setPermissionsTeamId($previousTeam);
-            $persistedActor->unsetRelation('roles')->unsetRelation('permissions');
-        }
+    public function viewSalary(User $actor, Company $company, Driver $driver): bool
+    {
+        return $this->allowsWorkforce($actor, $company, 'ViewSalary:Driver') && $this->driverInCompany($company, $driver);
+    }
+
+    public function viewAttendance(User $actor, Company $company, Driver $driver): bool
+    {
+        return $this->allowsWorkforce($actor, $company, 'ViewAttendance:Driver') && $this->driverInCompany($company, $driver);
     }
 }
