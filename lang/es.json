@@ -1,4 +1,7 @@
 {
+    "This field cannot be supplied when planning a trip.": "Este campo no se puede proporcionar al planificar un viaje.",
+    "The selected departure or resource conflicts with an existing trip.": "La salida o el recurso seleccionado entra en conflicto con un viaje existente.",
+    "The selected driver does not cover the complete planned interval.": "El conductor seleccionado no tiene disponibilidad para todo el intervalo planificado.",
     "Availability interval endpoints must use UTC.": "Los extremos del intervalo de disponibilidad deben estar en UTC.",
     "The end of the availability interval must be after its start.": "El fin del intervalo de disponibilidad debe ser posterior a su inicio.",
     "The availability interval does not match its overnight flag.": "El intervalo de disponibilidad no corresponde con su indicador de turno nocturno.",
@@ -552,6 +555,22 @@
     "Route leg distances must be finite non-negative numbers.": "Las distancias de los tramos deben ser números finitos mayores o iguales a cero.",
     "Locate segment": "Localizar tramo",
     "Review the suggested route": "Revisa el trazado sugerido",
+    "Scheduled": "Programado",
+    "In progress": "En curso",
+    "Completed": "Completado",
+    "Cancelled": "Cancelado",
+    "Trip history cannot be changed directly.": "El historial del viaje no se puede modificar directamente.",
+    "New trips must be scheduled without execution data.": "Los viajes nuevos deben estar programados y sin datos de ejecución.",
+    "Trip deletion is disabled. Preserve the trip history.": "La eliminación de viajes está deshabilitada. Conserva el historial del viaje.",
+    "This field cannot be supplied when preparing a trip plan.": "Este campo no se puede proporcionar al preparar el plan de un viaje.",
+    "The selected schedule does not belong to the available route pattern.": "El horario seleccionado no pertenece al patrón de ruta disponible.",
+    "The selected bus is unavailable.": "El autobús seleccionado no está disponible.",
+    "The selected schedule does not operate on this local service date.": "El horario seleccionado no opera en esta fecha local de servicio.",
+    "Arrival must be explicitly later than departure.": "La llegada debe ser explícitamente posterior a la salida.",
+    "The scheduled departure does not exist in the company timezone.": "La hora de salida programada no existe en la zona horaria de la empresa.",
+    "An explicit valid UTC offset is required for this departure.": "Se requiere un desplazamiento UTC explícito y válido para esta salida.",
+    "Arrival must include a valid local date, time and UTC offset for the company timezone.": "La llegada debe incluir una fecha local, hora y desplazamiento UTC válidos para la zona horaria de la empresa.",
+    "The saved route plan is incomplete or outdated. Calculate and save the route before planning.": "El trazado guardado está incompleto o desactualizado. Calcula y guarda la ruta antes de planificar.",
     "Salary amounts must be provided as decimal strings or integers.": "Los salarios deben proporcionarse como cadenas decimales o números enteros.",
     "A driver employment cannot be reassigned to another company or user.": "Un empleo de conductor no puede reasignarse a otra compañía ni a otro usuario.",
     "The selected company is unavailable.": "La compañía seleccionada no está disponible.",
@@ -566,5 +585,6 @@
     "Send Reset Code": "Enviar código de recuperación",
     "Reset Code Sent": "Código de recuperación enviado",
     "Password Updated": "Contraseña actualizada",
-    "Password Recovery Failed": "No se pudo completar la recuperación de contraseña"
+    "Password Recovery Failed": "No se pudo completar la recuperación de contraseña",
+    "The selected driver is unavailable or ineligible for the planned dates.": "El conductor seleccionado no está disponible o no cumple los requisitos para las fechas planificadas."
 }

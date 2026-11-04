@@ -93,7 +93,8 @@ describe('Driver Schedule Values', function (): void {
 
         expect(fn () => DB::transaction(fn () => DB::table('drivers')->where('id', $schedule->driver_id)->delete()))
             ->toThrow(function (QueryException $exception): void {
-                expect($exception->errorInfo[0])->toBe('23503');
+                expect($exception->errorInfo[0])->toBeIn(['23001', '23503']);
+                expect($exception->errorInfo[2])->toContain('driver_schedules_driver_id_foreign');
             });
         $this->assertModelExists($schedule);
         $this->assertModelExists($schedule->driver);

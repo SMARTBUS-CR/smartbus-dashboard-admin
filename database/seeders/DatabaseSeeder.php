@@ -13,10 +13,12 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             BusPermissionsSeeder::class,
+            TripPermissionsSeeder::class,
             DriverPermissionsSeeder::class,
             CompanySeeder::class,
             SarapiquiRoutesSeeder::class,
             BusSeeder::class,
+            TripSeeder::class,
         ]);
     }
 }
