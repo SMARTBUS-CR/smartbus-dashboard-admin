@@ -1,4 +1,6 @@
 {
+    "Availability interval endpoints must use UTC.": "Los extremos del intervalo de disponibilidad deben estar en UTC.",
+    "The end of the availability interval must be after its start.": "El fin del intervalo de disponibilidad debe ser posterior a su inicio.",
     "The availability interval does not match its overnight flag.": "El intervalo de disponibilidad no corresponde con su indicador de turno nocturno.",
     "A driver schedule cannot be reassigned or given a different identity.": "Un horario de conductor no puede reasignarse ni cambiar de identidad.",
     "This field cannot be changed through availability operations.": "Este campo no puede modificarse mediante operaciones de disponibilidad.",
