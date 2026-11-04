@@ -194,3 +194,28 @@ test('propagates unexpected database errors and rolls back the demo insertion', 
     $this->assertDatabaseCount('trips', 0);
     Http::assertNothingSent();
 });
+
+test('seeds all covered lifecycle examples and preserves their original history on repeated setup', function (): void {
+    [, $fixture] = demoTripResources();
+    DriverSchedule::query()->where('driver_id', $fixture->driver_id)->update(['valid_until' => '2026-11-23']);
+
+    $this->seed(TripSeeder::class);
+
+    $trips = Trip::query()->orderBy('id')->get();
+    expect($trips->pluck('status')->all())->toBe([
+        TripStatus::SCHEDULED, TripStatus::IN_PROGRESS, TripStatus::COMPLETED, TripStatus::CANCELLED,
+    ]);
+    expect($trips->pluck('service_date')->map->toDateString()->all())
+        ->toBe(['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23']);
+    expect($trips[1]->actual_departure_at->equalTo($trips[1]->scheduled_departure_at))->toBeTrue();
+    expect($trips[1]->actual_arrival_at)->toBeNull();
+    expect($trips[2]->actual_arrival_at->equalTo($trips[2]->scheduled_arrival_at))->toBeTrue();
+    expect($trips[3]->cancellation_reason)->toBe('Demo cancellation');
+    expect($trips[3]->actual_departure_at)->toBeNull();
+    $before = $trips->map->getRawOriginal()->all();
+
+    $this->seed(TripSeeder::class);
+
+    expect(Trip::query()->orderBy('id')->get()->map->getRawOriginal()->all())->toBe($before);
+    Http::assertNothingSent();
+});

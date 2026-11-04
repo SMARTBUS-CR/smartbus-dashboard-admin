@@ -11,6 +11,7 @@ use App\Services\TripManagementService;
 use App\Services\UserManagementService;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Validation\UncompromisedVerifier;
 use Illuminate\Database\Connection;
@@ -243,6 +244,8 @@ try {
         $result['status'] = 'success';
     } catch (ValidationException $exception) {
         $result = ['status' => 'validation', 'errors' => $exception->errors()];
+    } catch (AuthorizationException) {
+        $result = ['status' => 'authorization'];
     } catch (QueryException $exception) {
         $result = [
             'status' => 'database', 'connection' => $exception->getConnectionName(),

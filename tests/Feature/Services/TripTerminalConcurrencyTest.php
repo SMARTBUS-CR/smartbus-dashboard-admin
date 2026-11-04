@@ -16,6 +16,47 @@ afterEach(function (): void {
     $this->finishDriverConcurrency();
 });
 
+test('serializes replanning against start and preserves the plan selected before execution', function (bool $replanFirst): void {
+    Http::preventStrayRequests();
+    $company = $this->createConcurrentCompany();
+    $company->update(['timezone' => 'America/Costa_Rica']);
+    $trip = Trip::factory()->for($company)->withDriverAvailability()->create()->refresh();
+    $actor = createUserWithRole(UserRole::SuperAdmin);
+    $input = [
+        'actor_id' => $actor->id, 'company_id' => $company->id, 'trip_id' => $trip->id,
+        'previous_team' => null, 'instant' => '2026-10-26T12:45:00Z',
+        'plan' => [...$trip->only(['route_pattern_id', 'route_schedule_id', 'bus_id', 'driver_id']),
+            'service_date' => '2026-10-26', 'arrival_at' => '2026-10-26T08:30:00-06:00'],
+    ];
+    $first = $this->startDriverProcess([
+        ...$input, 'operation' => $replanFirst ? 'trip_replan' : 'trip_start', 'barrier_at' => 'trip_locked',
+    ]);
+    $firstReady = $first->await('ready');
+    $first->await('trip_locked');
+    $second = $this->startDriverProcess([
+        ...$input, 'operation' => $replanFirst ? 'trip_start' : 'trip_replan', 'barrier_at' => 'trip_lock_attempt',
+    ]);
+    $secondReady = $second->await('ready');
+    $second->await('trip_lock_attempt');
+    $second->release();
+    $deadline = microtime(true) + 5;
+    do {
+        $waiting = (bool) DB::selectOne('SELECT ?::integer = ANY(pg_blocking_pids(?::integer)) AS waiting', [$firstReady['pgsql_pid'], $secondReady['pgsql_pid']])->waiting;
+    } while (! $waiting && microtime(true) < $deadline);
+    expect($waiting)->toBeTrue();
+    $first->release();
+
+    expect($first->await('result')['status'])->toBe('success');
+    expect($second->await('result')['status'])->toBe($replanFirst ? 'success' : 'authorization');
+    $stored = $trip->fresh();
+    expect($stored->status)->toBe(TripStatus::IN_PROGRESS);
+    expect($stored->scheduled_arrival_at->utc()->format('H:i:s'))->toBe($replanFirst ? '14:30:00' : '13:30:00');
+    expect($stored->actual_departure_at->utc()->format('H:i:s'))->toBe('12:45:00');
+    expect($stored->company_id)->toBe($company->id);
+    expect($stored->planned_route_snapshot)->toBe($trip->planned_route_snapshot);
+    Http::assertNothingSent();
+})->with(['replan first' => [true], 'start first' => [false]]);
+
 test('serializes concurrent terminal retries and competing start or cancellation requests', function (string $firstOperation, string $secondOperation, TripStatus $expectedState, bool $retry): void {
     Http::preventStrayRequests();
     $company = $this->createConcurrentCompany();
