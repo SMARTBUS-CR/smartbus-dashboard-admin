@@ -1,4 +1,9 @@
 {
+    "The availability interval does not match its overnight flag.": "The availability interval does not match its overnight flag.",
+    "A driver schedule cannot be reassigned or given a different identity.": "A driver schedule cannot be reassigned or given a different identity.",
+    "This field cannot be changed through availability operations.": "This field cannot be changed through availability operations.",
+    "This availability overlaps an existing schedule for the driver.": "This availability overlaps an existing schedule for the driver.",
+    "The availability operation was cancelled.": "The availability operation was cancelled.",
     "This field cannot be changed through employment updates.": "This field cannot be changed through employment updates.",
     "Restore the archived driver before changing employment.": "Restore the archived driver before changing employment.",
     "The employment operation was cancelled.": "The employment operation was cancelled.",

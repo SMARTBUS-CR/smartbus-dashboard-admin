@@ -1,8 +1,11 @@
 <?php
 
 use App\Models\Company;
+use App\Models\Driver;
+use App\Models\DriverSchedule;
 use App\Models\User;
 use App\Services\DriverManagementService;
+use App\Services\DriverScheduleService;
 use App\Services\UserManagementService;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\Console\Kernel;
@@ -113,10 +116,17 @@ try {
         } elseif ($input['barrier_at'] === 'removal' && str_contains($query->sql, '"companies"') && str_contains($query->sql, 'for update')) {
             $paused = true;
             $pause('company_locked');
+        } elseif ($input['barrier_at'] === 'schedule_locked' && str_contains($query->sql, '"drivers"') && str_contains($query->sql, 'for update')) {
+            $paused = true;
+            $pause('driver_locked');
         }
     });
 
     DB::connection('pgsql')->beforeExecuting(static function (string $sql, array $bindings, Connection $connection) use ($input, $pause, &$paused): void {
+        if (! $paused && $input['barrier_at'] === 'schedule_attempt' && str_contains($sql, '"drivers"') && str_contains($sql, 'for update')) {
+            $paused = true;
+            $pause('driver_lock_attempt');
+        }
         if ($paused || $input['barrier_at'] !== 'registration') {
             return;
         }
@@ -131,7 +141,21 @@ try {
     $result = [];
 
     try {
-        if ($input['operation'] === 'remove') {
+        if (str_starts_with($input['operation'], 'schedule_')) {
+            $driver = Driver::withTrashed()->findOrFail($input['driver_id']);
+            $service = app(DriverScheduleService::class);
+            if ($input['operation'] === 'schedule_create') {
+                $schedule = $service->create($actor, $company, $driver, $input['schedule']);
+            } else {
+                $schedule = DriverSchedule::query()->findOrFail($input['schedule_id']);
+                if ($input['operation'] === 'schedule_update') {
+                    $schedule = $service->update($actor, $company, $driver, $schedule, $input['schedule']);
+                } else {
+                    $service->delete($actor, $company, $driver, $schedule);
+                }
+            }
+            $result = ['schedule_id' => $schedule->id];
+        } elseif ($input['operation'] === 'remove') {
             Filament::setTenant($company, isQuiet: true);
             app(UserManagementService::class)->removeCompanyAccess($actor, $target);
         } elseif ($input['operation'] === 'register') {
