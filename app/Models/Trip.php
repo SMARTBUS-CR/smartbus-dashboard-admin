@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Validation\ValidationException;
 
 #[DateFormat('Y-m-d H:i:s.uP')]
@@ -20,48 +21,38 @@ use Illuminate\Validation\ValidationException;
 class Trip extends Model
 {
     /** @use HasFactory<TripFactory> */
-    use HasFactory, HasUuids;
+    use HasFactory, HasUuids, SoftDeletes;
 
-    /** @param array<string, mixed> $options */
-    public function save(array $options = []): bool
+    protected static function booted(): void
     {
-        if ($this->exists && $this->isDirty()) {
-            $errors = [];
-            foreach (array_keys($this->getDirty()) as $field) {
-                $errors[$field] = __('Trip history cannot be changed directly.');
-            }
-            throw ValidationException::withMessages($errors);
-        }
-
-        if (! $this->exists) {
-            $this->status ??= TripStatus::SCHEDULED;
-            if ($this->status !== TripStatus::SCHEDULED) {
+        static::creating(function (Trip $trip): void {
+            $trip->status ??= TripStatus::SCHEDULED;
+            if ($trip->status !== TripStatus::SCHEDULED) {
                 throw ValidationException::withMessages([
                     'status' => __('New trips must be scheduled without execution data.'),
                 ]);
             }
             foreach (['actual_departure_at', 'actual_arrival_at', 'cancelled_at', 'cancellation_reason'] as $field) {
-                if ($this->getAttribute($field) !== null) {
+                if ($trip->getAttribute($field) !== null) {
                     throw ValidationException::withMessages([
                         $field => __('New trips must be scheduled without execution data.'),
                     ]);
                 }
             }
-        }
+        });
 
-        return parent::save($options);
-    }
+        static::updating(function (Trip $trip): void {
+            $changedFields = array_keys($trip->getDirty());
+            if ($changedFields === ['deleted_at'] && $trip->deleted_at === null && $trip->getRawOriginal('deleted_at') !== null) {
+                return;
+            }
 
-    public function delete(): bool
-    {
-        throw ValidationException::withMessages([
-            'trip' => __('Trip deletion is disabled. Preserve the trip history.'),
-        ]);
-    }
-
-    public function forceDelete(): bool
-    {
-        return $this->delete();
+            $errors = [];
+            foreach ($changedFields as $field) {
+                $errors[$field] = __('Trip history cannot be changed directly.');
+            }
+            throw ValidationException::withMessages($errors);
+        });
     }
 
     /** @return array<string, string> */
