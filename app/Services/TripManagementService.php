@@ -11,6 +11,7 @@ use App\Models\RouteScheduleException;
 use App\Models\Trip;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Arr;
@@ -56,6 +57,86 @@ class TripManagementService
 
     public function start(User $actor, Company $company, string $tripId): Trip
     {
+        return $this->withLockedTrip($actor, $company, $tripId, 'start', function (Company $company, Trip $trip): Trip {
+            if ($trip->status === TripStatus::IN_PROGRESS) {
+                return $trip;
+            }
+            if ($trip->status !== TripStatus::SCHEDULED) {
+                $this->reject('status', 'Only scheduled trips can be started.');
+            }
+            [$bus, $driver] = $this->lockTripResources($company, $trip);
+            $instant = CarbonImmutable::now('UTC');
+            if ($company->status !== CompanyStatus::ACTIVE) {
+                $this->reject('company', 'An active company context is required.');
+            }
+            if ($bus->trashed() || ! $bus->is_active) {
+                $this->reject('bus_id', 'The selected bus is unavailable.');
+            }
+            Validator::make(['timezone' => $company->timezone], ['timezone' => ['required', 'timezone']])->validate();
+            $driver = $this->drivers->validate($company, $driver->getKey(), [$instant->setTimezone($company->timezone)->toDateString()]);
+            if (! $this->availability->covers($driver, $instant, $instant->addMicrosecond())) {
+                $this->reject('driver_id', 'The assigned driver is unavailable at the actual start instant.');
+            }
+            if (RouteScheduleException::query()->where('route_schedule_id', $trip->route_schedule_id)
+                ->where('service_date', $trip->service_date->toDateString())->exists()) {
+                $this->reject('service_date', 'The selected departure is currently suspended.');
+            }
+            app(TripReservationService::class)->ensureNoOtherTripInProgress($trip, $driver);
+
+            return $this->persistTransition($trip, [
+                'status' => TripStatus::IN_PROGRESS,
+                'actual_departure_at' => $instant->format('Y-m-d H:i:s.uP'),
+            ]);
+        });
+    }
+
+    public function complete(User $actor, Company $company, string $tripId): Trip
+    {
+        return $this->withLockedTrip($actor, $company, $tripId, 'complete', function (Company $company, Trip $trip): Trip {
+            if ($trip->status === TripStatus::COMPLETED) {
+                return $trip;
+            }
+            if ($trip->status !== TripStatus::IN_PROGRESS) {
+                $this->reject('status', 'Only in-progress trips can be completed.');
+            }
+            $this->lockTripResources($company, $trip);
+            $instant = CarbonImmutable::now('UTC');
+            if ($instant->lessThan($trip->actual_departure_at)) {
+                $this->reject('actual_arrival_at', 'The actual arrival cannot be before the actual departure.');
+            }
+
+            return $this->persistTransition($trip, [
+                'status' => TripStatus::COMPLETED,
+                'actual_arrival_at' => $instant->format('Y-m-d H:i:s.uP'),
+            ]);
+        });
+    }
+
+    public function cancel(User $actor, Company $company, string $tripId, string $reason): Trip
+    {
+        return $this->withLockedTrip($actor, $company, $tripId, 'cancel', function (Company $company, Trip $trip) use ($reason): Trip {
+            $reason = trim($reason);
+            Validator::make(['cancellation_reason' => $reason], [
+                'cancellation_reason' => ['required', 'string', 'max:500'],
+            ])->validate();
+            if ($trip->status === TripStatus::CANCELLED) {
+                return $trip;
+            }
+            if ($trip->status !== TripStatus::SCHEDULED) {
+                $this->reject('status', 'Only scheduled trips can be cancelled.');
+            }
+            $this->lockTripResources($company, $trip);
+
+            return $this->persistTransition($trip, [
+                'status' => TripStatus::CANCELLED, 'cancellation_reason' => $reason,
+                'cancelled_at' => CarbonImmutable::now('UTC')->format('Y-m-d H:i:s.uP'),
+            ]);
+        });
+    }
+
+    /** @param Closure(Company, Trip): Trip $operation */
+    private function withLockedTrip(User $actor, Company $company, string $tripId, string $ability, Closure $operation): Trip
+    {
         $previousTeam = getPermissionsTeamId();
         $persistedActor = null;
         try {
@@ -65,58 +146,44 @@ class TripManagementService
                 throw new AuthorizationException;
             }
             setPermissionsTeamId($company->getKey());
-            Gate::forUser($persistedActor)->authorize('start', [Trip::class, $company]);
+            Gate::forUser($persistedActor)->authorize($ability, [Trip::class, $company]);
             Validator::make(['trip_id' => $tripId], ['trip_id' => ['required', 'uuid']])->validate();
 
-            return (new Trip)->getConnection()->transaction(function () use ($persistedActor, $company, $tripId): Trip {
+            return (new Trip)->getConnection()->transaction(function () use ($persistedActor, $company, $tripId, $ability, $operation): Trip {
                 $company = Company::query()->whereKey($company->getKey())->sharedLock()->firstOrFail();
                 $trip = Trip::query()->where('company_id', $company->getKey())->whereKey($tripId)->lockForUpdate()->firstOrFail();
-                Gate::forUser($persistedActor)->authorize('start', [Trip::class, $company, $trip]);
-                if ($trip->status === TripStatus::IN_PROGRESS) {
-                    return $trip;
-                }
-                if ($trip->status !== TripStatus::SCHEDULED) {
-                    $this->reject('status', 'Only scheduled trips can be started.');
-                }
-                $driver = Driver::withTrashed()->where('company_id', $company->getKey())->findOrFail($trip->driver_id);
-                $reservations = app(TripReservationService::class);
-                $reservations->lockPeople([$driver->user_id]);
-                $bus = Bus::withTrashed()->where('company_id', $company->getKey())->whereKey($trip->bus_id)->lockForUpdate()->firstOrFail();
-                $driver = Driver::withTrashed()->where('company_id', $company->getKey())->whereKey($trip->driver_id)->lockForUpdate()->firstOrFail();
-                $instant = CarbonImmutable::now('UTC');
-                if ($company->status !== CompanyStatus::ACTIVE) {
-                    $this->reject('company', 'An active company context is required.');
-                }
-                if ($bus->trashed() || ! $bus->is_active) {
-                    $this->reject('bus_id', 'The selected bus is unavailable.');
-                }
-                Validator::make(['timezone' => $company->timezone], ['timezone' => ['required', 'timezone']])->validate();
-                $driver = $this->drivers->validate($company, $driver->getKey(), [$instant->setTimezone($company->timezone)->toDateString()]);
-                if (! $this->availability->covers($driver, $instant, $instant->addMicrosecond())) {
-                    $this->reject('driver_id', 'The assigned driver is unavailable at the actual start instant.');
-                }
-                if (RouteScheduleException::query()->where('route_schedule_id', $trip->route_schedule_id)
-                    ->where('service_date', $trip->service_date->toDateString())->exists()) {
-                    $this->reject('service_date', 'The selected departure is currently suspended.');
-                }
-                $reservations->ensureNoOtherTripInProgress($trip, $driver);
+                Gate::forUser($persistedActor)->authorize($ability, [Trip::class, $company, $trip]);
 
-                $updated = Trip::query()->whereKey($trip->getKey())->where('company_id', $company->getKey())
-                    ->where('status', TripStatus::SCHEDULED)->update([
-                        'status' => TripStatus::IN_PROGRESS,
-                        'actual_departure_at' => $instant->format('Y-m-d H:i:s.uP'),
-                    ]);
-                if ($updated !== 1) {
-                    $this->reject('status', 'Only scheduled trips can be started.');
-                }
-
-                return $trip->refresh();
+                return $operation($company, $trip);
             });
         } finally {
             setPermissionsTeamId($previousTeam);
             $actor->unsetRelation('roles')->unsetRelation('permissions');
             $persistedActor?->unsetRelation('roles')->unsetRelation('permissions');
         }
+    }
+
+    /** @return array{Bus, Driver} */
+    private function lockTripResources(Company $company, Trip $trip): array
+    {
+        $identity = Driver::withTrashed()->where('company_id', $company->getKey())->findOrFail($trip->driver_id);
+        app(TripReservationService::class)->lockPeople([$identity->user_id]);
+        $bus = Bus::withTrashed()->where('company_id', $company->getKey())->whereKey($trip->bus_id)->lockForUpdate()->firstOrFail();
+        $driver = Driver::withTrashed()->where('company_id', $company->getKey())->whereKey($trip->driver_id)->lockForUpdate()->firstOrFail();
+
+        return [$bus, $driver];
+    }
+
+    /** @param array<string, mixed> $attributes Trusted transition columns only. */
+    private function persistTransition(Trip $trip, array $attributes): Trip
+    {
+        $updated = Trip::query()->whereKey($trip->getKey())->where('company_id', $trip->company_id)
+            ->where('status', $trip->status)->update($attributes);
+        if ($updated !== 1) {
+            throw new AuthorizationException;
+        }
+
+        return $trip->refresh();
     }
 
     /** @param array<string, mixed> $data */

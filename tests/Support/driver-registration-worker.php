@@ -179,9 +179,20 @@ try {
     $result = [];
 
     try {
-        if ($input['operation'] === 'trip_start') {
-            $trip = app(TripManagementService::class)->start($actor, $company, $input['trip_id']);
-            $result = ['trip_id' => $trip->id, 'actual_departure_at' => $trip->actual_departure_at->utc()->format('Y-m-d H:i:s.uP')];
+        if (in_array($input['operation'], ['trip_start', 'trip_complete', 'trip_cancel'], true)) {
+            $service = app(TripManagementService::class);
+            $trip = match ($input['operation']) {
+                'trip_start' => $service->start($actor, $company, $input['trip_id']),
+                'trip_complete' => $service->complete($actor, $company, $input['trip_id']),
+                'trip_cancel' => $service->cancel($actor, $company, $input['trip_id'], $input['reason']),
+            };
+            $result = [
+                'trip_id' => $trip->id,
+                'actual_departure_at' => $trip->actual_departure_at?->utc()->format('Y-m-d H:i:s.uP'),
+                'actual_arrival_at' => $trip->actual_arrival_at?->utc()->format('Y-m-d H:i:s.uP'),
+                'cancelled_at' => $trip->cancelled_at?->utc()->format('Y-m-d H:i:s.uP'),
+                'cancellation_reason' => $trip->cancellation_reason,
+            ];
         } elseif ($input['operation'] === 'trip_schedule' || $input['operation'] === 'trip_replan') {
             $service = app(TripManagementService::class);
             $trip = $input['operation'] === 'trip_schedule'
