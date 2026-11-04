@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\CompanyStatus;
+use App\Enums\DriverStatus;
 use App\Enums\UserRole;
 use App\Exceptions\DriverRegistrationCompensationException;
 use App\Models\Company;
@@ -24,6 +25,119 @@ use Throwable;
 class DriverManagementService
 {
     public function __construct(private readonly UserManagementService $users, private readonly PermissionRegistrar $permissions) {}
+
+    /** @param array<string, mixed> $data */
+    public function updateEmployment(User $actor, Company $company, Driver $driver, array $data): Driver
+    {
+        return $this->withLockedEmployment($actor, $company, $driver, 'update', function (Driver $employment) use ($company, $data): Driver {
+            $allowed = [
+                'license', 'license_expires_at', 'employment_starts_on', 'employment_ends_on',
+                'salary_amount', 'salary_currency', 'salary_period',
+            ];
+            $errors = [];
+            foreach (array_diff(array_keys($data), $allowed) as $field) {
+                $errors[$field] = __('This field cannot be changed through employment updates.');
+            }
+            if ($errors !== []) {
+                throw ValidationException::withMessages($errors);
+            }
+
+            $this->ensureEmploymentIsNotArchived($employment);
+            $employment->fill($data);
+            if (is_string($employment->license) && Driver::withTrashed()->where('company_id', $company->getKey())
+                ->where('license', $employment->license)->whereKeyNot($employment->getKey())->exists()) {
+                throw ValidationException::withMessages(['license' => __('This license is already reserved by a driver in this company.')]);
+            }
+            $this->ensureLifecycleOperationAllowed($company, $employment, 'updateEmployment');
+            if (! $employment->save()) {
+                throw ValidationException::withMessages(['driver' => __('The employment operation was cancelled.')]);
+            }
+
+            return $employment;
+        });
+    }
+
+    public function setActive(User $actor, Company $company, Driver $driver, bool $active): Driver
+    {
+        return $this->withLockedEmployment($actor, $company, $driver, 'update', function (Driver $employment) use ($company, $active): Driver {
+            $this->ensureEmploymentIsNotArchived($employment);
+            $employment->status = $active ? DriverStatus::ACTIVE : DriverStatus::INACTIVE;
+            $this->ensureLifecycleOperationAllowed($company, $employment, 'setActive');
+            if (! $employment->save()) {
+                throw ValidationException::withMessages(['driver' => __('The employment operation was cancelled.')]);
+            }
+
+            return $employment;
+        });
+    }
+
+    public function archive(User $actor, Company $company, Driver $driver): void
+    {
+        $this->withLockedEmployment($actor, $company, $driver, 'delete', function (Driver $employment) use ($company): Driver {
+            $this->ensureLifecycleOperationAllowed($company, $employment, 'archive');
+            if (! $employment->trashed() && ! $employment->delete()) {
+                throw ValidationException::withMessages(['driver' => __('The employment operation was cancelled.')]);
+            }
+
+            return $employment;
+        });
+    }
+
+    public function restore(User $actor, Company $company, Driver $driver): Driver
+    {
+        return $this->withLockedEmployment($actor, $company, $driver, 'restore', function (Driver $employment) use ($company): Driver {
+            $this->ensureLifecycleOperationAllowed($company, $employment, 'restore');
+            if ($employment->trashed() && ! $employment->restore()) {
+                throw ValidationException::withMessages(['driver' => __('The employment operation was cancelled.')]);
+            }
+
+            return $employment;
+        });
+    }
+
+    /**
+     * Subtask 09 will add real Trip assignment checks here. Called inside the
+     * PostgreSQL transaction with a locked employment and its proposed values.
+     */
+    protected function ensureLifecycleOperationAllowed(Company $company, Driver $driver, string $operation): void {}
+
+    private function ensureEmploymentIsNotArchived(Driver $driver): void
+    {
+        if ($driver->trashed()) {
+            throw ValidationException::withMessages(['driver' => __('Restore the archived driver before changing employment.')]);
+        }
+    }
+
+    /** @param Closure(Driver): Driver $operation */
+    private function withLockedEmployment(User $actor, Company $company, Driver $driver, string $ability, Closure $operation): Driver
+    {
+        $previousTeam = getPermissionsTeamId();
+
+        try {
+            setPermissionsTeamId($company->getKey());
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+
+            return DB::connection('pgsql')->transaction(function () use ($actor, $company, $driver, $ability, $operation): Driver {
+                $persistedCompany = Company::query()->whereKey($company->getKey())->sharedLock()->firstOrFail();
+                $employment = Driver::withTrashed()->where('company_id', $persistedCompany->getKey())
+                    ->whereKey($driver->getKey())->lockForUpdate()->firstOrFail();
+                Gate::forUser($actor)->authorize($ability, [Driver::class, $persistedCompany, $employment]);
+
+                return $operation($employment);
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            if ($exception->getConnectionName() !== 'pgsql'
+                || ($exception->errorInfo[0] ?? null) !== '23505'
+                || ! str_contains($exception->errorInfo[2] ?? '', '"drivers_company_id_license_unique"')) {
+                throw $exception;
+            }
+
+            throw ValidationException::withMessages(['license' => __('This license is already reserved by a driver in this company.')]);
+        } finally {
+            setPermissionsTeamId($previousTeam);
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+        }
+    }
 
     /**
      * @param  array{name: string, email: string, password: string, password_confirmation: string}  $identity
