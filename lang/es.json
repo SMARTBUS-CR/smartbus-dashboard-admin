@@ -587,7 +587,6 @@
     "Password Updated": "Contraseña actualizada",
     "Password Recovery Failed": "No se pudo completar la recuperación de contraseña",
     "The selected driver is unavailable or ineligible for the planned dates.": "El conductor seleccionado no está disponible o no cumple los requisitos para las fechas planificadas.",
-    "Permanent bus deletion is disabled. Archive the bus instead.": "La eliminación permanente de autobuses está deshabilitada. Archiva el autobús en su lugar.",
     "Buses with scheduled or in-progress trips cannot be deactivated or archived.": "No se pueden desactivar ni archivar autobuses con viajes programados o en curso.",
     "This change would invalidate an assigned trip.": "Este cambio invalidaría un viaje asignado.",
     "Only scheduled trips can be started.": "Solo se pueden iniciar viajes programados.",

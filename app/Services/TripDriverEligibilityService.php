@@ -49,14 +49,30 @@ class TripDriverEligibilityService
             'local_dates.*' => ['required', 'string', 'date_format:Y-m-d'],
         ])->validate();
 
-        $driver = Driver::query()->where('company_id', $company->getKey())
-            ->where('status', DriverStatus::ACTIVE)->find($driverId);
-        if (! Company::query()->whereKey($company->getKey())->where('status', CompanyStatus::ACTIVE)->exists() || ! $driver) {
+        $driver = Driver::query()->where('company_id', $company->getKey())->find($driverId);
+        if (! $driver || ! $this->isEligibleForDates($company, $driver, $localDates)) {
             $this->reject();
         }
-        $user = $driver->user;
+
+        return $driver;
+    }
+
+    /**
+     * Check a persisted driver's proposed employment values against trusted local dates.
+     * Identity, membership and role are read fresh without changing permission context.
+     *
+     * @param  list<string>  $localDates
+     */
+    public function isEligibleForDates(Company $company, Driver $driver, array $localDates): bool
+    {
+        if ($driver->company_id !== $company->getKey() || $driver->trashed() || $driver->status !== DriverStatus::ACTIVE
+            || ! Company::query()->whereKey($company->getKey())->where('status', CompanyStatus::ACTIVE)->exists()) {
+            return false;
+        }
+
+        $user = $driver->user()->first();
         if (! $user || ! CompanyUser::query()->where('company_id', $company->getKey())->where('user_id', $user->getKey())->exists()) {
-            $this->reject();
+            return false;
         }
 
         $hasDriverRole = $user->getConnection()->table('model_has_roles as assignments')
@@ -67,18 +83,18 @@ class TripDriverEligibilityService
             ->where('roles.company_id', $company->getKey())
             ->where('roles.name', UserRole::Driver->value)->where('roles.guard_name', 'web')->exists();
         if (! $hasDriverRole) {
-            $this->reject();
+            return false;
         }
 
         foreach ($localDates as $date) {
             if ($driver->employment_starts_on->toDateString() > $date
                 || ($driver->employment_ends_on !== null && $driver->employment_ends_on->toDateString() < $date)
                 || $driver->license_expires_at->toDateString() < $date) {
-                $this->reject();
+                return false;
             }
         }
 
-        return $driver;
+        return true;
     }
 
     private function reject(): never
