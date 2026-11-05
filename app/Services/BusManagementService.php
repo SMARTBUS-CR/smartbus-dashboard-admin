@@ -128,6 +128,148 @@ class BusManagementService
         }
     }
 
+    public function setActive(
+        User $actor,
+        Company $company,
+        string $busId,
+        bool $active,
+    ): Bus {
+        $previousTeam = getPermissionsTeamId();
+
+        try {
+            setPermissionsTeamId($company->getKey());
+
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+
+            Gate::forUser($actor)->authorize(
+                'update',
+                [Bus::class, $company],
+            );
+
+            $this->ensureActiveCompany($company);
+
+            return $this->persist(function () use (
+                $actor,
+                $company,
+                $busId,
+                $active,
+            ): Bus {
+                $bus = Bus::query()
+                    ->where('company_id', $company->getKey())
+                    ->lockForUpdate()
+                    ->findOrFail($busId);
+
+                Gate::forUser($actor)->authorize(
+                    'update',
+                    [Bus::class, $company, $bus],
+                );
+
+                if (! $active) {
+                    $this->ensureNoActiveTrips($bus);
+                }
+
+                $bus->is_active = $active;
+                $bus->save();
+
+                return $bus->refresh();
+            });
+        } finally {
+            setPermissionsTeamId($previousTeam);
+
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+        }
+    }
+
+    public function archive(
+        User $actor,
+        Company $company,
+        string $busId,
+    ): Bus {
+        $previousTeam = getPermissionsTeamId();
+
+        try {
+            setPermissionsTeamId($company->getKey());
+
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+
+            Gate::forUser($actor)->authorize(
+                'delete',
+                [Bus::class, $company],
+            );
+
+            $this->ensureActiveCompany($company);
+
+            return $this->persist(function () use (
+                $actor,
+                $company,
+                $busId,
+            ): Bus {
+                $bus = Bus::query()
+                    ->where('company_id', $company->getKey())
+                    ->lockForUpdate()
+                    ->findOrFail($busId);
+
+                Gate::forUser($actor)->authorize(
+                    'delete',
+                    [Bus::class, $company, $bus],
+                );
+
+                $this->ensureNoActiveTrips($bus);
+
+                $bus->delete();
+
+                return $bus;
+            });
+        } finally {
+            setPermissionsTeamId($previousTeam);
+
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+        }
+    }
+
+    public function restore(User $actor, Company $company, string $busId): Bus
+    {
+        $previousTeam = getPermissionsTeamId();
+
+        try {
+            setPermissionsTeamId($company->getKey());
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+            Gate::forUser($actor)->authorize('restore', [Bus::class, $company]);
+            $this->ensureActiveCompany($company);
+
+            return $this->persist(function () use ($actor, $company, $busId): Bus {
+                $bus = Bus::onlyTrashed()->where('company_id', $company->getKey())
+                    ->lockForUpdate()->findOrFail($busId);
+
+                Gate::forUser($actor)->authorize('restore', [Bus::class, $company, $bus]);
+                $this->validateIdentity($company, $bus->only([
+                    'country_code', 'plate_number', 'unit_number',
+                ]), $bus);
+                $bus->restore();
+
+                return $bus->refresh();
+            });
+        } finally {
+            setPermissionsTeamId($previousTeam);
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+        }
+    }
+
+    private function ensureNoActiveTrips(Bus $bus): void
+    {
+        $hasActiveTrips = $bus->getConnection()->table('trips')
+            ->where('company_id', $bus->company_id)
+            ->where('bus_id', $bus->getKey())
+            ->whereIn('status', ['scheduled', 'in_progress'])
+            ->exists();
+
+        if ($hasActiveTrips) {
+            throw ValidationException::withMessages([
+                'bus' => __('Buses with scheduled or in-progress trips cannot be deactivated or archived.'),
+            ]);
+        }
+    }
+
     private function ensureActiveCompany(Company $company): void
     {
         $current = Company::query()->find($company->getKey());
@@ -194,6 +336,14 @@ class BusManagementService
             'year' => ['nullable', 'integer', 'between:1900,'.(now()->year + 1)],
         ])->validate();
 
+        $this->validateIdentity($company, $normalized, $bus);
+
+        return $normalized;
+    }
+
+    /** @param array<string, mixed> $normalized */
+    private function validateIdentity(Company $company, array $normalized, ?Bus $bus = null): void
+    {
         Validator::make($normalized, [
             'plate_number' => [
                 Rule::unique(Bus::class, 'plate_number')
@@ -207,7 +357,6 @@ class BusManagementService
             ],
         ])->validate();
 
-        return $normalized;
     }
 
     /** @param Closure(): Bus $operation */

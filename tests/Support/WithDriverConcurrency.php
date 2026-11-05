@@ -48,6 +48,21 @@ trait WithDriverConcurrency
             $process->close();
         }
 
+        $database = DB::connection('pgsql');
+        $routes = $database->table('routes')->whereIn('company_id', $this->concurrentCompanyIds)->pluck('id');
+        $patterns = $database->table('route_patterns')->whereIn('route_id', $routes)->pluck('id');
+        $schedules = $database->table('route_schedules')->whereIn('route_pattern_id', $patterns)->pluck('id');
+        $database->table('trips')->whereIn('company_id', $this->concurrentCompanyIds)->delete();
+        $database->table('route_schedule_exceptions')->whereIn('route_schedule_id', $schedules)->delete();
+        $database->table('route_schedules')->whereIn('id', $schedules)->delete();
+        $database->table('route_pattern_stops')->whereIn('route_pattern_id', $patterns)->delete();
+        $database->table('route_patterns')->whereIn('id', $patterns)->delete();
+        $database->table('route_fares')->whereIn('route_id', $routes)->delete();
+        $database->table('routes')->whereIn('id', $routes)->delete();
+        foreach (['buses', 'stops'] as $table) {
+            $database->table($table)->whereIn('company_id', $this->concurrentCompanyIds)->delete();
+        }
+
         DB::connection('pgsql')->table('driver_schedules')->whereIn('driver_id',
             DB::connection('pgsql')->table('drivers')->select('id')->whereIn('company_id', $this->concurrentCompanyIds)
         )->delete();

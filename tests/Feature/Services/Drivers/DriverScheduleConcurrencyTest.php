@@ -13,7 +13,7 @@ afterEach(function (): void {
 });
 
 describe('Driver Schedule Concurrency', function (): void {
-    test('serializes competing mutations on the persisted driver row', function (string $scenario): void {
+    test('serializes competing mutations on the shared person lock', function (string $scenario): void {
         $company = $this->createConcurrentCompany();
         $previous = $this->createConcurrentCompany();
         $actor = $this->createWorkforceAdministrator($company);
@@ -29,15 +29,15 @@ describe('Driver Schedule Concurrency', function (): void {
             'previous_team' => $previous->id, 'schedule' => $data, 'schedule_id' => $schedule?->id,
         ];
         $first = $this->startDriverProcess([
-            ...$input, 'operation' => $scenario === 'delete-create' ? 'schedule_delete' : 'schedule_create', 'barrier_at' => 'schedule_locked',
+            ...$input, 'operation' => $scenario === 'delete-create' ? 'schedule_delete' : 'schedule_create', 'barrier_at' => 'person_locked',
         ]);
         $firstReady = $first->await('ready');
-        $first->await('driver_locked');
+        $first->await('person_locked');
         $second = $this->startDriverProcess([
-            ...$input, 'operation' => $scenario === 'create-update' ? 'schedule_update' : 'schedule_create', 'barrier_at' => 'schedule_attempt',
+            ...$input, 'operation' => $scenario === 'create-update' ? 'schedule_update' : 'schedule_create', 'barrier_at' => 'person_attempt',
         ]);
         $secondReady = $second->await('ready');
-        $second->await('driver_lock_attempt');
+        $second->await('person_lock_attempt');
         $second->release();
         $waiting = false;
         $deadline = microtime(true) + 5;

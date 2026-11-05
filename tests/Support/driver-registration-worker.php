@@ -4,8 +4,10 @@ use App\Models\Company;
 use App\Models\Driver;
 use App\Models\DriverSchedule;
 use App\Models\User;
+use App\Services\BusManagementService;
 use App\Services\DriverManagementService;
 use App\Services\DriverScheduleService;
+use App\Services\TripManagementService;
 use App\Services\UserManagementService;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\Console\Kernel;
@@ -110,7 +112,16 @@ try {
             return;
         }
 
-        if ($input['barrier_at'] === 'license' && str_starts_with($query->sql, 'select exists') && str_contains($query->sql, '"drivers"') && str_contains($query->sql, '"license"')) {
+        if ($input['barrier_at'] === 'trip_written' && str_starts_with($query->sql, 'insert into "trips"')) {
+            $paused = true;
+            $pause('trip_written');
+        } elseif ($input['barrier_at'] === 'person_locked' && str_contains($query->sql, 'pg_advisory_xact_lock')) {
+            $paused = true;
+            $pause('person_locked');
+        } elseif ($input['barrier_at'] === 'bus_locked' && str_contains($query->sql, '"buses"') && str_contains($query->sql, 'for update')) {
+            $paused = true;
+            $pause('bus_locked');
+        } elseif ($input['barrier_at'] === 'license' && str_starts_with($query->sql, 'select exists') && str_contains($query->sql, '"drivers"') && str_contains($query->sql, '"license"')) {
             $paused = true;
             $pause('license_checked');
         } elseif ($input['barrier_at'] === 'removal' && str_contains($query->sql, '"companies"') && str_contains($query->sql, 'for update')) {
@@ -123,6 +134,18 @@ try {
     });
 
     DB::connection('pgsql')->beforeExecuting(static function (string $sql, array $bindings, Connection $connection) use ($input, $pause, &$paused): void {
+        if (! $paused && $input['barrier_at'] === 'trip_write_attempt' && str_starts_with($sql, 'insert into "trips"')) {
+            $paused = true;
+            $pause('trip_write_attempt');
+        }
+        if (! $paused && $input['barrier_at'] === 'person_attempt' && str_contains($sql, 'pg_advisory_xact_lock')) {
+            $paused = true;
+            $pause('person_lock_attempt');
+        }
+        if (! $paused && $input['barrier_at'] === 'bus_attempt' && str_contains($sql, '"buses"') && str_contains($sql, 'for update')) {
+            $paused = true;
+            $pause('bus_lock_attempt');
+        }
         if (! $paused && $input['barrier_at'] === 'schedule_attempt' && str_contains($sql, '"drivers"') && str_contains($sql, 'for update')) {
             $paused = true;
             $pause('driver_lock_attempt');
@@ -141,7 +164,30 @@ try {
     $result = [];
 
     try {
-        if (str_starts_with($input['operation'], 'schedule_')) {
+        if ($input['operation'] === 'trip_schedule' || $input['operation'] === 'trip_replan') {
+            $service = app(TripManagementService::class);
+            $trip = $input['operation'] === 'trip_schedule'
+                ? $service->schedule($actor, $company, $input['plan'])
+                : $service->replan($actor, $company, $input['trip_id'], $input['plan']);
+            $result = ['trip_id' => $trip->id];
+        } elseif ($input['operation'] === 'bus_deactivate' || $input['operation'] === 'bus_archive') {
+            $service = app(BusManagementService::class);
+            if ($input['operation'] === 'bus_archive') {
+                $service->archive($actor, $company, $input['bus_id']);
+            } else {
+                $service->setActive($actor, $company, $input['bus_id'], false);
+            }
+        } elseif (in_array($input['operation'], ['driver_deactivate', 'driver_archive', 'license_shorten'], true)) {
+            $driver = Driver::findOrFail($input['driver_id']);
+            $service = app(DriverManagementService::class);
+            if ($input['operation'] === 'driver_archive') {
+                $service->archive($actor, $company, $driver);
+            } elseif ($input['operation'] === 'license_shorten') {
+                $service->updateEmployment($actor, $company, $driver, ['license_expires_at' => '2026-10-25']);
+            } else {
+                $service->setActive($actor, $company, $driver, false);
+            }
+        } elseif (str_starts_with($input['operation'], 'schedule_')) {
             $driver = Driver::withTrashed()->findOrFail($input['driver_id']);
             $service = app(DriverScheduleService::class);
             if ($input['operation'] === 'schedule_create') {

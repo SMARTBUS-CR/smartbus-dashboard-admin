@@ -47,12 +47,13 @@ class DriverScheduleService
             if (! $schedule->delete()) {
                 throw ValidationException::withMessages(['schedule' => __('The availability operation was cancelled.')]);
             }
+            app(TripReservationService::class)->ensureAvailabilityAllowed($driver);
 
             return $schedule;
         });
     }
 
-    /** Subtask 09 will add checks against the real committed Trip assignments. */
+    /** Extension point before availability writes; persisted coverage is checked before commit. */
     protected function ensureScheduleOperationAllowed(Company $company, Driver $driver, DriverSchedule $schedule, string $operation): void {}
 
     /** @param Closure(Company, Driver, ?DriverSchedule): DriverSchedule $operation */
@@ -66,6 +67,8 @@ class DriverScheduleService
 
             return DB::connection('pgsql')->transaction(function () use ($actor, $company, $driver, $ability, $schedule, $operation): DriverSchedule {
                 $company = Company::query()->whereKey($company->getKey())->sharedLock()->firstOrFail();
+                $identity = Driver::withTrashed()->where('company_id', $company->getKey())->findOrFail($driver->getKey());
+                app(TripReservationService::class)->lockPeople([$identity->user_id]);
                 $driver = Driver::withTrashed()->where('company_id', $company->getKey())->whereKey($driver->getKey())->lockForUpdate()->firstOrFail();
                 $record = $schedule === null ? null : DriverSchedule::query()->where('driver_id', $driver->getKey())->whereKey($schedule->getKey())->lockForUpdate()->firstOrFail();
                 Gate::forUser($actor)->authorize($ability, [DriverSchedule::class, $company, $record ?? $driver]);
@@ -107,6 +110,7 @@ class DriverScheduleService
         if (! $schedule->save()) {
             throw ValidationException::withMessages(['schedule' => __('The availability operation was cancelled.')]);
         }
+        app(TripReservationService::class)->ensureAvailabilityAllowed($driver);
     }
 
     private function overlaps(DriverSchedule $first, DriverSchedule $second, string $timezone): bool
