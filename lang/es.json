@@ -588,5 +588,10 @@
     "Password Recovery Failed": "No se pudo completar la recuperación de contraseña",
     "The selected driver is unavailable or ineligible for the planned dates.": "El conductor seleccionado no está disponible o no cumple los requisitos para las fechas planificadas.",
     "Buses with scheduled or in-progress trips cannot be deactivated or archived.": "No se pueden desactivar ni archivar autobuses con viajes programados o en curso.",
-    "This change would invalidate an assigned trip.": "Este cambio invalidaría un viaje asignado."
+    "This change would invalidate an assigned trip.": "Este cambio invalidaría un viaje asignado.",
+    "The requested route does not exist or has been archived.": "La ruta solicitada no existe o ha sido archivada.",
+    "The requested route pattern does not exist or has been archived.": "El trazado de ruta solicitado no existe o ha sido archivado.",
+    "The requested stop does not exist or has been archived.": "La parada solicitada no existe o ha sido archivada.",
+    "The requested trip was not found.": "El viaje solicitado no fue encontrado.",
+    "The requested resource was not found.": "El recurso solicitado no fue encontrado."
 }
