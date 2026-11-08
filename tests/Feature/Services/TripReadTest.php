@@ -334,6 +334,46 @@ test('excludes private fields and values from the actual nested history response
     Http::assertNothingSent();
 })->with(['list', 'detail']);
 
+test('returns bilingual history validation errors without Filament', function (string $locale, string $scenario, string $field, string $message): void {
+    $company = createCompany();
+    $actor = createUserWithRole(UserRole::SuperAdmin);
+    $service = app(TripReadService::class);
+    $previousLocale = app()->getLocale();
+
+    try {
+        app()->setLocale($locale);
+        $read = match ($scenario) {
+            'missing from' => fn () => $service->listFor($actor, $company, '', '2026-10-26'),
+            'missing until' => fn () => $service->listFor($actor, $company, '2026-10-26', ''),
+            'invalid from' => fn () => $service->listFor($actor, $company, '2026-02-30', '2026-10-26'),
+            'invalid until' => fn () => $service->listFor($actor, $company, '2026-10-26', 'invalid'),
+            'reversed range' => fn () => $service->listFor($actor, $company, '2026-10-27', '2026-10-26'),
+            'missing id' => fn () => $service->findFor($actor, $company, ''),
+            default => fn () => $service->findFor($actor, $company, 'invalid'),
+        };
+        expect($read)->toThrow(function (ValidationException $exception) use ($field, $message): void {
+            expect($exception->errors()[$field][0])->toBe($message);
+        });
+    } finally {
+        app()->setLocale($previousLocale);
+    }
+})->with([
+    ['en', 'missing from', 'from_date', 'The start date field is required.'],
+    ['es', 'missing from', 'from_date', 'El campo fecha inicial es obligatorio.'],
+    ['en', 'missing until', 'until_date', 'The end date field is required.'],
+    ['es', 'missing until', 'until_date', 'El campo fecha final es obligatorio.'],
+    ['en', 'invalid from', 'from_date', 'The start date field must match the format Y-m-d.'],
+    ['es', 'invalid from', 'from_date', 'El campo fecha inicial debe coincidir con el formato Y-m-d.'],
+    ['en', 'invalid until', 'until_date', 'The end date field must match the format Y-m-d.'],
+    ['es', 'invalid until', 'until_date', 'El campo fecha final debe coincidir con el formato Y-m-d.'],
+    ['en', 'reversed range', 'until_date', 'The end date field must be a date after or equal to start date.'],
+    ['es', 'reversed range', 'until_date', 'El campo fecha final debe ser una fecha posterior o igual a fecha inicial.'],
+    ['en', 'missing id', 'trip_id', 'The trip identifier field is required.'],
+    ['es', 'missing id', 'trip_id', 'El campo identificador del viaje es obligatorio.'],
+    ['en', 'invalid id', 'trip_id', 'The trip identifier field must be a valid UUID.'],
+    ['es', 'invalid id', 'trip_id', 'El campo identificador del viaje debe ser un UUID válido.'],
+]);
+
 test('preserves repeated occurrences nulls and the original revision in history reads', function (string $operation): void {
     Http::preventStrayRequests();
     $company = createCompany(['timezone' => 'America/Costa_Rica']);

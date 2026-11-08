@@ -27,7 +27,7 @@ class TripReadService
 
     /**
      * Inclusive local service dates; all states and archived history are readable.
-     * This proposed read contract is pending confirmation by the consuming contributor.
+     * The inclusive range and response projection are agreed with the consuming contributor.
      *
      * @return Collection<int, array{
      *     id: string, status: string, service_date: string,
