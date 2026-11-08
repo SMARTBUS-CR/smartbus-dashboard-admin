@@ -3,8 +3,12 @@
 namespace App\Http\Resources\Api\V1\Operations;
 
 use App\Http\Resources\JsonApi\JsonApiResource;
+use App\Models\Route;
 use Illuminate\Http\Request;
 
+/**
+ * @mixin Route
+ */
 class RouteResource extends JsonApiResource
 {
     /**

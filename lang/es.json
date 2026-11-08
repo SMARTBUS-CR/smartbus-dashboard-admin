@@ -17,6 +17,7 @@
     "(and :count more errors)": "(y :count error más)|(y :count errores más)|(y :count errores más)",
     "A decryption key is required.": "Se requiere una clave de descifrado.",
     "A Timeout Occurred": "Se produjo un tiempo de espera",
+    "API Documentation": "Documentación de la API",
     "Accept": "Aceptar",
     "Accepted": "Aceptado",
     "Action": "Acción",

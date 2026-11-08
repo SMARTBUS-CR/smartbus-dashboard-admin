@@ -3,8 +3,12 @@
 namespace App\Http\Resources\Api\V1\Operations;
 
 use App\Http\Resources\JsonApi\JsonApiResource;
+use App\Models\RouteSchedule;
 use Illuminate\Http\Request;
 
+/**
+ * @mixin RouteSchedule
+ */
 class RouteScheduleResource extends JsonApiResource
 {
     /**

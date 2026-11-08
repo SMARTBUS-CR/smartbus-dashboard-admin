@@ -3,8 +3,12 @@
 namespace App\Http\Resources\Api\V1\Operations;
 
 use App\Http\Resources\JsonApi\JsonApiResource;
+use App\Models\Stop;
 use Illuminate\Http\Request;
 
+/**
+ * @mixin Stop
+ */
 class StopResource extends JsonApiResource
 {
     /**

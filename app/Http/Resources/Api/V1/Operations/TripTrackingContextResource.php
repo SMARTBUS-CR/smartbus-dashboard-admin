@@ -3,8 +3,12 @@
 namespace App\Http\Resources\Api\V1\Operations;
 
 use App\Http\Resources\JsonApi\JsonApiResource;
+use App\Models\Trip;
 use Illuminate\Http\Request;
 
+/**
+ * @mixin Trip
+ */
 class TripTrackingContextResource extends JsonApiResource
 {
     /**
