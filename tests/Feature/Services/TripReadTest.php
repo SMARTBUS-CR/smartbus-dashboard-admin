@@ -2,10 +2,14 @@
 
 use App\Enums\UserRole;
 use App\Models\CompanyUser;
+use App\Models\Route;
+use App\Models\RoutePattern;
+use App\Models\RoutePatternStop;
 use App\Models\Trip;
 use App\Services\TripReadService;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 
@@ -159,3 +163,207 @@ test('authorizes before validating and restores permission context after history
         setPermissionsTeamId($previousTeam);
     }
 })->with(['success', 'denied', 'invalid', 'revoked']);
+
+test('reads the saved trip detail after catalogue edits and parent archival', function (string $role): void {
+    Http::preventStrayRequests();
+    $trip = Trip::factory()->withEligibleDriver()->completed()->create();
+    $company = $trip->company;
+    $actor = match ($role) {
+        'driver' => $trip->driver->user,
+        'super admin' => createUserWithRole(UserRole::SuperAdmin),
+        default => createUserWithRole(UserRole::Admin, $company),
+    };
+    if ($role === 'admin') {
+        CompanyUser::factory()->create(['company_id' => $company->id, 'user_id' => $actor->id]);
+        grantShield($actor, ['View:Trip'], $company);
+    }
+    $snapshot = $trip->planned_route_snapshot;
+    $pattern = $trip->pattern;
+    $route = $pattern->route;
+    $stops = $pattern->stopOccurrences()->with('stop')->get()->pluck('stop');
+    $pattern->update(['name' => 'Changed pattern']);
+    $route->update(['name' => 'Changed route']);
+    $stops->first()->update(['name' => 'Changed stop']);
+    $pattern->stopOccurrences()->get()->each->delete();
+    foreach ($stops as $stop) {
+        $stop->delete();
+    }
+    $pattern->delete();
+    $route->delete();
+    $trip->bus->delete();
+    if ($role !== 'driver') {
+        $trip->driver->user->delete();
+    }
+    $trip->driver->delete();
+    $company->update(['timezone' => 'Asia/Tokyo']);
+    $company->delete();
+    $trip->delete();
+    $before = $trip->fresh()->getRawOriginal();
+
+    $row = app(TripReadService::class)->findFor($actor, $company, $trip->id);
+
+    expect($row['id'])->toBe($trip->id)
+        ->and($row['planned_route_snapshot'])->toBe($snapshot)
+        ->and($row['status'])->toBe('completed')
+        ->and($row['actual_departure_at'])->toBe('2026-10-26T12:30:00.000000Z')
+        ->and($row['actual_arrival_at'])->toBe('2026-10-26T13:30:00.000000Z')
+        ->and($row['company']['deleted_at'])->not->toBeNull()
+        ->and($row['driver']['deleted_at'])->not->toBeNull()
+        ->and($row['bus']['deleted_at'])->not->toBeNull()
+        ->and($row['deleted_at'])->not->toBeNull()
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
+    Http::assertNothingSent();
+})->with(['admin', 'driver', 'super admin']);
+
+test('hides inaccessible trip details with the same not-found outcome as missing trips', function (string $scenario, string $role): void {
+    $own = Trip::factory()->withEligibleDriver()->create();
+    $company = $own->company;
+    $actor = match ($role) {
+        'driver' => $own->driver->user,
+        'super admin' => createUserWithRole(UserRole::SuperAdmin),
+        default => createUserWithRole(UserRole::Admin, $company),
+    };
+    if ($role === 'admin') {
+        CompanyUser::factory()->create(['company_id' => $company->id, 'user_id' => $actor->id]);
+    }
+    if ($role !== 'super admin') {
+        grantShield($actor, ['View:Trip'], $company);
+    }
+    $id = match ($scenario) {
+        'foreign' => Trip::factory()->create()->id,
+        'unassigned' => Trip::factory()->for($company)->create()->id,
+        default => '00000000-0000-4000-8000-000000000099',
+    };
+
+    expect(fn () => app(TripReadService::class)->findFor($actor, $company, $id))
+        ->toThrow(function (ModelNotFoundException $exception) use ($id): void {
+            expect($exception->getModel())->toBe(Trip::class)
+                ->and($exception->getIds())->toBe([$id])
+                ->and($exception->getMessage())->toBe('No query results for model [App\\Models\\Trip] '.$id);
+        });
+})->with([
+    ['missing', 'admin'], ['foreign', 'admin'], ['missing', 'super admin'], ['foreign', 'super admin'],
+    ['missing', 'driver'], ['foreign', 'driver'], ['unassigned', 'driver'],
+]);
+
+test('validates the trip identifier before querying PostgreSQL', function (string $id): void {
+    $company = createCompany();
+    $actor = createUserWithRole(UserRole::SuperAdmin);
+
+    expect(fn () => app(TripReadService::class)->findFor($actor, $company, $id))
+        ->toThrow(function (ValidationException $exception): void {
+            expect($exception->errors())->toHaveKey('trip_id');
+        });
+})->with(['', 'invalid', "' OR TRUE --", ' 00000000-0000-4000-8000-000000000099']);
+
+test('restores permission context and requires detail permission before validating an identifier', function (string $outcome): void {
+    $trip = Trip::factory()->create();
+    $company = $trip->company;
+    $actor = createUserWithRole(UserRole::Admin, $company);
+    CompanyUser::factory()->create(['company_id' => $company->id, 'user_id' => $actor->id]);
+    grantShield($actor, [$outcome === 'denied' ? 'ViewAny:Trip' : 'View:Trip'], $company);
+    if ($outcome === 'revoked') {
+        $actor->fresh()->delete();
+    }
+    $previousTeam = getPermissionsTeamId();
+    $otherCompany = createCompany();
+    try {
+        setPermissionsTeamId($otherCompany->id);
+        $actor->load('roles', 'permissions');
+        $id = match ($outcome) {
+            'success' => $trip->id,
+            'missing' => '00000000-0000-4000-8000-000000000099',
+            default => 'invalid',
+        };
+        $read = fn () => app(TripReadService::class)->findFor($actor, $company, $id);
+        if ($outcome === 'success') {
+            expect($read()['id'])->toBe($trip->id);
+        } else {
+            expect($read)->toThrow(match ($outcome) {
+                'invalid' => ValidationException::class,
+                'missing' => ModelNotFoundException::class,
+                default => AuthorizationException::class,
+            });
+        }
+        expect(getPermissionsTeamId())->toBe($otherCompany->id)
+            ->and($actor->relationLoaded('roles'))->toBeFalse()
+            ->and($actor->relationLoaded('permissions'))->toBeFalse();
+    } finally {
+        setPermissionsTeamId($previousTeam);
+    }
+})->with(['success', 'denied', 'invalid', 'missing', 'revoked']);
+
+test('excludes private fields and values from the actual nested history response', function (string $operation): void {
+    Http::preventStrayRequests();
+    $trip = Trip::factory()->create();
+    $actor = createUserWithRole(UserRole::SuperAdmin);
+    $driver = $trip->driver;
+    $user = $driver->user;
+    $privateUser = $user->makeVisible(['password', 'remember_token'])->toArray();
+    $privateDriver = $driver->makeVisible(['salary_amount', 'salary_currency', 'salary_period'])->toArray();
+    $expectedSnapshot = $trip->fresh()->planned_route_snapshot;
+    $snapshot = $expectedSnapshot;
+    $snapshot['driver'] = $privateDriver;
+    $snapshot['user'] = $privateUser;
+    $snapshot['route_geometry']['properties'] = ['credentials' => $privateUser];
+    $snapshot['occurrences'][0]['driver'] = $privateDriver;
+    $snapshot['occurrences'][0]['user'] = $privateUser;
+    Trip::query()->whereKey($trip->id)->update(['planned_route_snapshot' => $snapshot]);
+    $before = $trip->fresh()->getRawOriginal();
+    $service = app(TripReadService::class);
+
+    $row = $operation === 'list'
+        ? $service->listFor($actor, $trip->company, '2026-10-26', '2026-10-26')->sole()
+        : $service->findFor($actor, $trip->company, $trip->id);
+
+    expect(array_keys($row))->toEqualCanonicalizing([
+        'id', 'status', 'service_date', 'scheduled_departure_at', 'scheduled_arrival_at',
+        'actual_departure_at', 'actual_arrival_at', 'cancelled_at', 'cancellation_reason', 'deleted_at',
+        'route_pattern_id', 'route_schedule_id', 'company', 'bus', 'driver', 'planned_route_snapshot',
+    ]);
+    expect($row['company'])->toBe(['id' => $trip->company_id, 'name' => $trip->company->legal_name, 'deleted_at' => null]);
+    expect($row['driver'])->toBe(['id' => $driver->id, 'user_id' => $driver->user_id, 'deleted_at' => null]);
+    expect(array_keys($row['bus']))->toEqualCanonicalizing(['id', 'country_code', 'plate_number', 'unit_number', 'deleted_at']);
+    expect($row['planned_route_snapshot'])->toBe($expectedSnapshot);
+    expect(json_encode($row, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR))->not->toContain(
+        '"salary_amount"', '"salary_currency"', '"salary_period"', '"password"', '"remember_token"',
+        '"email"', '"license"', '"credentials"', '"user"',
+        $driver->salary_amount, $driver->license, $user->email, $user->getRawOriginal('password'), $user->remember_token,
+    );
+    expect($trip->fresh()->getRawOriginal())->toBe($before);
+    Http::assertNothingSent();
+})->with(['list', 'detail']);
+
+test('preserves repeated occurrences nulls and the original revision in history reads', function (string $operation): void {
+    Http::preventStrayRequests();
+    $company = createCompany(['timezone' => 'America/Costa_Rica']);
+    $pattern = RoutePattern::factory()->for(Route::factory()->for($company))->withSavedPlan()->create();
+    $occurrences = $pattern->stopOccurrences()->get();
+    $occurrences[1]->update(['minutes_from_start' => 15]);
+    $last = RoutePatternStop::factory()->for($pattern, 'pattern')->create([
+        'stop_id' => $occurrences[0]->stop_id, 'stop_sequence' => 3, 'minutes_from_start' => null,
+    ]);
+    $pattern->refresh()->update([
+        'route_geometry' => ['type' => 'LineString', 'coordinates' => [[-84, 10], [-84.01, 10.01], [-84, 10]]],
+        'distance_meters' => '3000.00', 'driving_duration_seconds' => '600.00',
+        'routing_points_hash' => hash('sha256', '-84.0000000,10.0000000;-84.0100000,10.0100000;-84.0000000,10.0000000'),
+        'routing_leg_distances' => null,
+    ]);
+    $trip = Trip::factory()->for($company)->create(['route_pattern_id' => $pattern->id]);
+    $expectedSnapshot = $trip->fresh()->planned_route_snapshot;
+    $actor = createUserWithRole(UserRole::SuperAdmin);
+    $service = app(TripReadService::class);
+
+    $row = $operation === 'list'
+        ? $service->listFor($actor, $company, '2026-10-26', '2026-10-26')->sole()
+        : $service->findFor($actor, $company, $trip->id);
+
+    expect($row['planned_route_snapshot'])->toBe($expectedSnapshot)
+        ->and($row['planned_route_snapshot']['routing_leg_distances'])->toBeNull()
+        ->and(array_column($row['planned_route_snapshot']['occurrences'], 'occurrence_id'))
+        ->toBe([$occurrences[0]->id, $occurrences[1]->id, $last->id])
+        ->and(array_column($row['planned_route_snapshot']['occurrences'], 'stop_id'))
+        ->toBe([$occurrences[0]->stop_id, $occurrences[1]->stop_id, $occurrences[0]->stop_id])
+        ->and(array_column($row['planned_route_snapshot']['occurrences'], 'minutes_from_start'))->toBe([null, 15, null]);
+    Http::assertNothingSent();
+})->with(['list', 'detail']);

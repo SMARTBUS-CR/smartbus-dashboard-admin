@@ -7,7 +7,9 @@ use App\Models\Company;
 use App\Models\Driver;
 use App\Models\Trip;
 use App\Models\User;
+use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -41,6 +43,40 @@ class TripReadService
      */
     public function listFor(User $actor, Company $company, string $fromDate, string $untilDate): Collection
     {
+        return $this->read($actor, $company, 'viewAny', function (User $currentActor) use ($company, $fromDate, $untilDate): Collection {
+            Validator::make(['from_date' => $fromDate, 'until_date' => $untilDate], [
+                'from_date' => ['required', 'string', 'date_format:Y-m-d'],
+                'until_date' => ['required', 'string', 'date_format:Y-m-d', 'after_or_equal:from_date'],
+            ])->validate();
+
+            return $this->scopedQuery($currentActor, $company)
+                ->whereBetween('service_date', [$fromDate, $untilDate])
+                ->orderBy('service_date')->orderBy('scheduled_departure_at')->orderBy('id')
+                ->get()->map(fn (Trip $trip): array => $this->project($trip));
+        });
+    }
+
+    /**
+     * Return the same projection as listFor, including archived history.
+     * Missing, foreign and unassigned trips share the not-found outcome.
+     *
+     * @return array<string, mixed>
+     */
+    public function findFor(User $actor, Company $company, string $tripId): array
+    {
+        return $this->read($actor, $company, 'view', function (User $currentActor) use ($company, $tripId): array {
+            Validator::make(['trip_id' => $tripId], ['trip_id' => ['required', 'uuid']])->validate();
+
+            $trip = $this->scopedQuery($currentActor, $company)->findOrFail($tripId);
+            Gate::forUser($currentActor)->authorize('view', [Trip::class, $company, $trip]);
+
+            return $this->project($trip);
+        });
+    }
+
+    /** @param Closure(User): (Collection|array) $operation */
+    private function read(User $actor, Company $company, string $ability, Closure $operation): Collection|array
+    {
         $previousTeam = getPermissionsTeamId();
         $currentActor = null;
 
@@ -51,34 +87,34 @@ class TripReadService
             if ($currentActor === null) {
                 throw new AuthorizationException;
             }
-            Gate::forUser($currentActor)->authorize('viewAny', [Trip::class, $company]);
+            Gate::forUser($currentActor)->authorize($ability, [Trip::class, $company]);
 
-            Validator::make(['from_date' => $fromDate, 'until_date' => $untilDate], [
-                'from_date' => ['required', 'string', 'date_format:Y-m-d'],
-                'until_date' => ['required', 'string', 'date_format:Y-m-d', 'after_or_equal:from_date'],
-            ])->validate();
-
-            $query = Trip::withTrashed()->where('company_id', $company->getKey())
-                ->whereBetween('service_date', [$fromDate, $untilDate]);
-
-            if (! $currentActor->isSuperAdmin() && $currentActor->roles()
-                ->where('roles.company_id', $company->getKey())->where('guard_name', 'web')
-                ->where('name', UserRole::Driver->value)->exists()) {
-                $query->whereIn('driver_id', Driver::withTrashed()->select('id')
-                    ->where('company_id', $company->getKey())->where('user_id', $currentActor->getKey()));
-            }
-
-            return $query->with([
-                'company:id,legal_name,deleted_at',
-                'bus:id,country_code,plate_number,unit_number,deleted_at',
-                'driver:id,user_id,deleted_at',
-            ])->orderBy('service_date')->orderBy('scheduled_departure_at')->orderBy('id')
-                ->get(self::TRIP_FIELDS)->map(fn (Trip $trip): array => $this->project($trip));
+            return $operation($currentActor);
         } finally {
             setPermissionsTeamId($previousTeam);
             $actor->unsetRelation('roles')->unsetRelation('permissions');
             $currentActor?->unsetRelation('roles')->unsetRelation('permissions');
         }
+    }
+
+    /** @return Builder<Trip> */
+    private function scopedQuery(User $actor, Company $company): Builder
+    {
+        $query = Trip::withTrashed()->select(self::TRIP_FIELDS)->where('company_id', $company->getKey())
+            ->with([
+                'company:id,legal_name,deleted_at',
+                'bus:id,country_code,plate_number,unit_number,deleted_at',
+                'driver:id,user_id,deleted_at',
+            ]);
+
+        if (! $actor->isSuperAdmin() && $actor->roles()
+            ->where('roles.company_id', $company->getKey())->where('guard_name', 'web')
+            ->where('name', UserRole::Driver->value)->exists()) {
+            $query->whereIn('driver_id', Driver::withTrashed()->select('id')
+                ->where('company_id', $company->getKey())->where('user_id', $actor->getKey()));
+        }
+
+        return $query;
     }
 
     /** @return array<string, mixed> */
