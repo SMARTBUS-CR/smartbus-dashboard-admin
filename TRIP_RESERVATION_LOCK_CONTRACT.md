@@ -30,7 +30,7 @@ Hash collisions only serialize unrelated people; they never skip checks.
 
 Order, only where applicable:
 
-1. Existing Company shared lock, then existing Trip row lock for replan.
+1. Existing Company shared lock, then existing Trip row lock for replan/start/complete/cancel.
 2. Affected person locks, then Bus rows, then Driver rows.
 3. Existing target DriverSchedule row lock for update/delete.
 
@@ -48,6 +48,9 @@ this PostgreSQL reservation transaction.
 | Operation | Check under resource locks |
 | --- | --- |
 | Schedule/replan | Active company/bus, Driver eligibility, full `covers()` and no overlapping Trip across any profile of that User. |
+| Start | Current company/bus and Driver eligibility, effective departure suspension, availability at the actual start instant, and no other in-progress Trip for the bus or any profile of that User. |
+| Complete | Authorized assigned driver or administrator; in-progress state and server arrival at or after actual departure. Company inactivity does not prevent authorized closure. |
+| Cancel | Authorized administrator, scheduled state and trimmed nonempty reason of at most 500 characters. |
 | Bus deactivate/archive | No scheduled/in-progress Trip for the bus. |
 | Driver deactivate/archive | No scheduled/in-progress Trip for that profile. |
 | Employment/license edit | Proposed values preserve assigned-trip eligibility. |
@@ -63,7 +66,21 @@ Intervals are UTC [departure, arrival): existing start < proposed end AND
 existing end > proposed start. Allow adjacency; replan excludes its own Trip.
 Only scheduled/in-progress Trips reserve intervals. Completed departures still
 occupy schedule/date identity; cancelled history can be replaced without deletion.
-HU #39 adds overdue in-progress execution rules.
+At start, another in-progress Trip blocks the bus/person even after its planned
+interval ends. Start checks the actual instant, not full planned-window coverage.
+Complete and cancel use the same resource-lock order before writing, releasing
+the reservation through the persisted state change.
+
+Scope and authorize before resolving retries. Equivalent retries preserve the
+first server timestamps and cancellation reason; cancellation retries still
+validate the supplied reason. Replan cannot change started or terminal Trips.
+Normal and quiet direct model history writes and permanent deletion remain
+prohibited; only the trusted service transitions may modify execution history.
+Soft deletion does not cancel or complete a Trip: scheduled/in-progress Trips
+retain their reservations and in-progress occupancy even when soft deleted.
+Restoration may clear `deleted_at` without changing any other historical field.
+Factory/seeder
+execution examples are explicit development fixtures, not operational transitions.
 
 Preserve private bilingual field errors for known constraint conflicts.
 Person conflicts use `driver_id` without exposing foreign details. Unexpected
