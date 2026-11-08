@@ -554,5 +554,11 @@
     "The requested route pattern does not exist or has been archived.": "The requested route pattern does not exist or has been archived.",
     "The requested stop does not exist or has been archived.": "The requested stop does not exist or has been archived.",
     "The requested trip was not found.": "The requested trip was not found.",
-    "The requested resource was not found.": "The requested resource was not found."
+    "The requested resource was not found.": "The requested resource was not found.",
+    "Only scheduled trips can be started.": "Only scheduled trips can be started.",
+    "The assigned driver is unavailable at the actual start instant.": "The assigned driver is unavailable at the actual start instant.",
+    "The selected departure is currently suspended.": "The selected departure is currently suspended.",
+    "Only in-progress trips can be completed.": "Only in-progress trips can be completed.",
+    "The actual arrival cannot be before the actual departure.": "The actual arrival cannot be before the actual departure.",
+    "Only scheduled trips can be cancelled.": "Only scheduled trips can be cancelled."
 }

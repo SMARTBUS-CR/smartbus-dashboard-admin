@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\TripStatus;
 use App\Enums\UserRole;
 use App\Models\Bus;
 use App\Models\Company;
@@ -22,6 +23,43 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class TripFactory extends Factory
 {
+    /** Persist an execution fixture after normal scheduled creation, retaining model guards. */
+    public function inProgress(): static
+    {
+        return $this->afterCreating(function (Trip $trip): void {
+            Trip::query()->whereKey($trip->getKey())->update([
+                'status' => TripStatus::IN_PROGRESS->value,
+                'actual_departure_at' => $trip->scheduled_departure_at->utc()->format('Y-m-d H:i:s.uP'),
+            ]);
+            $trip->refresh();
+        });
+    }
+
+    /** Persist a completed fixture with actual times matching its planned window. */
+    public function completed(): static
+    {
+        return $this->inProgress()->afterCreating(function (Trip $trip): void {
+            Trip::query()->whereKey($trip->getKey())->update([
+                'status' => TripStatus::COMPLETED->value,
+                'actual_arrival_at' => $trip->scheduled_arrival_at->utc()->format('Y-m-d H:i:s.uP'),
+            ]);
+            $trip->refresh();
+        });
+    }
+
+    /** Persist cancellation history without creating actual departure or arrival times. */
+    public function cancelled(): static
+    {
+        return $this->afterCreating(function (Trip $trip): void {
+            Trip::query()->whereKey($trip->getKey())->update([
+                'status' => TripStatus::CANCELLED->value,
+                'cancelled_at' => $trip->scheduled_departure_at->subHour()->utc()->format('Y-m-d H:i:s.uP'),
+                'cancellation_reason' => 'Demo cancellation',
+            ]);
+            $trip->refresh();
+        });
+    }
+
     /**
      * Define the model's default state.
      *

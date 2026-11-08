@@ -115,3 +115,22 @@ test('default trip fixtures do not create driver availability', function (): voi
     $this->assertDatabaseCount('driver_schedules', 0);
     Http::assertNothingSent();
 });
+
+test('persists lifecycle factory states without weakening direct model guards', function (string $method, TripStatus $status): void {
+    Http::preventStrayRequests();
+    $trip = Trip::factory()->{$method}()->create()->refresh();
+    expect($trip->status)->toBe($status);
+    expect($trip->actual_departure_at?->equalTo($trip->scheduled_departure_at))->toBe($status !== TripStatus::CANCELLED ? true : null);
+    expect($trip->actual_arrival_at?->equalTo($trip->scheduled_arrival_at))->toBe($status === TripStatus::COMPLETED ? true : null);
+    expect($trip->cancelled_at?->equalTo($trip->scheduled_departure_at->subHour()))->toBe($status === TripStatus::CANCELLED ? true : null);
+    expect($trip->cancellation_reason)->toBe($status === TripStatus::CANCELLED ? 'Demo cancellation' : null);
+    $before = $trip->getRawOriginal();
+    $trip->forceFill(['status' => TripStatus::SCHEDULED]);
+    expect(fn () => $trip->saveQuietly())->toThrow(ValidationException::class);
+    expect($trip->fresh()->getRawOriginal())->toBe($before);
+    Http::assertNothingSent();
+})->with([
+    ['inProgress', TripStatus::IN_PROGRESS],
+    ['completed', TripStatus::COMPLETED],
+    ['cancelled', TripStatus::CANCELLED],
+]);
