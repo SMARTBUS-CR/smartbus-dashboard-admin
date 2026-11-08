@@ -54,16 +54,19 @@ class TripReservationService
             || ($operation === 'updateEmployment' && ! $driver->isDirty(['license', 'employment_starts_on', 'employment_ends_on', 'license_expires_at']))) {
             return;
         }
+        $instant = CarbonImmutable::now('UTC');
         foreach ($this->assignments($driver)->get() as $trip) {
             if ($operation === 'archive' || $driver->status !== DriverStatus::ACTIVE) {
                 $this->rejectAssignment();
             }
             $dates = [];
-            $end = $trip->scheduled_arrival_at->setTimezone($company->timezone);
-            for ($day = $trip->scheduled_departure_at->setTimezone($company->timezone)->startOfDay(); $day < $end; $day = $day->addDay()->startOfDay()) {
-                $dates[] = $day->toDateString();
+            foreach ($this->assignmentWindows($trip, $instant) as [$start, $end]) {
+                $end = $end->setTimezone($company->timezone);
+                for ($day = $start->setTimezone($company->timezone)->startOfDay(); $day < $end; $day = $day->addDay()->startOfDay()) {
+                    $dates[$day->toDateString()] = true;
+                }
             }
-            if (! $this->eligibility->isEligibleForDates($company, $driver, $dates)) {
+            if (! $this->eligibility->isEligibleForDates($company, $driver, array_keys($dates))) {
                 $this->rejectAssignment();
             }
         }
@@ -85,17 +88,39 @@ class TripReservationService
     /** Check persisted proposed changes inside the transaction; rejection rolls them back. */
     public function ensureAvailabilityAllowed(Driver $driver): void
     {
+        $instant = CarbonImmutable::now('UTC');
         foreach ($this->assignments($driver)->get() as $trip) {
-            if (! $this->availability->covers($driver, $trip->scheduled_departure_at->utc(), $trip->scheduled_arrival_at->utc())) {
-                $this->rejectAssignment();
+            foreach ($this->assignmentWindows($trip, $instant) as [$start, $end]) {
+                if (! $this->availability->covers($driver, $start, $end)) {
+                    $this->rejectAssignment();
+                }
             }
         }
+    }
+
+    /**
+     * Protect the plan and observed execution independently, without filling a
+     * waiting gap before a late start. Include the current instant in the
+     * half-open execution window using the database timestamp precision.
+     *
+     * @return list<array{CarbonImmutable, CarbonImmutable}>
+     */
+    private function assignmentWindows(Trip $trip, CarbonImmutable $instant): array
+    {
+        $windows = [[$trip->scheduled_departure_at->utc(), $trip->scheduled_arrival_at->utc()]];
+        if ($trip->status === TripStatus::IN_PROGRESS) {
+            $start = $trip->actual_departure_at->utc();
+            $end = $instant >= $start ? $instant->addMicrosecond() : $start->addMicrosecond();
+            $windows[] = [$start, $end];
+        }
+
+        return $windows;
     }
 
     /** @return Builder<Trip> */
     private function assignments(Driver $driver): Builder
     {
-        return Trip::withTrashed()->select(['id', 'scheduled_departure_at', 'scheduled_arrival_at'])
+        return Trip::withTrashed()->select(['id', 'status', 'scheduled_departure_at', 'scheduled_arrival_at', 'actual_departure_at'])
             ->where('driver_id', $driver->getKey())->whereIn('status', [TripStatus::SCHEDULED, TripStatus::IN_PROGRESS]);
     }
 

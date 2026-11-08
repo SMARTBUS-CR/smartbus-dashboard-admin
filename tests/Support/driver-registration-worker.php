@@ -121,7 +121,10 @@ try {
             return;
         }
 
-        if ($input['barrier_at'] === 'trip_locked' && str_contains($query->sql, '"trips"') && str_contains($query->sql, 'for update')) {
+        if ($input['barrier_at'] === 'drivers_locked' && str_contains($query->sql, '"drivers"') && str_contains($query->sql, 'for update')) {
+            $paused = true;
+            $pause('drivers_locked');
+        } elseif ($input['barrier_at'] === 'trip_locked' && str_contains($query->sql, '"trips"') && str_contains($query->sql, 'for update')) {
             $paused = true;
             $pause('trip_locked');
         } elseif ($input['barrier_at'] === 'trip_written' && str_starts_with($query->sql, 'insert into "trips"')) {
@@ -207,11 +210,13 @@ try {
             } else {
                 $service->setActive($actor, $company, $input['bus_id'], false);
             }
-        } elseif (in_array($input['operation'], ['driver_deactivate', 'driver_archive', 'license_shorten'], true)) {
+        } elseif (in_array($input['operation'], ['driver_deactivate', 'driver_archive', 'license_shorten', 'driver_update'], true)) {
             $driver = Driver::findOrFail($input['driver_id']);
             $service = app(DriverManagementService::class);
             if ($input['operation'] === 'driver_archive') {
                 $service->archive($actor, $company, $driver);
+            } elseif ($input['operation'] === 'driver_update') {
+                $service->updateEmployment($actor, $company, $driver, $input['employment']);
             } elseif ($input['operation'] === 'license_shorten') {
                 $service->updateEmployment($actor, $company, $driver, ['license_expires_at' => '2026-10-25']);
             } else {
