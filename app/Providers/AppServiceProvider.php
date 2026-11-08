@@ -74,7 +74,7 @@ class AppServiceProvider extends ServiceProvider
                     return false;
                 }
 
-                if (in_array($ability, ['start', 'complete', 'cancel'], true)) {
+                if (in_array($ability, ['viewAny', 'view', 'start', 'complete', 'cancel'], true)) {
                     return null;
                 }
 
