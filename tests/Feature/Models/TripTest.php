@@ -7,6 +7,7 @@ use App\Models\Driver;
 use App\Models\RoutePattern;
 use App\Models\RouteSchedule;
 use App\Models\Trip;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 
 /** @return array<string, mixed> */
@@ -97,7 +98,7 @@ test('protects stored trip planning and execution fields against direct writes',
     'cancellation reason' => ['cancellation_reason', 'Forged cancellation'],
 ]);
 
-test('soft deletes trips and restores them without changing their history', function (string $method): void {
+test('soft deletes trips and restores them without changing their history', function (string $method, string $restore): void {
     $trip = Trip::query()->create(planningTripAttributes())->refresh();
     $before = $trip->getRawOriginal();
 
@@ -105,10 +106,10 @@ test('soft deletes trips and restores them without changing their history', func
     $this->assertSoftDeleted($trip);
     expect(Trip::query()->find($trip->getKey()))->toBeNull();
 
-    expect($trip->restore())->toBeTrue();
+    expect($trip->{$restore}())->toBeTrue();
     $restored = Trip::query()->findOrFail($trip->getKey());
     expect($restored->getRawOriginal('planned_route_snapshot'))->toBe($before['planned_route_snapshot']);
-})->with(['delete', 'deleteQuietly']);
+})->with(['delete', 'deleteQuietly'])->with(['restore', 'restoreQuietly']);
 
 test('hydrates every trip execution state without changing historical timestamps', function (string $state, string $case): void {
     $trip = (new Trip)->newFromBuilder([
@@ -122,11 +123,11 @@ test('hydrates every trip execution state without changing historical timestamps
     ['completed', 'COMPLETED'], ['cancelled', 'CANCELLED'],
 ]);
 
-test('rejects execution data on new trips', function (string $field, string $value): void {
+test('rejects execution data on new trips', function (string $field, string $value, bool $quiet): void {
     $trip = (new Trip(planningTripAttributes()))->forceFill([$field => $value]);
 
     try {
-        $trip->save();
+        $quiet ? $trip->saveQuietly() : $trip->save();
         $this->fail('Expected a validation exception.');
     } catch (ValidationException $exception) {
         expect($exception->errors())->toHaveKey($field);
@@ -136,6 +137,69 @@ test('rejects execution data on new trips', function (string $field, string $val
     ['status', 'completed'], ['actual_departure_at', '2026-10-26 12:00:00+00'],
     ['actual_arrival_at', '2026-10-26 13:00:00+00'], ['cancelled_at', '2026-10-26 11:00:00+00'],
     ['cancellation_reason', 'Forged cancellation'],
+])->with(['normal' => [false], 'quiet' => [true]]);
+
+test('rejects database-valid changes to terminal history when events are suppressed', function (string $state, string $method): void {
+    Http::preventStrayRequests();
+    $trip = Trip::factory()->{$state}()->create()->refresh();
+    $before = $trip->getRawOriginal();
+    if ($state === 'completed') {
+        $trip->actual_arrival_at = $trip->actual_arrival_at->addMinute();
+    } else {
+        $trip->cancellation_reason = 'Changed reason';
+    }
+
+    expect(fn () => $method === 'saveQuietly'
+        ? $trip->saveQuietly()
+        : Trip::withoutEvents(fn () => $trip->save()))->toThrow(ValidationException::class);
+    expect($trip->fresh()->getRawOriginal())->toBe($before);
+    Http::assertNothingSent();
+})->with(['completed', 'cancelled'])->with(['saveQuietly', 'withoutEvents']);
+
+test('rejects permanent deletion of visible and soft deleted trip history', function (string $method, bool $archived): void {
+    Http::preventStrayRequests();
+    $trip = Trip::factory()->completed()->create()->refresh();
+    if ($archived) {
+        $trip->delete();
+    }
+    $before = Trip::withTrashed()->findOrFail($trip->id)->getRawOriginal();
+
+    expect(fn () => $method === 'forceDestroy'
+        ? Trip::forceDestroy($trip->id)
+        : $trip->{$method}())->toThrow(ValidationException::class);
+
+    expect(Trip::withTrashed()->findOrFail($trip->id)->getRawOriginal())->toBe($before);
+    Http::assertNothingSent();
+})->with(['forceDelete', 'forceDeleteQuietly', 'forceDestroy'])->with([false, true]);
+
+test('rejects history changes hidden inside a restoration', function (string $method): void {
+    Http::preventStrayRequests();
+    $trip = Trip::factory()->completed()->create();
+    $trip->delete();
+    $trip = Trip::withTrashed()->findOrFail($trip->id);
+    $before = $trip->getRawOriginal();
+    $trip->actual_arrival_at = $trip->actual_arrival_at->addMinute();
+
+    expect(fn () => $trip->{$method}())->toThrow(ValidationException::class);
+
+    expect(Trip::withTrashed()->findOrFail($trip->id)->getRawOriginal())->toBe($before);
+    Http::assertNothingSent();
+})->with(['restore', 'restoreQuietly']);
+
+test('localizes permanent trip deletion errors', function (string $locale, string $message): void {
+    Http::preventStrayRequests();
+    app()->setLocale($locale);
+    $trip = Trip::factory()->completed()->create();
+
+    expect(fn () => $trip->forceDeleteQuietly())->toThrow(function (ValidationException $exception) use ($message): void {
+        expect($exception->errors())->toBe(['trip' => [$message]]);
+    });
+
+    $this->assertModelExists($trip);
+    Http::assertNothingSent();
+})->with([
+    ['en', 'Trip deletion is disabled. Preserve the trip history.'],
+    ['es', 'La eliminación de viajes está deshabilitada. Conserva el historial del viaje.'],
 ]);
 
 test('translates history protection messages', function (string $locale, string $historyMessage): void {

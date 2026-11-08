@@ -74,6 +74,10 @@ class AppServiceProvider extends ServiceProvider
                     return false;
                 }
 
+                if (in_array($ability, ['start', 'complete', 'cancel'], true)) {
+                    return null;
+                }
+
                 $trip = $record instanceof Trip ? $record : ($arguments[2] ?? null);
                 if ($ability === 'update' && $trip instanceof Trip) {
                     $company = $arguments[1] ?? null;

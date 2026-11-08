@@ -594,5 +594,11 @@
     "The requested route pattern does not exist or has been archived.": "El trazado de ruta solicitado no existe o ha sido archivado.",
     "The requested stop does not exist or has been archived.": "La parada solicitada no existe o ha sido archivada.",
     "The requested trip was not found.": "El viaje solicitado no fue encontrado.",
-    "The requested resource was not found.": "El recurso solicitado no fue encontrado."
+    "The requested resource was not found.": "El recurso solicitado no fue encontrado.",
+    "Only scheduled trips can be started.": "Solo se pueden iniciar viajes programados.",
+    "The assigned driver is unavailable at the actual start instant.": "El conductor asignado no tiene disponibilidad en el instante real de inicio.",
+    "The selected departure is currently suspended.": "La salida seleccionada está suspendida actualmente.",
+    "Only in-progress trips can be completed.": "Solo se pueden completar viajes en curso.",
+    "The actual arrival cannot be before the actual departure.": "La llegada real no puede ser anterior a la salida real.",
+    "Only scheduled trips can be cancelled.": "Solo se pueden cancelar viajes programados."
 }

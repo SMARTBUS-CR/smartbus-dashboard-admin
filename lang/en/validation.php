@@ -167,6 +167,7 @@ return [
         'brand' => 'brand',
         'model' => 'model',
         'company_id' => 'company',
+        'cancellation_reason' => 'cancellation reason',
         'address' => 'address',
         'affiliate_url' => 'affiliate URL',
         'age' => 'age',

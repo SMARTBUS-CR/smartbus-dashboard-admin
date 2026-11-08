@@ -167,6 +167,7 @@ return [
         'brand' => 'marca',
         'model' => 'modelo',
         'company_id' => 'empresa',
+        'cancellation_reason' => 'motivo de cancelación',
         'address' => 'dirección',
         'affiliate_url' => 'URL de afiliado',
         'age' => 'edad',
