@@ -20,7 +20,12 @@ class RouteController extends Controller
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $pageSize = min((int) $request->input('page.size', 20), 100);
+        $request->validate([
+            'page.size' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page.number' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $pageSize = (int) $request->input('page.size', 20);
         $pageNumber = (int) $request->input('page.number', 1);
 
         $routes = QueryBuilder::for(Route::query()->with('company'))

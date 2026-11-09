@@ -114,6 +114,16 @@ describe('Route Catalogue Endpoints', function (): void {
         $codes = collect($response->json('data'))->pluck('attributes.code')->all();
         expect($codes)->toContain('PATTERN-1', 'PATTERN-2');
     });
+
+    it('validates pagination parameters and returns 422 for negative or invalid limits', function (): void {
+        $response = $this->getJson('/api/v1/operations/routes?page[size]=-5');
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['page.size']);
+
+        $stopResponse = $this->getJson('/api/v1/operations/stops?page[size]=500');
+        $stopResponse->assertStatus(422)
+            ->assertJsonValidationErrors(['page.size']);
+    });
 });
 
 describe('Route Pattern Details and Stop Occurrences', function (): void {
@@ -224,6 +234,39 @@ describe('Route Pattern Details and Stop Occurrences', function (): void {
         $times = collect($response->json('data'))->pluck('attributes.departure_time')->all();
         expect($times)->toContain('07:30:00', '08:00:00');
     });
+
+    it('filters pattern schedules by specific service date respecting company timezone and exceptions', function (): void {
+        $company = createCompany(['timezone' => 'America/Costa_Rica']);
+        $route = Route::factory()->for($company)->create();
+        $pattern = RoutePattern::factory()->for($route)->create();
+
+        // Monday schedule (day_of_week = 1)
+        $scheduleMon = RouteSchedule::factory()->create([
+            'route_pattern_id' => $pattern->id,
+            'day_of_week' => 1,
+            'departure_time' => '07:00:00',
+            'valid_from' => '2026-01-01',
+        ]);
+        // Tuesday schedule (day_of_week = 2)
+        $scheduleTue = RouteSchedule::factory()->create([
+            'route_pattern_id' => $pattern->id,
+            'day_of_week' => 2,
+            'departure_time' => '08:00:00',
+            'valid_from' => '2026-01-01',
+        ]);
+
+        // Monday 2026-11-09
+        $responseMon = $this->getJson("/api/v1/operations/route-patterns/{$pattern->id}/schedules?date=2026-11-09");
+        $responseMon->assertOk();
+        $monTimes = collect($responseMon->json('data'))->pluck('attributes.departure_time')->all();
+        expect($monTimes)->toBe(['07:00:00']);
+
+        // Tuesday 2026-11-10
+        $responseTue = $this->getJson("/api/v1/operations/route-patterns/{$pattern->id}/schedules?date=2026-11-10");
+        $responseTue->assertOk();
+        $tueTimes = collect($responseTue->json('data'))->pluck('attributes.departure_time')->all();
+        expect($tueTimes)->toBe(['08:00:00']);
+    });
 });
 
 describe('Stop Catalogue Retrieval', function (): void {
@@ -326,6 +369,18 @@ describe('Route Fare Retrieval', function (): void {
 
         $amounts = collect($response->json('data'))->pluck('attributes.amount')->all();
         expect($amounts)->toContain('550.00', '600.00');
+
+        // Filter by date during first fare period
+        $resEarly = $this->getJson("/api/v1/operations/routes/{$route->id}/fares?date=2026-03-15");
+        $resEarly->assertOk();
+        $earlyAmounts = collect($resEarly->json('data'))->pluck('attributes.amount')->all();
+        expect($earlyAmounts)->toBe(['550.00']);
+
+        // Filter by date during second fare period
+        $resLate = $this->getJson("/api/v1/operations/routes/{$route->id}/fares?date=2026-08-15");
+        $resLate->assertOk();
+        $lateAmounts = collect($resLate->json('data'))->pluck('attributes.amount')->all();
+        expect($lateAmounts)->toBe(['600.00']);
     });
 });
 
