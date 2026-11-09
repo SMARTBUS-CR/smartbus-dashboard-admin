@@ -19,8 +19,8 @@ describe('Driver Schedule Policy', function (): void {
         expect(Gate::forUser($actor)->allows($ability, $arguments))->toBeFalse();
         CompanyUser::create(['company_id' => $company->id, 'user_id' => $actor->id]);
         setPermissionsTeamId($other->id);
-        expect(Gate::forUser($actor)->allows($ability, $arguments))->toBeTrue();
-        expect(getPermissionsTeamId())->toBe($other->id);
+        expect(Gate::forUser($actor)->allows($ability, $arguments))->toBeTrue()
+            ->and(getPermissionsTeamId())->toBe($other->id);
         CompanyUser::where('company_id', $company->id)->where('user_id', $actor->id)->sole()->delete();
         expect(Gate::forUser($actor)->allows($ability, $arguments))->toBeFalse();
     })->with([
@@ -46,8 +46,8 @@ describe('Driver Schedule Policy', function (): void {
         [$company, $other] = createTenantPair();
         $actor = createUserWithRole(UserRole::SuperAdmin);
         $driver = Driver::factory()->for($company)->create();
-        expect(Gate::forUser($actor)->allows('create', [DriverSchedule::class, $company, $driver]))->toBeTrue();
-        expect(Gate::forUser($actor)->allows('create', [DriverSchedule::class, $other, $driver]))->toBeFalse();
+        expect(Gate::forUser($actor)->allows('create', [DriverSchedule::class, $company, $driver]))->toBeTrue()
+            ->and(Gate::forUser($actor)->allows('create', [DriverSchedule::class, $other, $driver]))->toBeFalse();
         $company->update(['status' => CompanyStatus::INACTIVE]);
         expect(Gate::forUser($actor)->allows('create', [DriverSchedule::class, $company, $driver]))->toBeFalse();
     });
@@ -86,9 +86,9 @@ describe('Driver Schedule Policy', function (): void {
         $schedule = DriverSchedule::factory()->for($driver)->create();
         setPermissionsTeamId($other->id);
         $actor->load('roles', 'permissions');
-        expect(Gate::forUser($actor)->allows('view', [DriverSchedule::class, $company, $schedule]))->toBeFalse();
-        expect(getPermissionsTeamId())->toBe($other->id);
-        expect($actor->relationLoaded('roles'))->toBeFalse();
+        expect(Gate::forUser($actor)->allows('view', [DriverSchedule::class, $company, $schedule]))->toBeFalse()
+            ->and(getPermissionsTeamId())->toBe($other->id)
+            ->and($actor->relationLoaded('roles'))->toBeFalse();
         grantShield($actor, ['View:DriverSchedule'], $company);
         User::whereKey($actor->id)->delete();
         expect(Gate::forUser($actor)->allows('view', [DriverSchedule::class, $company, $schedule]))->toBeFalse();

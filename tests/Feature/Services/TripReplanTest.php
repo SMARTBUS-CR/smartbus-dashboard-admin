@@ -49,23 +49,22 @@ test('replaces the complete scheduled plan while preserving trip identity and hi
 
     $updated = app(TripManagementService::class)->replan($actor, $company, $trip->getKey(), $data);
 
-    expect($updated->getKey())->toBe($trip->getKey());
-    expect($updated->company_id)->toBe($company->getKey());
-    expect($updated->getRawOriginal('created_at'))->toBe($before['created_at']);
-    expect($updated->only(['route_pattern_id', 'route_schedule_id', 'bus_id', 'driver_id']))
-        ->toBe($replacement->only(['route_pattern_id', 'route_schedule_id', 'bus_id', 'driver_id']));
-    expect($updated->service_date->toDateString())->toBe('2026-11-02');
-    expect($updated->scheduled_departure_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-02 12:30:00');
-    expect($updated->scheduled_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-02 13:30:00');
-    expect($updated->status)->toBe(TripStatus::SCHEDULED);
-    expect($updated->actual_departure_at)->toBeNull();
-    expect($updated->actual_arrival_at)->toBeNull();
-    expect($updated->planned_route_snapshot['revision_hash'])->toBe(app(TripPlanSnapshotService::class)->revisionHash($updated->planned_route_snapshot));
-    expect(getPermissionsTeamId())->toBe($team);
+    expect($updated->getKey())->toBe($trip->getKey())
+        ->and($updated->company_id)->toBe($company->getKey())
+        ->and($updated->getRawOriginal('created_at'))->toBe($before['created_at'])
+        ->and($updated->only(['route_pattern_id', 'route_schedule_id', 'bus_id', 'driver_id']))->toBe($replacement->only(['route_pattern_id', 'route_schedule_id', 'bus_id', 'driver_id']))
+        ->and($updated->service_date->toDateString())->toBe('2026-11-02')
+        ->and($updated->scheduled_departure_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-02 12:30:00')
+        ->and($updated->scheduled_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-02 13:30:00')
+        ->and($updated->status)->toBe(TripStatus::SCHEDULED)
+        ->and($updated->actual_departure_at)->toBeNull()
+        ->and($updated->actual_arrival_at)->toBeNull()
+        ->and($updated->planned_route_snapshot['revision_hash'])->toBe(app(TripPlanSnapshotService::class)->revisionHash($updated->planned_route_snapshot))
+        ->and(getPermissionsTeamId())->toBe($team);
     $this->assertDatabaseCount('trips', 1);
     $updated->forceFill(['driver_id' => $trip->driver_id]);
-    expect(fn () => $updated->save())->toThrow(ValidationException::class);
-    expect($trip->fresh()->driver_id)->toBe($replacement->driver_id);
+    expect(fn () => $updated->save())->toThrow(ValidationException::class)
+        ->and($trip->fresh()->driver_id)->toBe($replacement->driver_id);
     Http::assertNothingSent();
 });
 
@@ -95,9 +94,9 @@ test('authorizes replanning before resolving the trip or validating the payload'
     $before = $trip->getRawOriginal();
 
     expect(fn () => app(TripManagementService::class)->replan($actor, $company, 'not-a-uuid', []))
-        ->toThrow(AuthorizationException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
-    expect(getPermissionsTeamId())->toBe($team);
+        ->toThrow(AuthorizationException::class)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before)
+        ->and(getPermissionsTeamId())->toBe($team);
 })->with(['archived actor', 'archived membership', 'missing permission', 'missing membership', 'foreign admin', 'driver', 'passenger']);
 
 test('hides missing and foreign trip identifiers even from super admins', function (bool $foreign): void {
@@ -110,8 +109,8 @@ test('hides missing and foreign trip identifiers even from super admins', functi
     $before = $trip->getRawOriginal();
 
     expect(fn () => app(TripManagementService::class)->replan($actor, $company, $id, $data))
-        ->toThrow(ModelNotFoundException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+        ->toThrow(ModelNotFoundException::class)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 })->with([false, true]);
 
 test('rejects started and terminal replanning even for super admins', function (string $status): void {
@@ -126,8 +125,8 @@ test('rejects started and terminal replanning even for super admins', function (
     $actor = createUserWithRole(UserRole::SuperAdmin);
 
     expect(fn () => app(TripManagementService::class)->replan($actor, $company, $trip->getKey(), $data))
-        ->toThrow(AuthorizationException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+        ->toThrow(AuthorizationException::class)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 })->with(['in_progress', 'completed', 'cancelled']);
 
 test('requires the complete plan and rejects forged replanning fields without changing the original', function (string $field, bool $remove): void {
@@ -142,8 +141,8 @@ test('requires the complete plan and rejects forged replanning fields without ch
     expect(fn () => app(TripManagementService::class)->replan($actor, $company, $trip->getKey(), $data))
         ->toThrow(function (ValidationException $exception) use ($field): void {
             expect($exception->errors())->toHaveKey($field);
-        });
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+        })
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 })->with([
     ['route_pattern_id', true], ['route_schedule_id', true], ['bus_id', true], ['driver_id', true], ['service_date', true], ['arrival_at', true],
     ['id', false], ['company_id', false], ['status', false], ['actual_departure_at', false], ['actual_arrival_at', false],
@@ -168,8 +167,8 @@ test('rolls back replanning conflicts and preserves both persisted plans', funct
     expect(fn () => app(TripManagementService::class)->replan($actor, $company, $trip->getKey(), $data))
         ->toThrow(function (ValidationException $exception) use ($field): void {
             expect($exception->errors())->toHaveKey($field);
-        });
-    expect(Trip::query()->orderBy('id')->get()->map->getRawOriginal()->all())->toBe($before);
+        })
+        ->and(Trip::query()->orderBy('id')->get()->map->getRawOriginal()->all())->toBe($before);
     $this->assertModelExists($reserved);
 })->with([['departure', 'service_date'], ['bus', 'bus_id'], ['driver', 'driver_id']]);
 
@@ -185,12 +184,12 @@ test('rebuilds snapshots only through explicit replanning and accepts an equival
 
     $updated = app(TripManagementService::class)->replan($actor, $company, $trip->getKey(), $data);
 
-    expect($updated->planned_route_snapshot['pattern_name'])->toBe('Reviewed replacement pattern');
-    expect($updated->planned_route_snapshot['revision_hash'])->not->toBe($trip->planned_route_snapshot['revision_hash']);
-    expect($updated->scheduled_departure_at->utc()->format('H:i:s'))->toBe('13:30:00');
+    expect($updated->planned_route_snapshot['pattern_name'])->toBe('Reviewed replacement pattern')
+        ->and($updated->planned_route_snapshot['revision_hash'])->not->toBe($trip->planned_route_snapshot['revision_hash'])
+        ->and($updated->scheduled_departure_at->utc()->format('H:i:s'))->toBe('13:30:00');
     $repeated = app(TripManagementService::class)->replan($actor, $company, $trip->getKey(), $data);
-    expect($repeated->planned_route_snapshot)->toBe($updated->planned_route_snapshot);
-    expect($repeated->getKey())->toBe($trip->getKey());
+    expect($repeated->planned_route_snapshot)->toBe($updated->planned_route_snapshot)
+        ->and($repeated->getKey())->toBe($trip->getKey());
     Http::assertNothingSent();
 });
 
@@ -216,9 +215,9 @@ test('rolls back a failed replanning write and restores permission context', fun
     } finally {
         $connection->setEventDispatcher($dispatcher);
     }
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
-    expect($trip->bus->fresh()->capacity)->toBe($capacity);
-    expect(getPermissionsTeamId())->toBe($team);
+    expect($trip->fresh()->getRawOriginal())->toBe($before)
+        ->and($trip->bus->fresh()->capacity)->toBe($capacity)
+        ->and(getPermissionsTeamId())->toBe($team);
     $this->assertDatabaseCount('trips', 1);
 });
 
@@ -231,8 +230,8 @@ test('localizes replanning failures and preserves the stored plan', function (st
     expect(fn () => app(TripManagementService::class)->replan($actor, $company, $trip->getKey(), $data))
         ->toThrow(function (ValidationException $exception) use ($message): void {
             expect($exception->errors())->toBe(['driver_id' => [$message]]);
-        });
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+        })
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 })->with([
     ['en', 'The selected driver does not cover the complete planned interval.'],
     ['es', 'El conductor seleccionado no tiene disponibilidad para todo el intervalo planificado.'],

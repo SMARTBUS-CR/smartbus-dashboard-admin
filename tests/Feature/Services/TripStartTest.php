@@ -37,10 +37,9 @@ test('starts a scheduled trip once with a trusted UTC instant and preserves its 
 
     $started = app(TripManagementService::class)->start($actor, $trip->company, $trip->id);
 
-    expect($started->status)->toBe(TripStatus::IN_PROGRESS);
-    expect($started->actual_departure_at->utc()->format('Y-m-d H:i:s.uP'))->toBe('2026-10-26 12:45:00.123456+00:00');
-    expect(Arr::except($started->getRawOriginal(), ['status', 'actual_departure_at', 'updated_at']))
-        ->toBe(Arr::except($before, ['status', 'actual_departure_at', 'updated_at']));
+    expect($started->status)->toBe(TripStatus::IN_PROGRESS)
+        ->and($started->actual_departure_at->utc()->format('Y-m-d H:i:s.uP'))->toBe('2026-10-26 12:45:00.123456+00:00')
+        ->and(Arr::except($started->getRawOriginal(), ['status', 'actual_departure_at', 'updated_at']))->toBe(Arr::except($before, ['status', 'actual_departure_at', 'updated_at']));
     Http::assertNothingSent();
 });
 
@@ -69,9 +68,8 @@ test('revalidates current resources and eligibility before starting even for a s
     expect(fn () => app(TripManagementService::class)->start($actor, $trip->company, $trip->id))
         ->toThrow(function (ValidationException $exception) use ($field): void {
             expect($exception->errors())->toHaveKey($field);
-        });
-
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+        })
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 })->with([
     ['inactive company', 'company'], ['inactive bus', 'bus_id'], ['archived bus', 'bus_id'],
     ['inactive driver', 'driver_id'], ['archived driver', 'driver_id'], ['archived identity', 'driver_id'],
@@ -88,12 +86,12 @@ test('checks availability only at the actual instant with an exclusive end bound
 
     if ($allowed) {
         $started = app(TripManagementService::class)->start($actor, $trip->company, $trip->id);
-        expect($started->status)->toBe(TripStatus::IN_PROGRESS);
-        expect($started->actual_departure_at->utc()->format('Y-m-d\TH:i:s.uP'))->toBe($instant);
+        expect($started->status)->toBe(TripStatus::IN_PROGRESS)
+            ->and($started->actual_departure_at->utc()->format('Y-m-d\TH:i:s.uP'))->toBe($instant);
     } else {
         expect(fn () => app(TripManagementService::class)->start($actor, $trip->company, $trip->id))
-            ->toThrow(ValidationException::class);
-        expect($trip->fresh()->status)->toBe(TripStatus::SCHEDULED);
+            ->toThrow(ValidationException::class)
+            ->and($trip->fresh()->status)->toBe(TripStatus::SCHEDULED);
     }
 })->with([
     ['2026-10-26T12:45:00.000000+00:00', true],
@@ -111,10 +109,10 @@ test('allows the assigned driver to start without administrative permissions and
 
     $started = app(TripManagementService::class)->start($actor, $trip->company, $trip->id);
 
-    expect($started->status)->toBe(TripStatus::IN_PROGRESS);
-    expect(getPermissionsTeamId())->toBe($team);
-    expect($actor->relationLoaded('roles'))->toBeFalse();
-    expect($actor->relationLoaded('permissions'))->toBeFalse();
+    expect($started->status)->toBe(TripStatus::IN_PROGRESS)
+        ->and(getPermissionsTeamId())->toBe($team)
+        ->and($actor->relationLoaded('roles'))->toBeFalse()
+        ->and($actor->relationLoaded('permissions'))->toBeFalse();
 });
 
 test('authorizes before validating identifiers or resolving an unauthorized retry', function (): void {
@@ -127,9 +125,9 @@ test('authorizes before validating identifiers or resolving an unauthorized retr
     grantShield($actor, ['Start:Trip'], $trip->company);
     $before = $started->getRawOriginal();
 
-    expect(fn () => $service->start($actor, $trip->company, 'invalid'))->toThrow(AuthorizationException::class);
-    expect(fn () => $service->start($actor, $trip->company, $trip->id))->toThrow(AuthorizationException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+    expect(fn () => $service->start($actor, $trip->company, 'invalid'))->toThrow(AuthorizationException::class)
+        ->and(fn () => $service->start($actor, $trip->company, $trip->id))->toThrow(AuthorizationException::class)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 });
 
 test('preserves the original start on an authorized retry even when operational eligibility changed', function (): void {
@@ -150,8 +148,8 @@ test('scopes trip lookup to the selected company even for a super administrator'
     [$trip, $actor] = tripStartInputs();
 
     expect(fn () => app(TripManagementService::class)->start($actor, createCompany(), $trip->id))
-        ->toThrow(ModelNotFoundException::class);
-    expect($trip->fresh()->status)->toBe(TripStatus::SCHEDULED);
+        ->toThrow(ModelNotFoundException::class)
+        ->and($trip->fresh()->status)->toBe(TripStatus::SCHEDULED);
 });
 
 test('rejects another in-progress trip even after its planned interval has elapsed', function (string $resource, bool $archived): void {
@@ -173,9 +171,9 @@ test('rejects another in-progress trip even after its planned interval has elaps
     expect(fn () => app(TripManagementService::class)->start($actor, $trip->company, $trip->id))
         ->toThrow(function (ValidationException $exception) use ($resource): void {
             expect($exception->errors())->toBe([$resource === 'bus' ? 'bus_id' : 'driver_id' => [__('The selected departure or resource conflicts with an existing trip.')]]);
-        });
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
-    expect(Trip::withTrashed()->findOrFail($other->id)->status)->toBe(TripStatus::IN_PROGRESS);
+        })
+        ->and($trip->fresh()->getRawOriginal())->toBe($before)
+        ->and(Trip::withTrashed()->findOrFail($other->id)->status)->toBe(TripStatus::IN_PROGRESS);
 })->with(['bus', 'person'])->with(['visible' => [false], 'soft deleted' => [true]]);
 
 test('rejects started-trip retries after current actor authorization is revoked', function (string $revoked): void {
@@ -198,9 +196,9 @@ test('rejects started-trip retries after current actor authorization is revoked'
     $team = createCompany()->id;
     setPermissionsTeamId($team);
 
-    expect(fn () => $service->start($actor, $trip->company, $trip->id))->toThrow(AuthorizationException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
-    expect(getPermissionsTeamId())->toBe($team);
+    expect(fn () => $service->start($actor, $trip->company, $trip->id))->toThrow(AuthorizationException::class)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before)
+        ->and(getPermissionsTeamId())->toBe($team);
 })->with(['permission', 'membership', 'identity']);
 
 test('rejects starting terminal trips without changing history', function (TripStatus $status): void {
@@ -214,8 +212,8 @@ test('rejects starting terminal trips without changing history', function (TripS
     expect(fn () => app(TripManagementService::class)->start($actor, $trip->company, $trip->id))
         ->toThrow(function (ValidationException $exception): void {
             expect($exception->errors())->toBe(['status' => [__('Only scheduled trips can be started.')]]);
-        });
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+        })
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 })->with([TripStatus::COMPLETED, TripStatus::CANCELLED]);
 
 test('uses the actual company-local date for employment and license eligibility', function (string $instant, bool $allowed): void {
@@ -226,8 +224,8 @@ test('uses the actual company-local date for employment and license eligibility'
     if ($allowed) {
         expect(app(TripManagementService::class)->start($actor, $trip->company, $trip->id)->status)->toBe(TripStatus::IN_PROGRESS);
     } else {
-        expect(fn () => app(TripManagementService::class)->start($actor, $trip->company, $trip->id))->toThrow(ValidationException::class);
-        expect($trip->fresh()->status)->toBe(TripStatus::SCHEDULED);
+        expect(fn () => app(TripManagementService::class)->start($actor, $trip->company, $trip->id))->toThrow(ValidationException::class)
+            ->and($trip->fresh()->status)->toBe(TripStatus::SCHEDULED);
     }
 })->with([['2026-10-27T05:59:59.999999Z', true], ['2026-10-27T06:00:00Z', false]]);
 
@@ -254,9 +252,9 @@ test('rolls back a failed start and its database side effects', function (): voi
     } finally {
         $connection->setEventDispatcher($dispatcher);
     }
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
-    expect($trip->bus->fresh()->capacity)->toBe($capacity);
-    expect(getPermissionsTeamId())->toBe($team);
+    expect($trip->fresh()->getRawOriginal())->toBe($before)
+        ->and($trip->bus->fresh()->capacity)->toBe($capacity)
+        ->and(getPermissionsTeamId())->toBe($team);
 });
 
 test('returns bilingual start errors without changing the stored trip', function (string $locale, string $scenario, string $field, string $message): void {
@@ -277,8 +275,8 @@ test('returns bilingual start errors without changing the stored trip', function
     expect(fn () => app(TripManagementService::class)->start($actor, $trip->company, $trip->id))
         ->toThrow(function (ValidationException $exception) use ($field, $message): void {
             expect($exception->errors())->toBe([$field => [$message]]);
-        });
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+        })
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 })->with([
     ['en', 'availability', 'driver_id', 'The assigned driver is unavailable at the actual start instant.'],
     ['es', 'availability', 'driver_id', 'El conductor asignado no tiene disponibilidad en el instante real de inicio.'],
@@ -296,8 +294,8 @@ test('denies another driver access to a started trip before resolving its retry'
     $other = createUserWithRole(UserRole::Driver, $trip->company);
     CompanyUser::factory()->create(['company_id' => $trip->company_id, 'user_id' => $other->id]);
 
-    expect(fn () => $service->start($other, $trip->company, $trip->id))->toThrow(AuthorizationException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+    expect(fn () => $service->start($other, $trip->company, $trip->id))->toThrow(AuthorizationException::class)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 });
 
 test('starts the stored historical plan without rebuilding it after catalogue edits', function (): void {
@@ -309,7 +307,7 @@ test('starts the stored historical plan without rebuilding it after catalogue ed
 
     $started = app(TripManagementService::class)->start($actor, $trip->company, $trip->id);
 
-    expect($started->only(['scheduled_departure_at', 'scheduled_arrival_at', 'planned_route_snapshot']))->toEqual($before);
-    expect($started->status)->toBe(TripStatus::IN_PROGRESS);
+    expect($started->only(['scheduled_departure_at', 'scheduled_arrival_at', 'planned_route_snapshot']))->toEqual($before)
+        ->and($started->status)->toBe(TripStatus::IN_PROGRESS);
     Http::assertNothingSent();
 });

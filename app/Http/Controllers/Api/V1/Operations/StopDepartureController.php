@@ -8,6 +8,7 @@ use App\Http\Resources\Api\V1\Operations\StopDepartureResource;
 use App\Models\Stop;
 use App\Services\Operations\StopDepartureService;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class StopDepartureController extends Controller
 {
@@ -30,6 +31,17 @@ class StopDepartureController extends Controller
             (int) $request->input('window_minutes', 120),
         );
 
-        return StopDepartureResource::collection($departures);
+        $pageSize = (int) ($request->input('page.size') ?? $request->input('per_page', 20));
+        $pageNumber = (int) ($request->input('page.number') ?? 1);
+
+        $paginated = new LengthAwarePaginator(
+            $departures->forPage($pageNumber, $pageSize)->values(),
+            $departures->count(),
+            $pageSize,
+            $pageNumber,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        return StopDepartureResource::collection($paginated);
     }
 }

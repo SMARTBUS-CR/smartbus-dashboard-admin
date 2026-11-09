@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\WithDriverTrips;
 
-uses(WithDriverTrips::class);
+pest()->use(WithDriverTrips::class);
 
 describe('Driver Trip Lifecycle', function (): void {
     test('rejects invalidating lifecycle changes and preserves employment and trips', function (string $status, string $operation, array $data): void {
@@ -29,9 +29,8 @@ describe('Driver Trip Lifecycle', function (): void {
             default => $service->updateEmployment($actor, $trip->company, $driver, $data),
         })->toThrow(function (ValidationException $exception): void {
             expect($exception->errors())->toBe(['driver' => [__('This change would invalidate an assigned trip.')]]);
-        });
-
-        expect($driver->fresh()->getRawOriginal())->toBe($before)
+        })
+            ->and($driver->fresh()->getRawOriginal())->toBe($before)
             ->and($trip->fresh()->getRawOriginal())->toBe($tripBefore)
             ->and(getPermissionsTeamId())->toBe($previousTeam);
     })->with(['scheduled', 'in_progress'])->with([
@@ -54,9 +53,8 @@ describe('Driver Trip Lifecycle', function (): void {
         $history = $trip->getRawOriginal();
 
         expect(fn () => app(DriverManagementService::class)->updateEmployment($actor, $trip->company, $driver, ['license' => 'REPLACEMENT-LICENSE']))
-            ->toThrow(ValidationException::class);
-
-        expect($driver->fresh()->getRawOriginal())->toBe($before)
+            ->toThrow(ValidationException::class)
+            ->and($driver->fresh()->getRawOriginal())->toBe($before)
             ->and($trip->fresh()->getRawOriginal())->toBe($history);
     })->with(['identity', 'membership', 'role']);
 
@@ -85,7 +83,7 @@ describe('Driver Trip Lifecycle', function (): void {
 
         $updated = app(DriverManagementService::class)->updateEmployment($actor, $trip->company, $trip->driver, ['salary_amount' => '9999999999.99']);
 
-        expect($queries)->toBe([])->and($updated->salary_amount)->toBe('9999999999.99');
+        expect($queries)->toBeEmpty()->and($updated->salary_amount)->toBe('9999999999.99');
         $this->assertModelExists($trip);
     })->with(['scheduled', 'in_progress']);
 
@@ -113,8 +111,8 @@ describe('Driver Trip Lifecycle', function (): void {
         $outsider = $this->createWorkforceAdministrator($other);
 
         expect(fn () => app(DriverManagementService::class)->updateEmployment($outsider, $trip->company, $trip->driver, ['salary_amount' => '1.00']))
-            ->toThrow(AuthorizationException::class);
-        expect(Trip::query()->whereKey($trip->id)->count())->toBe(1);
+            ->toThrow(AuthorizationException::class)
+            ->and(Trip::query()->whereKey($trip->id)->count())->toBe(1);
     });
 
     test('uses all touched local dates and excludes an exact midnight arrival', function (string $arrival, bool $allowed): void {
@@ -127,8 +125,8 @@ describe('Driver Trip Lifecycle', function (): void {
         if ($allowed) {
             expect($update()->license_expires_at->toDateString())->toBe('2026-10-26');
         } else {
-            expect($update)->toThrow(ValidationException::class);
-            expect($trip->driver->fresh()->getRawOriginal())->toBe($before);
+            expect($update)->toThrow(ValidationException::class)
+                ->and($trip->driver->fresh()->getRawOriginal())->toBe($before);
         }
     })->with([
         'exact midnight' => ['2026-10-27T00:00:00-06:00', true],
@@ -149,9 +147,8 @@ describe('Driver Trip Lifecycle', function (): void {
         $before = $first->driver->getRawOriginal();
 
         expect(fn () => app(DriverManagementService::class)->updateEmployment($actor, $first->company, $first->driver, ['license_expires_at' => '2026-10-30']))
-            ->toThrow(ValidationException::class);
-
-        expect($first->driver->fresh()->getRawOriginal())->toBe($before);
+            ->toThrow(ValidationException::class)
+            ->and($first->driver->fresh()->getRawOriginal())->toBe($before);
         $this->assertModelExists($first);
         $this->assertModelExists($second);
     });
@@ -169,9 +166,8 @@ describe('Driver Trip Lifecycle', function (): void {
         expect(fn () => app(TripManagementService::class)->replan($actor, $trip->company, $trip->id, [
             ...$trip->only(['route_pattern_id', 'route_schedule_id', 'bus_id', 'driver_id']),
             'service_date' => '2026-10-26', 'arrival_at' => '2026-10-26T07:30:00-06:00',
-        ]))->toThrow(ValidationException::class);
-
-        expect($trip->fresh()->getRawOriginal())->toBe($before);
+        ]))->toThrow(ValidationException::class)
+            ->and($trip->fresh()->getRawOriginal())->toBe($before);
     })->with(['identity', 'membership', 'role']);
 
     test('returns a private translated assignment error', function (): void {

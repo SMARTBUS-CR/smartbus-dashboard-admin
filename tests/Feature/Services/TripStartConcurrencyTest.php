@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\Support\WithDriverConcurrency;
 
-uses(WithDriverConcurrency::class);
+pest()->use(WithDriverConcurrency::class);
 
 afterEach(function (): void {
     $this->finishDriverConcurrency();
@@ -87,21 +87,21 @@ test('serializes starts and preserves timestamps or rejects competing occupancy 
     $winner = $first->await('result');
     $secondResult = $second->await('result');
 
-    expect($winner['status'])->toBe('success');
-    expect($firstTrip->fresh()->status)->toBe(TripStatus::IN_PROGRESS);
+    expect($winner['status'])->toBe('success')
+        ->and($firstTrip->fresh()->status)->toBe(TripStatus::IN_PROGRESS);
     if ($scenario === 'retry') {
-        expect($secondResult['status'])->toBe('success');
-        expect($secondResult['actual_departure_at'])->toBe($winner['actual_departure_at']);
-        expect($secondTrip->fresh()->actual_departure_at->utc()->format('Y-m-d H:i:s.uP'))->toBe('2026-10-26 12:45:00.000000+00:00');
+        expect($secondResult['status'])->toBe('success')
+            ->and($secondResult['actual_departure_at'])->toBe($winner['actual_departure_at'])
+            ->and($secondTrip->fresh()->actual_departure_at->utc()->format('Y-m-d H:i:s.uP'))->toBe('2026-10-26 12:45:00.000000+00:00');
     } else {
-        expect($secondResult['status'])->toBe('validation');
-        expect($secondResult['errors'])->toHaveKey($scenario === 'bus' ? 'bus_id' : 'driver_id');
-        expect($secondTrip->fresh()->getRawOriginal())->toBe($before);
+        expect($secondResult['status'])->toBe('validation')
+            ->and($secondResult['errors'])->toHaveKey($scenario === 'bus' ? 'bus_id' : 'driver_id')
+            ->and($secondTrip->fresh()->getRawOriginal())->toBe($before);
     }
     foreach ([$winner, $secondResult] as $result) {
-        expect($result['team_restored'])->toBeTrue();
-        expect($result['actor_cache_cleared'])->toBeTrue();
-        expect($result['pgsql_level'])->toBe(0);
-        expect($result['pgsql_transaction'])->toBeFalse();
+        expect($result['team_restored'])->toBeTrue()
+            ->and($result['actor_cache_cleared'])->toBeTrue()
+            ->and($result['pgsql_level'])->toBe(0)
+            ->and($result['pgsql_transaction'])->toBeFalse();
     }
 })->with(['retry', 'bus', 'person']);

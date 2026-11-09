@@ -62,6 +62,33 @@ class DirectJourneySearchService
             ->get()
             ->groupBy('route_pattern_id');
 
+        $patternIds = $boardingPatternStops->pluck('route_pattern_id')->unique()->all();
+
+        // Sample company timezone or default to UTC
+        $companyTimezone = $boardingPatternStops->first()?->pattern?->route?->company?->timezone ?? 'UTC';
+        $departureInCompanyTz = $departureAtUtc->setTimezone($companyTimezone);
+
+        // Consider service dates around query time to support midnight crossings
+        $datesToCheck = collect([
+            $departureInCompanyTz->subDay()->startOfDay(),
+            $departureInCompanyTz->startOfDay(),
+            $departureInCompanyTz->addDay()->startOfDay(),
+        ]);
+
+        // Bulk load schedules for candidate patterns across target dates avoiding N+1
+        $schedulesByPatternAndDate = [];
+        foreach ($datesToCheck as $date) {
+            $dateStr = $date->format('Y-m-d');
+            $schedules = RouteSchedule::query()
+                ->whereIn('route_pattern_id', $patternIds)
+                ->scheduledOn($date)
+                ->get();
+
+            foreach ($schedules as $sched) {
+                $schedulesByPatternAndDate[$sched->route_pattern_id][$dateStr][] = $sched;
+            }
+        }
+
         $journeys = collect();
 
         foreach ($boardingPatternStops as $boarding) {
@@ -78,29 +105,7 @@ class DirectJourneySearchService
             $route = $pattern->route;
             $company = $route->company;
             $companyTimezone = $company?->timezone ?? 'UTC';
-
             $departureInCompanyTz = $departureAtUtc->setTimezone($companyTimezone);
-            $serviceDate = $departureInCompanyTz->format('Y-m-d');
-
-            // Find valid schedules for this pattern on this service day
-            $schedules = RouteSchedule::query()
-                ->where('route_pattern_id', $pattern->id)
-                ->scheduledOn($departureInCompanyTz)
-                ->get();
-
-            if ($schedules->isEmpty()) {
-                continue;
-            }
-
-            // Find applicable route fare for this service date
-            $fare = $route->fares
-                ->filter(function (RouteFare $fare) use ($serviceDate): bool {
-                    $validFromOk = $fare->valid_from === null || $fare->valid_from->format('Y-m-d') <= $serviceDate;
-                    $validUntilOk = $fare->valid_until === null || $fare->valid_until->format('Y-m-d') >= $serviceDate;
-
-                    return $validFromOk && $validUntilOk;
-                })
-                ->first();
 
             foreach ($matchingAlightings as $alighting) {
                 // Must be forward in sequence to respect direction ordering
@@ -111,52 +116,84 @@ class DirectJourneySearchService
                 $originDistance = $originStops->get($boarding->stop_id);
                 $destDistance = $destStops->get($alighting->stop_id);
 
-                $boardingMinutes = $boarding->minutes_from_start ?? 0;
-                $alightingMinutes = $alighting->minutes_from_start ?? $boardingMinutes;
+                // Preserve null when minutes_from_start is unknown on intermediate stops
+                $boardingMinutes = $boarding->stop_sequence === 1
+                    ? ($boarding->minutes_from_start ?? 0)
+                    : $boarding->minutes_from_start;
 
-                foreach ($schedules as $schedule) {
-                    $scheduledBoardingAt = $departureInCompanyTz->copy()
-                        ->setTimeFromTimeString($schedule->departure_time)
-                        ->addMinutes($boardingMinutes);
+                $alightingMinutes = $alighting->minutes_from_start;
 
-                    // Only return departures on or after the requested departure time
-                    if ($scheduledBoardingAt->lessThan($departureInCompanyTz)) {
-                        continue;
+                foreach ($datesToCheck as $date) {
+                    $dateInTz = $date->setTimezone($companyTimezone);
+                    $dateStr = $dateInTz->format('Y-m-d');
+
+                    $schedules = $schedulesByPatternAndDate[$pattern->id][$dateStr] ?? [];
+
+                    $fare = $route->fares
+                        ->filter(function (RouteFare $f) use ($dateStr): bool {
+                            $validFromOk = $f->valid_from === null || $f->valid_from->format('Y-m-d') <= $dateStr;
+                            $validUntilOk = $f->valid_until === null || $f->valid_until->format('Y-m-d') >= $dateStr;
+
+                            return $validFromOk && $validUntilOk;
+                        })
+                        ->first();
+
+                    foreach ($schedules as $schedule) {
+                        $originDepartureAt = $dateInTz->copy()
+                            ->setTimeFromTimeString($schedule->departure_time);
+
+                        $scheduledBoardingAt = $boardingMinutes !== null
+                            ? $originDepartureAt->addMinutes($boardingMinutes)
+                            : null;
+
+                        // Only return departures on or after the requested departure time
+                        if ($scheduledBoardingAt !== null) {
+                            if ($scheduledBoardingAt->lessThan($departureInCompanyTz)) {
+                                continue;
+                            }
+                            if ($scheduledBoardingAt->greaterThan($departureInCompanyTz->addHours(24))) {
+                                continue;
+                            }
+                        } else {
+                            if ($originDepartureAt->lessThan($departureInCompanyTz->subHours(2))) {
+                                continue;
+                            }
+                        }
+
+                        $estimatedArrivalAt = $alightingMinutes !== null
+                            ? $originDepartureAt->addMinutes($alightingMinutes)
+                            : null;
+
+                        $journeys->push(new Fluent([
+                            'id' => sprintf('%s-%s-%s-%s-%s', $pattern->id, $schedule->id, $boarding->id, $alighting->id, $dateStr),
+                            'route_id' => (string) $route->id,
+                            'route_code' => $route->code,
+                            'route_name' => $route->name,
+                            'pattern_id' => (string) $pattern->id,
+                            'pattern_name' => $pattern->name,
+                            'headsign' => $pattern->headsign,
+                            'company_id' => (string) $company?->id,
+                            'company_name' => $company?->name,
+                            'boarding_stop' => [
+                                'stop_id' => (string) $boarding->stop_id,
+                                'stop_name' => $boarding->stop?->name,
+                                'stop_sequence' => $boarding->stop_sequence,
+                                'distance_m' => (int) $originDistance,
+                            ],
+                            'alighting_stop' => [
+                                'stop_id' => (string) $alighting->stop_id,
+                                'stop_name' => $alighting->stop?->name,
+                                'stop_sequence' => $alighting->stop_sequence,
+                                'distance_m' => (int) $destDistance,
+                            ],
+                            'scheduled_departure_at' => $scheduledBoardingAt?->toIso8601String(),
+                            'estimated_arrival_at' => $estimatedArrivalAt?->toIso8601String(),
+                            'fare' => $fare ? [
+                                'amount' => (string) $fare->amount,
+                                'currency' => $fare->currency,
+                            ] : null,
+                        ]));
                     }
-
-                    $estimatedArrivalAt = $departureInCompanyTz->copy()
-                        ->setTimeFromTimeString($schedule->departure_time)
-                        ->addMinutes($alightingMinutes);
-
-                    $journeys->push(new Fluent([
-                        'id' => sprintf('%s-%s-%s-%s', $pattern->id, $schedule->id, $boarding->id, $alighting->id),
-                        'route_id' => (string) $route->id,
-                        'route_code' => $route->code,
-                        'route_name' => $route->name,
-                        'pattern_id' => (string) $pattern->id,
-                        'pattern_name' => $pattern->name,
-                        'headsign' => $pattern->headsign,
-                        'company_id' => (string) $company?->id,
-                        'company_name' => $company?->name,
-                        'boarding_stop' => [
-                            'stop_id' => (string) $boarding->stop_id,
-                            'stop_name' => $boarding->stop?->name,
-                            'stop_sequence' => $boarding->stop_sequence,
-                            'distance_m' => (int) $originDistance,
-                        ],
-                        'alighting_stop' => [
-                            'stop_id' => (string) $alighting->stop_id,
-                            'stop_name' => $alighting->stop?->name,
-                            'stop_sequence' => $alighting->stop_sequence,
-                            'distance_m' => (int) $destDistance,
-                        ],
-                        'scheduled_departure_at' => $scheduledBoardingAt->toIso8601String(),
-                        'estimated_arrival_at' => $estimatedArrivalAt->toIso8601String(),
-                        'fare' => $fare ? [
-                            'amount' => (string) $fare->amount,
-                            'currency' => $fare->currency,
-                        ] : null,
-                    ]));
                 }
             }
         }

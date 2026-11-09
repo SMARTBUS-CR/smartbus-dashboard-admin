@@ -25,6 +25,10 @@ class StopDepartureRequest extends FormRequest
         return [
             'departure_at' => ['nullable', 'date'],
             'window_minutes' => ['nullable', 'integer', 'min:1', 'max:480'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page' => ['nullable'],
+            'page.size' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page.number' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

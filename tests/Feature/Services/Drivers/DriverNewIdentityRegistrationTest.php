@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class);
+pest()->use(WithDriverRegistration::class);
 
 describe('Driver New Identity Registration', function (): void {
     test('registers a new hashed identity and employment through the existing identity infrastructure', function (): void {
@@ -21,14 +21,14 @@ describe('Driver New Identity Registration', function (): void {
         $driver = app(DriverManagementService::class)->register($actor, $company, $this->validDriverIdentity(), $this->validDriverEmployment());
 
         $user = $driver->user->fresh();
-        expect($user->email)->toBe('new-driver@example.test');
-        expect($user->name)->toBe('New Driver');
-        expect(Hash::check('N7v!qL2#rX9@kP4', $user->getRawOriginal('password')))->toBeTrue();
-        expect($user->hasVerifiedEmail())->toBeTrue();
-        expect($driver->user_id)->toBe($user->id);
-        expect($driver->company_id)->toBe($company->id);
-        expect(getPermissionsTeamId())->toBe($previousTeam);
-        expect(CompanyUser::query()->where('company_id', $company->id)->where('user_id', $user->id)->exists())->toBeTrue();
+        expect($user->email)->toBe('new-driver@example.test')
+            ->and($user->name)->toBe('New Driver')
+            ->and(Hash::check('N7v!qL2#rX9@kP4', $user->getRawOriginal('password')))->toBeTrue()
+            ->and($user->hasVerifiedEmail())->toBeTrue()
+            ->and($driver->user_id)->toBe($user->id)
+            ->and($driver->company_id)->toBe($company->id)
+            ->and(getPermissionsTeamId())->toBe($previousTeam)
+            ->and(CompanyUser::query()->where('company_id', $company->id)->where('user_id', $user->id)->exists())->toBeTrue();
         $this->assertDatabaseCount('users', 2, 'mysql');
         $this->assertDatabaseCount('drivers', 1);
     });
@@ -77,8 +77,8 @@ describe('Driver New Identity Registration', function (): void {
             'name' => str_repeat('A', 100), 'email' => $email,
         ]), $this->validDriverEmployment());
 
-        expect($driver->user->name)->toBe(str_repeat('A', 100));
-        expect($driver->user->email)->toBe($email);
+        expect($driver->user->name)->toBe(str_repeat('A', 100))
+            ->and($driver->user->email)->toBe($email);
     });
 
     test('rejects a password identified as compromised by the existing verifier', function (): void {
@@ -105,9 +105,9 @@ describe('Driver New Identity Registration', function (): void {
         expect(fn () => app(DriverManagementService::class)->register($actor, $company, $this->validDriverIdentity(), $this->validDriverEmployment()))
             ->toThrow(function (ValidationException $exception): void {
                 expect($exception->errors())->toHaveKey('email');
-            });
-        expect($existing->fresh()->getRawOriginal('password'))->toBe($originalPassword);
-        expect($existing->fresh()->trashed())->toBe($archived);
+            })
+            ->and($existing->fresh()->getRawOriginal('password'))->toBe($originalPassword)
+            ->and($existing->fresh()->trashed())->toBe($archived);
         $this->assertDatabaseCount('users', 2, 'mysql');
         $this->assertDatabaseCount('drivers', 0);
     })->with(['existing identity' => false, 'archived identity' => true]);

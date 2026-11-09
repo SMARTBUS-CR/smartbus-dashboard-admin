@@ -29,6 +29,10 @@ class JourneySearchRequest extends FormRequest
             'destination_lng' => ['required', 'numeric', 'between:-180,180'],
             'departure_at' => ['nullable', 'date'],
             'walking_radius_m' => ['nullable', 'integer', 'min:50', 'max:2000'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page' => ['nullable'],
+            'page.size' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page.number' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

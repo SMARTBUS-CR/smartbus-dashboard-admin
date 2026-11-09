@@ -83,8 +83,8 @@ describe('Bus Update', function (): void {
             $service->update($actor, $company, $bus->getKey(), ['capacity' => 50]);
             $this->fail('Expected a validation exception.');
         } catch (ValidationException $exception) {
-            expect($exception->errors())->toHaveKey('company');
-            expect($bus->fresh()->capacity)->toBe(40);
+            expect($exception->errors())->toHaveKey('company')
+                ->and($bus->fresh()->capacity)->toBe(40);
         }
     })->with(['inactive' => [false], 'archived' => [true]]);
 
@@ -128,8 +128,8 @@ describe('Bus Update', function (): void {
             }
             expect(getPermissionsTeamId())->toBe($previousCompany->getKey())
                 ->and($actor->relationLoaded('roles'))->toBeFalse()
-                ->and($actor->relationLoaded('permissions'))->toBeFalse();
-            expect($bus->fresh()->capacity)->toBe($outcome === 'success' ? 50 : 40);
+                ->and($actor->relationLoaded('permissions'))->toBeFalse()
+                ->and($bus->fresh()->capacity)->toBe($outcome === 'success' ? 50 : 40);
         } finally {
             setPermissionsTeamId($originalTeam);
             $actor->unsetRelation('roles')->unsetRelation('permissions');
@@ -218,8 +218,8 @@ describe('Bus Update', function (): void {
             $service->update($actor, $company, $bus->getKey(), ['brand' => 'Changed', $field => $value]);
             $this->fail('Expected a validation exception.');
         } catch (ValidationException $exception) {
-            expect($exception->errors())->toHaveKey($field);
-            expect($bus->fresh()->getAttributes())->toBe($before);
+            expect($exception->errors())->toHaveKey($field)
+                ->and($bus->fresh()->getAttributes())->toBe($before);
         }
     })->with([
         'ownership' => ['company_id', null],
@@ -254,8 +254,8 @@ describe('Bus Update', function (): void {
             $service->update($actor, $company, $bus->getKey(), [$field => $existing->{$field}, 'capacity' => 50]);
             $this->fail('Expected a validation exception.');
         } catch (ValidationException $exception) {
-            expect($exception->errors())->toHaveKey($field);
-            expect($bus->fresh()->getAttributes())->toBe($before);
+            expect($exception->errors())->toHaveKey($field)
+                ->and($bus->fresh()->getAttributes())->toBe($before);
         }
     })->with([
         'plate' => ['plate_number', false], 'archived plate' => ['plate_number', true],
@@ -271,8 +271,8 @@ describe('Bus Update', function (): void {
         ]);
 
         expect(fn () => $service->update($actor, $company, $bus->getKey(), ['capacity' => 50]))
-            ->toThrow(ModelNotFoundException::class);
-        expect($bus->fresh()->capacity)->toBe(40);
+            ->toThrow(ModelNotFoundException::class)
+            ->and($bus->fresh()->capacity)->toBe(40);
     });
 
     test('rejects an update without company access and permission', function (string $scenario): void {
@@ -295,7 +295,7 @@ describe('Bus Update', function (): void {
         }
 
         expect(fn () => $service->update($actor, $company, $bus->getKey(), ['capacity' => 50]))
-            ->toThrow(AuthorizationException::class);
-        expect($bus->fresh()->capacity)->toBe(40);
+            ->toThrow(AuthorizationException::class)
+            ->and($bus->fresh()->capacity)->toBe(40);
     })->with(['missing permission', 'foreign admin', 'driver', 'passenger', 'archived membership']);
 });

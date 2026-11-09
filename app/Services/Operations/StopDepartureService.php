@@ -26,6 +26,41 @@ class StopDepartureService
             ->where('stop_id', $stop->id)
             ->get();
 
+        if ($patternStops->isEmpty()) {
+            return collect();
+        }
+
+        $patternIds = $patternStops->pluck('route_pattern_id')->unique()->all();
+
+        // Sample company timezone from patterns or default to UTC
+        $companyTimezone = $patternStops->first()->pattern?->route?->company?->timezone ?? 'UTC';
+        $departureInCompanyTz = $departureAtUtc->setTimezone($companyTimezone);
+        $windowEnd = $departureInCompanyTz->addMinutes($windowMinutes);
+
+        // Service dates to query: yesterday, today, and tomorrow (if window reaches next day)
+        $datesToCheck = collect([
+            $departureInCompanyTz->subDay()->startOfDay(),
+            $departureInCompanyTz->startOfDay(),
+        ]);
+
+        if ($windowEnd->toDateString() > $departureInCompanyTz->toDateString()) {
+            $datesToCheck->push($departureInCompanyTz->addDay()->startOfDay());
+        }
+
+        // Bulk-load schedules by pattern and service date avoiding N+1 queries
+        $schedulesByPatternAndDate = [];
+        foreach ($datesToCheck as $date) {
+            $dateStr = $date->format('Y-m-d');
+            $schedules = RouteSchedule::query()
+                ->whereIn('route_pattern_id', $patternIds)
+                ->scheduledOn($date)
+                ->get();
+
+            foreach ($schedules as $schedule) {
+                $schedulesByPatternAndDate[$schedule->route_pattern_id][$dateStr][] = $schedule;
+            }
+        }
+
         $departures = collect();
 
         foreach ($patternStops as $patternStop) {
@@ -35,55 +70,54 @@ class StopDepartureService
             }
 
             $route = $pattern->route;
-            $company = $route->company;
-            $companyTimezone = $company?->timezone ?? 'UTC';
 
-            $departureInCompanyTz = $departureAtUtc->setTimezone($companyTimezone);
-            $serviceDate = $departureInCompanyTz->format('Y-m-d');
-            $windowEnd = $departureInCompanyTz->addMinutes($windowMinutes);
-
-            $schedules = RouteSchedule::query()
-                ->where('route_pattern_id', $pattern->id)
-                ->scheduledOn($departureInCompanyTz)
-                ->get();
-
-            if ($schedules->isEmpty()) {
+            // Unknown intermediate stop departure time cannot be placed in a scheduled window
+            if ($patternStop->stop_sequence > 1 && $patternStop->minutes_from_start === null) {
                 continue;
             }
 
-            $fare = $route->fares
-                ->filter(function (RouteFare $fare) use ($serviceDate): bool {
-                    $validFromOk = $fare->valid_from === null || $fare->valid_from->format('Y-m-d') <= $serviceDate;
-                    $validUntilOk = $fare->valid_until === null || $fare->valid_until->format('Y-m-d') >= $serviceDate;
+            $minutesFromStart = $patternStop->stop_sequence === 1
+                ? ($patternStop->minutes_from_start ?? 0)
+                : (int) $patternStop->minutes_from_start;
 
-                    return $validFromOk && $validUntilOk;
-                })
-                ->first();
+            foreach ($datesToCheck as $date) {
+                $dateInTz = $date->setTimezone($companyTimezone);
+                $dateStr = $dateInTz->format('Y-m-d');
 
-            $minutesFromStart = $patternStop->minutes_from_start ?? 0;
+                $schedules = $schedulesByPatternAndDate[$pattern->id][$dateStr] ?? [];
 
-            foreach ($schedules as $schedule) {
-                $stopDepartureAt = $departureInCompanyTz->copy()
-                    ->setTimeFromTimeString($schedule->departure_time)
-                    ->addMinutes($minutesFromStart);
+                $fare = $route->fares
+                    ->filter(function (RouteFare $f) use ($dateStr): bool {
+                        $validFromOk = $f->valid_from === null || $f->valid_from->format('Y-m-d') <= $dateStr;
+                        $validUntilOk = $f->valid_until === null || $f->valid_until->format('Y-m-d') >= $dateStr;
 
-                if ($stopDepartureAt->greaterThanOrEqualTo($departureInCompanyTz) && $stopDepartureAt->lessThanOrEqualTo($windowEnd)) {
-                    $departures->push(new Fluent([
-                        'id' => sprintf('%s-%s', $schedule->id, $patternStop->id),
-                        'route_id' => (string) $route->id,
-                        'route_code' => $route->code,
-                        'route_name' => $route->name,
-                        'pattern_id' => (string) $pattern->id,
-                        'headsign' => $pattern->headsign,
-                        'stop_id' => (string) $stop->id,
-                        'stop_name' => $stop->name,
-                        'stop_sequence' => $patternStop->stop_sequence,
-                        'scheduled_stop_departure_at' => $stopDepartureAt->toIso8601String(),
-                        'fare' => $fare ? [
-                            'amount' => (string) $fare->amount,
-                            'currency' => $fare->currency,
-                        ] : null,
-                    ]));
+                        return $validFromOk && $validUntilOk;
+                    })
+                    ->first();
+
+                foreach ($schedules as $schedule) {
+                    $stopDepartureAt = $dateInTz->copy()
+                        ->setTimeFromTimeString($schedule->departure_time)
+                        ->addMinutes($minutesFromStart);
+
+                    if ($stopDepartureAt->greaterThanOrEqualTo($departureInCompanyTz) && $stopDepartureAt->lessThanOrEqualTo($windowEnd)) {
+                        $departures->push(new Fluent([
+                            'id' => sprintf('%s-%s-%s', $schedule->id, $patternStop->id, $dateStr),
+                            'route_id' => (string) $route->id,
+                            'route_code' => $route->code,
+                            'route_name' => $route->name,
+                            'pattern_id' => (string) $pattern->id,
+                            'headsign' => $pattern->headsign,
+                            'stop_id' => (string) $stop->id,
+                            'stop_name' => $stop->name,
+                            'stop_sequence' => $patternStop->stop_sequence,
+                            'scheduled_stop_departure_at' => $stopDepartureAt->toIso8601String(),
+                            'fare' => $fare ? [
+                                'amount' => (string) $fare->amount,
+                                'currency' => $fare->currency,
+                            ] : null,
+                        ]));
+                    }
                 }
             }
         }

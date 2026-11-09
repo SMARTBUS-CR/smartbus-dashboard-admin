@@ -8,7 +8,7 @@ use App\Services\DriverManagementService;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class);
+pest()->use(WithDriverRegistration::class);
 
 describe('Driver Registration Guards', function (): void {
     test('rejects a global super admin identity without granting driver access', function (): void {
@@ -39,8 +39,8 @@ describe('Driver Registration Guards', function (): void {
                 expect($exception->errors())->toHaveKey($field);
             });
         $this->assertDatabaseCount('drivers', 1);
-        expect($existing->fresh()->trashed())->toBe($archived);
-        expect(CompanyUser::withTrashed()->where('user_id', $target->id)->exists())->toBeFalse();
+        expect($existing->fresh()->trashed())->toBe($archived)
+            ->and(CompanyUser::withTrashed()->where('user_id', $target->id)->exists())->toBeFalse();
     })->with([
         'existing employment' => ['user_id', false],
         'archived employment' => ['user_id', true],

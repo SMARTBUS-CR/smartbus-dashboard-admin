@@ -7,6 +7,7 @@ use App\Http\Requests\Api\V1\Operations\JourneySearchRequest;
 use App\Http\Resources\Api\V1\Operations\JourneyResource;
 use App\Services\Operations\DirectJourneySearchService;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class JourneyController extends Controller
 {
@@ -19,6 +20,17 @@ class JourneyController extends Controller
     {
         $journeys = $searchService->search($request->validated());
 
-        return JourneyResource::collection($journeys);
+        $pageSize = (int) ($request->input('page.size') ?? $request->input('per_page', 20));
+        $pageNumber = (int) ($request->input('page.number') ?? 1);
+
+        $paginated = new LengthAwarePaginator(
+            $journeys->forPage($pageNumber, $pageSize)->values(),
+            $journeys->count(),
+            $pageSize,
+            $pageNumber,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        return JourneyResource::collection($paginated);
     }
 }

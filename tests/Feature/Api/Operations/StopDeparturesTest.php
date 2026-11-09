@@ -138,4 +138,89 @@ describe('Planned Stop Departures API', function (): void {
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['window_minutes']);
     });
+
+    it('captures departures crossing midnight into next day and from previous day late service', function (): void {
+        $company = createCompany(['timezone' => 'America/Costa_Rica']);
+        $route = Route::factory()->for($company)->create();
+        $pattern = RoutePattern::factory()->for($route)->create(['headsign' => 'Nocturno']);
+        $stop = Stop::factory()->for($company)->create(['name' => 'Parada Nocturna']);
+
+        RoutePatternStop::factory()->create([
+            'route_pattern_id' => $pattern->id,
+            'stop_id' => $stop->id,
+            'stop_sequence' => 2,
+            'minutes_from_start' => 30, // 30 mins after departure
+        ]);
+
+        // Trip 1: Dispatched Monday 23:45 -> arrives at stop at Tuesday 00:15
+        RouteSchedule::factory()->create([
+            'route_pattern_id' => $pattern->id,
+            'day_of_week' => 1, // Monday
+            'departure_time' => '23:45:00',
+            'valid_from' => '2026-01-01',
+        ]);
+
+        // Trip 2: Dispatched Tuesday 00:30 -> arrives at stop at Tuesday 01:00
+        RouteSchedule::factory()->create([
+            'route_pattern_id' => $pattern->id,
+            'day_of_week' => 2, // Tuesday
+            'departure_time' => '00:30:00',
+            'valid_from' => '2026-01-01',
+        ]);
+
+        // Query Monday 23:30 Costa Rica (2026-11-10 05:30 UTC), window 120 minutes (until 01:30 Tuesday)
+        $response = $this->getJson("/api/v1/operations/stops/{$stop->id}/departures?".http_build_query([
+            'departure_at' => '2026-11-10T05:30:00Z',
+            'window_minutes' => 120,
+        ]));
+
+        $response->assertOk();
+        $departures = $response->json('data');
+        expect(count($departures))->toBe(2);
+    });
+
+    it('paginates stop departures and validates pagination input with 422', function (): void {
+        $company = createCompany(['timezone' => 'America/Costa_Rica']);
+        $route = Route::factory()->for($company)->create();
+        $pattern = RoutePattern::factory()->for($route)->create();
+        $stop = Stop::factory()->for($company)->create();
+
+        RoutePatternStop::factory()->create([
+            'route_pattern_id' => $pattern->id,
+            'stop_id' => $stop->id,
+            'stop_sequence' => 1,
+            'minutes_from_start' => 0,
+        ]);
+
+        for ($i = 0; $i < 5; $i++) {
+            RouteSchedule::factory()->create([
+                'route_pattern_id' => $pattern->id,
+                'day_of_week' => 1,
+                'departure_time' => sprintf('%02d:00:00', $i + 7),
+                'valid_from' => '2026-01-01',
+            ]);
+        }
+
+        // Test pagination page[size]=2
+        $response = $this->getJson("/api/v1/operations/stops/{$stop->id}/departures?".http_build_query([
+            'departure_at' => '2026-11-09T12:00:00Z',
+            'window_minutes' => 300,
+            'page' => ['size' => 2, 'number' => 1],
+        ]));
+
+        $response->assertOk()
+            ->assertJsonStructure([
+                'data',
+                'links',
+                'meta',
+            ]);
+
+        expect(count($response->json('data')))->toBe(2)
+            ->and($response->json('meta.total'))->toBe(5);
+
+        // Validation rejects negative or invalid pagination with 422
+        $this->getJson("/api/v1/operations/stops/{$stop->id}/departures?per_page=-1")->assertStatus(422);
+        $this->getJson("/api/v1/operations/stops/{$stop->id}/departures?per_page=0")->assertStatus(422);
+        $this->getJson("/api/v1/operations/stops/{$stop->id}/departures?per_page=500")->assertStatus(422);
+    });
 });

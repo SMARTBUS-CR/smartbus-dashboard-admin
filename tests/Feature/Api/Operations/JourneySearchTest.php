@@ -227,4 +227,102 @@ describe('Direct Journey Search API', function (): void {
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['origin_lat', 'walking_radius_m']);
     });
+
+    it('preserves null for estimated arrival and intermediate departure when minutes_from_start is unknown', function (): void {
+        $company = createCompany(['timezone' => 'America/Costa_Rica']);
+        $route = Route::factory()->for($company)->create();
+        $pattern = RoutePattern::factory()->for($route)->create();
+
+        $stopOrigin = Stop::factory()->for($company)->create(['latitude' => 9.9333, 'longitude' => -84.0833]);
+        $stopDest = Stop::factory()->for($company)->create(['latitude' => 10.0167, 'longitude' => -84.2167]);
+
+        RoutePatternStop::factory()->create([
+            'route_pattern_id' => $pattern->id,
+            'stop_id' => $stopOrigin->id,
+            'stop_sequence' => 1,
+            'minutes_from_start' => 0,
+        ]);
+        RoutePatternStop::factory()->create([
+            'route_pattern_id' => $pattern->id,
+            'stop_id' => $stopDest->id,
+            'stop_sequence' => 2,
+            'minutes_from_start' => null, // Unknown arrival time
+        ]);
+
+        RouteSchedule::factory()->create([
+            'route_pattern_id' => $pattern->id,
+            'day_of_week' => 1, // Monday
+            'departure_time' => '07:00:00',
+            'valid_from' => '2026-01-01',
+        ]);
+
+        $response = $this->getJson('/api/v1/operations/journeys?'.http_build_query([
+            'origin_lat' => 9.9333,
+            'origin_lng' => -84.0833,
+            'destination_lat' => 10.0167,
+            'destination_lng' => -84.2167,
+            'departure_at' => '2026-11-09T13:00:00Z',
+        ]));
+
+        $response->assertOk();
+        $journey = $response->json('data.0');
+        expect($journey['attributes']['scheduled_departure_at'])->not->toBeNull()
+            ->and($journey['attributes']['estimated_arrival_at'])->toBeNull();
+    });
+
+    it('finds journeys departing after midnight into the next calendar day', function (): void {
+        $company = createCompany(['timezone' => 'America/Costa_Rica']);
+        $route = Route::factory()->for($company)->create();
+        $pattern = RoutePattern::factory()->for($route)->create();
+
+        $stopOrigin = Stop::factory()->for($company)->create(['latitude' => 9.9333, 'longitude' => -84.0833]);
+        $stopDest = Stop::factory()->for($company)->create(['latitude' => 10.0167, 'longitude' => -84.2167]);
+
+        RoutePatternStop::factory()->create([
+            'route_pattern_id' => $pattern->id,
+            'stop_id' => $stopOrigin->id,
+            'stop_sequence' => 1,
+            'minutes_from_start' => 0,
+        ]);
+        RoutePatternStop::factory()->create([
+            'route_pattern_id' => $pattern->id,
+            'stop_id' => $stopDest->id,
+            'stop_sequence' => 2,
+            'minutes_from_start' => 30,
+        ]);
+
+        // Tuesday schedule: 00:30 (early morning)
+        RouteSchedule::factory()->create([
+            'route_pattern_id' => $pattern->id,
+            'day_of_week' => 2, // Tuesday
+            'departure_time' => '00:30:00',
+            'valid_from' => '2026-01-01',
+        ]);
+
+        // Query late Monday night: 2026-11-09 23:30 Costa Rica = 2026-11-10 05:30 UTC
+        $response = $this->getJson('/api/v1/operations/journeys?'.http_build_query([
+            'origin_lat' => 9.9333,
+            'origin_lng' => -84.0833,
+            'destination_lat' => 10.0167,
+            'destination_lng' => -84.2167,
+            'departure_at' => '2026-11-10T05:30:00Z',
+        ]));
+
+        $response->assertOk();
+        $journeys = $response->json('data');
+        expect($journeys)->not->toBeEmpty();
+    });
+
+    it('validates pagination parameters returning 422 for invalid values', function (): void {
+        $response = $this->getJson('/api/v1/operations/journeys?'.http_build_query([
+            'origin_lat' => 9.9333,
+            'origin_lng' => -84.0833,
+            'destination_lat' => 10.0167,
+            'destination_lng' => -84.2167,
+            'per_page' => -5,
+        ]));
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['per_page']);
+    });
 });
