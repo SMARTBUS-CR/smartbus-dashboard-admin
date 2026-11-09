@@ -46,6 +46,14 @@ Route::prefix('v1/operations')->group(function (): void {
 
     // Telemetry Tracking Context (for GPS Service)
     Route::get('trips/{id}/tracking-context', [TrackingContextController::class, 'show'])
+        ->middleware('auth.api')
         ->whereUuid('id')
         ->name('operations.trips.tracking-context');
+});
+
+// Internal Service Routes (GPS & ETA microservices)
+Route::prefix('internal/v1')->middleware('auth.api')->group(function (): void {
+    Route::get('trips/{id}/tracking-context', [TrackingContextController::class, 'show'])
+        ->whereUuid('id')
+        ->name('internal.trips.tracking-context');
 });

@@ -12,6 +12,18 @@ use App\Models\User;
 
 class TripPolicy
 {
+    public function view(User $user, Company|Trip $target, Company|Trip|null $extra = null): bool
+    {
+        $trip = $target instanceof Trip ? $target : ($extra instanceof Trip ? $extra : null);
+        $company = $target instanceof Company ? $target : ($extra instanceof Company ? $extra : $trip?->company);
+
+        if ($company === null) {
+            return false;
+        }
+
+        return $this->allowsExecution($user, $company, $trip, 'View:Trip', true);
+    }
+
     public function create(User $user, Company $company): bool
     {
         return $user->canAccessTenant($company) && $user->can('Create:Trip');
