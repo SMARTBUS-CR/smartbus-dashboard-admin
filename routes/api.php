@@ -35,14 +35,15 @@ Route::prefix('v1/operations')->group(function (): void {
     Route::get('stops', [StopController::class, 'index'])->name('operations.stops.index');
     Route::get('stops/{id}', [StopController::class, 'show'])->whereUuid('id')->name('operations.stops.show');
 
-    // Driver Profiles & Assigned Trips
-    Route::get('driver/profiles', [DriverProfileController::class, 'index'])->name('operations.driver.profiles');
-    Route::get('driver/trips', [DriverTripController::class, 'index'])->name('operations.driver.trips');
+    // Driver Profiles, Assigned Trips & Trip Execution (Authenticated)
+    Route::middleware('auth.api')->group(function (): void {
+        Route::get('driver/profiles', [DriverProfileController::class, 'index'])->name('operations.driver.profiles');
+        Route::get('driver/trips', [DriverTripController::class, 'index'])->name('operations.driver.trips');
 
-    // Trip Execution & Lifecycle
-    Route::get('trips/{id}', [TripExecutionController::class, 'show'])->whereUuid('id')->name('operations.trips.show');
-    Route::post('trips/{id}/start', [TripExecutionController::class, 'start'])->whereUuid('id')->name('operations.trips.start');
-    Route::post('trips/{id}/complete', [TripExecutionController::class, 'complete'])->whereUuid('id')->name('operations.trips.complete');
+        Route::get('trips/{id}', [TripExecutionController::class, 'show'])->whereUuid('id')->name('operations.trips.show');
+        Route::post('trips/{id}/start', [TripExecutionController::class, 'start'])->whereUuid('id')->name('operations.trips.start');
+        Route::post('trips/{id}/complete', [TripExecutionController::class, 'complete'])->whereUuid('id')->name('operations.trips.complete');
+    });
 
     // Telemetry Tracking Context (for GPS Service)
     Route::get('trips/{id}/tracking-context', [TrackingContextController::class, 'show'])

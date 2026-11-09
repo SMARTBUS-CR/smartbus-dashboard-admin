@@ -17,7 +17,15 @@ class DriverProfileController extends Controller
      */
     public function index(Request $request): AnonymousResourceCollection
     {
+        $request->validate([
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page.size' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page.number' => ['nullable', 'integer', 'min:1'],
+        ]);
+
         $userId = $request->user()?->id;
+        $pageSize = (int) ($request->input('page.size') ?? $request->input('per_page', 15));
+        $pageNumber = (int) ($request->input('page.number') ?? 1);
 
         $profiles = QueryBuilder::for(Driver::query()->where('user_id', $userId))
             ->allowedFilters(
@@ -27,7 +35,7 @@ class DriverProfileController extends Controller
             ->allowedIncludes('company')
             ->defaultSort('-created_at')
             ->allowedSorts('employment_starts_on', 'status', 'created_at')
-            ->paginate($request->integer('per_page', 15));
+            ->paginate($pageSize, ['*'], 'page[number]', $pageNumber);
 
         return DriverProfileResource::collection($profiles);
     }
