@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AuthenticateExternalApiToken;
 use App\Http\Middleware\SetLocale;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -23,6 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->api(append: [
             SetLocale::class,
+        ]);
+
+        $middleware->alias([
+            'auth.api' => AuthenticateExternalApiToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

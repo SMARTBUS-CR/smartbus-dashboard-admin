@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignUuid('driver_id')
                 ->constrained('drivers')
                 ->restrictOnDelete();
-            
+
             $table->smallInteger('day_of_week');
             $table->time('start_time');
             $table->time('end_time');
@@ -24,7 +24,7 @@ return new class extends Migration
             $table->boolean('ends_next_day')->default(false);
             $table->date('valid_from')->nullable();
             $table->date('valid_until')->nullable();
-            
+
             $table->timestamps();
 
             $table->index(['driver_id', 'day_of_week']);

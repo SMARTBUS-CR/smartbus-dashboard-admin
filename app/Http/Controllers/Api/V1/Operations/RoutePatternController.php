@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\Operations\RoutePatternResource;
 use App\Http\Resources\Api\V1\Operations\RouteScheduleResource;
 use App\Models\RoutePattern;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -37,13 +38,25 @@ class RoutePatternController extends Controller
      */
     public function schedules(string $id, Request $request): AnonymousResourceCollection
     {
-        $pattern = RoutePattern::query()->whereNull('deleted_at')->find($id);
+        $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
+        $pattern = RoutePattern::query()->with('route.company')->whereNull('deleted_at')->find($id);
 
         if (! $pattern) {
             abort(404, __('The requested route pattern does not exist or has been archived.'));
         }
 
-        $schedules = $pattern->schedules()
+        $query = $pattern->schedules();
+
+        if ($request->filled('date')) {
+            $companyTz = $pattern->route?->company?->timezone ?? 'UTC';
+            $targetDate = CarbonImmutable::parse($request->input('date'), $companyTz);
+            $query->scheduledOn($targetDate);
+        }
+
+        $schedules = $query
             ->orderBy('day_of_week')
             ->orderBy('departure_time')
             ->get();

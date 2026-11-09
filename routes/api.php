@@ -41,17 +41,26 @@ Route::prefix('v1/operations')->group(function (): void {
     // Direct Journey Search
     Route::get('journeys', [JourneyController::class, 'index'])->name('operations.journeys.index');
 
-    // Driver Profiles & Assigned Trips
-    Route::get('driver/profiles', [DriverProfileController::class, 'index'])->name('operations.driver.profiles');
-    Route::get('driver/trips', [DriverTripController::class, 'index'])->name('operations.driver.trips');
+    // Driver Profiles, Assigned Trips & Trip Execution (Authenticated)
+    Route::middleware('auth.api')->group(function (): void {
+        Route::get('driver/profiles', [DriverProfileController::class, 'index'])->name('operations.driver.profiles');
+        Route::get('driver/trips', [DriverTripController::class, 'index'])->name('operations.driver.trips');
 
-    // Trip Execution & Lifecycle
-    Route::get('trips/{id}', [TripExecutionController::class, 'show'])->whereUuid('id')->name('operations.trips.show');
-    Route::post('trips/{id}/start', [TripExecutionController::class, 'start'])->whereUuid('id')->name('operations.trips.start');
-    Route::post('trips/{id}/complete', [TripExecutionController::class, 'complete'])->whereUuid('id')->name('operations.trips.complete');
+        Route::get('trips/{id}', [TripExecutionController::class, 'show'])->whereUuid('id')->name('operations.trips.show');
+        Route::post('trips/{id}/start', [TripExecutionController::class, 'start'])->whereUuid('id')->name('operations.trips.start');
+        Route::post('trips/{id}/complete', [TripExecutionController::class, 'complete'])->whereUuid('id')->name('operations.trips.complete');
+    });
 
     // Telemetry Tracking Context (for GPS Service)
     Route::get('trips/{id}/tracking-context', [TrackingContextController::class, 'show'])
+        ->middleware('auth.api')
         ->whereUuid('id')
         ->name('operations.trips.tracking-context');
+});
+
+// Internal Service Routes (GPS & ETA microservices)
+Route::prefix('internal/v1')->middleware('auth.api')->group(function (): void {
+    Route::get('trips/{id}/tracking-context', [TrackingContextController::class, 'show'])
+        ->whereUuid('id')
+        ->name('internal.trips.tracking-context');
 });

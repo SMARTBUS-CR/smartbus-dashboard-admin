@@ -28,7 +28,7 @@ return new class extends Migration
             $table->smallInteger('capacity');
 
             $table->boolean('is_active')->default(true);
-            
+
             $table->timestamps();
             $table->softDeletes();
 

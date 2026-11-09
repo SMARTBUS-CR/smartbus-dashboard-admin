@@ -3,6 +3,7 @@
 use App\Enums\TripStatus;
 use App\Enums\UserRole;
 use App\Models\Trip;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 
 describe('Trip Details Retrieval', function (): void {
@@ -39,9 +40,30 @@ describe('Trip Details Retrieval', function (): void {
         $response = $this->getJson('/api/v1/operations/trips/0192e2b3-0000-7000-8000-000000000000');
         $response->assertNotFound();
     });
+
+    it('rejects unauthenticated requests to trip show with 401', function (): void {
+        $trip = Trip::factory()->withDriverAvailability()->create()->refresh();
+
+        $this->getJson("/api/v1/operations/trips/{$trip->id}")->assertStatus(401);
+    });
+
+    it('rejects unauthorized users from retrieving trip details with 403', function (): void {
+        $trip = Trip::factory()->withDriverAvailability()->create()->refresh();
+        $otherUser = User::factory()->create();
+
+        $this->actingAs($otherUser);
+
+        $response = $this->getJson("/api/v1/operations/trips/{$trip->id}");
+        $response->assertStatus(403);
+    });
 });
 
 describe('Trip Start Endpoint', function (): void {
+    it('rejects unauthenticated requests to start trip with 401', function (): void {
+        $trip = Trip::factory()->withDriverAvailability()->create()->refresh();
+
+        $this->postJson("/api/v1/operations/trips/{$trip->id}/start")->assertStatus(401);
+    });
     it('allows the assigned driver to start a scheduled trip and returns in_progress state', function (): void {
         $trip = Trip::factory()->withDriverAvailability()->create()->refresh();
         $driverUser = $trip->driver->user;
@@ -100,7 +122,7 @@ describe('Trip Start Endpoint', function (): void {
     });
 
     it('returns 409 conflict when starting a trip that is already completed or cancelled', function (): void {
-        $completedTrip = Trip::factory()->completed()->create()->refresh();
+        $completedTrip = Trip::factory()->withEligibleDriver()->completed()->create()->refresh();
         $this->actingAs($completedTrip->driver->user);
 
         $response = $this->postJson("/api/v1/operations/trips/{$completedTrip->id}/start");
@@ -109,6 +131,12 @@ describe('Trip Start Endpoint', function (): void {
 });
 
 describe('Trip Completion Endpoint', function (): void {
+    it('rejects unauthenticated requests to complete trip with 401', function (): void {
+        $trip = Trip::factory()->withEligibleDriver()->inProgress()->create()->refresh();
+
+        $this->postJson("/api/v1/operations/trips/{$trip->id}/complete")->assertStatus(401);
+    });
+
     it('allows the assigned driver to complete an in-progress trip and returns completed state', function (): void {
         $trip = Trip::factory()->withEligibleDriver()->inProgress()->create()->refresh();
         $driverUser = $trip->driver->user;

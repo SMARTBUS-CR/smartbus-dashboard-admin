@@ -17,13 +17,28 @@ class RouteFareController extends Controller
      */
     public function index(string $routeId, Request $request): AnonymousResourceCollection
     {
+        $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
         $route = Route::query()->whereNull('deleted_at')->find($routeId);
 
         if (! $route) {
             abort(404, __('The requested route does not exist or has been archived.'));
         }
 
-        $fares = $route->fares()
+        $query = $route->fares();
+
+        if ($request->filled('date')) {
+            $date = $request->input('date');
+            $query->where(function ($q) use ($date): void {
+                $q->whereNull('valid_from')->orWhere('valid_from', '<=', $date);
+            })->where(function ($q) use ($date): void {
+                $q->whereNull('valid_until')->orWhere('valid_until', '>=', $date);
+            });
+        }
+
+        $fares = $query
             ->orderBy('amount')
             ->get();
 

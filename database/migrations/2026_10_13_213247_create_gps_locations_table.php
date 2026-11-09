@@ -29,7 +29,7 @@ return new class extends Migration
             $table->timestampTz('received_at', 6)->useCurrent();
 
             $table->geography('location', subtype: 'point', srid: 4326)->nullable();
-            
+
             $table->timestamps();
 
             $table->unique(['trip_id', 'recorded_at']);

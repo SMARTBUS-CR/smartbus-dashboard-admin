@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\V1\Operations;
 
-use App\Enums\TripStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\Operations\TripResource;
 use App\Models\Trip;
@@ -25,6 +24,18 @@ class TripExecutionController extends Controller
             throw new NotFoundHttpException(__('The requested trip was not found.'));
         }
 
+        $user = $request->user();
+        if (! $user) {
+            abort(401, __('Authentication required.'));
+        }
+
+        $isAssignedDriver = $trip->driver && (string) $trip->driver->user_id === (string) $user->id;
+        $isAuthorized = $user->isSuperAdmin() || $isAssignedDriver || $user->can('view', [$trip, $trip->company]);
+
+        if (! $isAuthorized) {
+            abort(403, __('You are not authorized to view this trip.'));
+        }
+
         return TripResource::make($trip);
     }
 
@@ -40,22 +51,8 @@ class TripExecutionController extends Controller
         }
 
         $actor = $request->user();
-
-        // 1. Idempotency: If already in progress, return current state
-        if ($trip->status === TripStatus::IN_PROGRESS) {
-            // Verify actor is authorized
-            if ($actor && ! $actor->isSuperAdmin() && $trip->driver?->user_id !== $actor->id) {
-                abort(403);
-            }
-
-            return TripResource::make($trip);
-        }
-
-        // 2. Reject terminal state transitions with 409 Conflict
-        if (in_array($trip->status, [TripStatus::COMPLETED, TripStatus::CANCELLED], true)) {
-            return response()->json([
-                'message' => __('Only scheduled trips can be started.'),
-            ], 409);
+        if (! $actor) {
+            abort(401, __('Authentication required.'));
         }
 
         try {
@@ -86,21 +83,8 @@ class TripExecutionController extends Controller
         }
 
         $actor = $request->user();
-
-        // 1. Idempotency: If already completed, return current state
-        if ($trip->status === TripStatus::COMPLETED) {
-            if ($actor && ! $actor->isSuperAdmin() && $trip->driver?->user_id !== $actor->id) {
-                abort(403);
-            }
-
-            return TripResource::make($trip);
-        }
-
-        // 2. Reject if trip is not in progress with 409 Conflict
-        if ($trip->status !== TripStatus::IN_PROGRESS) {
-            return response()->json([
-                'message' => __('Only in-progress trips can be completed.'),
-            ], 409);
+        if (! $actor) {
+            abort(401, __('Authentication required.'));
         }
 
         try {

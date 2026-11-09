@@ -183,4 +183,26 @@ describe('Driver Assigned Trips', function (): void {
         $dateIds = collect($dateFiltered->json('data'))->pluck('id')->all();
         expect($dateIds)->toBe([$scheduledTrip->id]);
     });
+
+    it('rejects unauthenticated requests to driver endpoints with 401', function (): void {
+        $this->getJson('/api/v1/operations/driver/profiles')->assertStatus(401);
+        $this->getJson('/api/v1/operations/driver/trips')->assertStatus(401);
+    });
+
+    it('validates per_page pagination parameters returning 422 for invalid values', function (): void {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Negative per_page
+        $this->getJson('/api/v1/operations/driver/profiles?per_page=-5')->assertStatus(422);
+        $this->getJson('/api/v1/operations/driver/trips?per_page=-1')->assertStatus(422);
+
+        // Zero per_page
+        $this->getJson('/api/v1/operations/driver/profiles?per_page=0')->assertStatus(422);
+        $this->getJson('/api/v1/operations/driver/trips?per_page=0')->assertStatus(422);
+
+        // Excessive per_page
+        $this->getJson('/api/v1/operations/driver/profiles?per_page=150')->assertStatus(422);
+        $this->getJson('/api/v1/operations/driver/trips?per_page=500')->assertStatus(422);
+    });
 });
