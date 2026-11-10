@@ -45,6 +45,23 @@ class Stop extends Model
                 ->whereIn('id', $sharedStopIds)));
     }
 
+    /** @param Builder<Stop> $query */
+    #[Scope]
+    protected function withinBoundingBox(Builder $query, float $west, float $south, float $east, float $north): void
+    {
+        $query->whereBetween('longitude', [$west, $east])->whereBetween('latitude', [$south, $north]);
+    }
+
+    /** @param Builder<Stop> $query */
+    #[Scope]
+    protected function withinRadius(Builder $query, float $latitude, float $longitude, float $radiusMeters): void
+    {
+        $query->whereRaw(
+            'ST_DWithin(ST_SetSRID(ST_MakePoint(longitude::double precision, latitude::double precision), 4326)::geography, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)',
+            [$longitude, $latitude, $radiusMeters],
+        );
+    }
+
     protected function casts(): array
     {
         return [

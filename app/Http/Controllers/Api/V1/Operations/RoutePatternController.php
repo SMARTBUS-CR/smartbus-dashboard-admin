@@ -7,6 +7,7 @@ use App\Http\Resources\Api\V1\Operations\RoutePatternResource;
 use App\Http\Resources\Api\V1\Operations\RouteScheduleResource;
 use App\Models\RoutePattern;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -48,7 +49,7 @@ class RoutePatternController extends Controller
             abort(404, __('The requested route pattern does not exist or has been archived.'));
         }
 
-        $query = $pattern->schedules();
+        $query = $pattern->schedules()->with(['exceptions' => fn (HasMany $exceptions): HasMany => $exceptions->orderBy('service_date')]);
 
         if ($request->filled('date')) {
             $companyTz = $pattern->route?->company?->timezone ?? 'UTC';

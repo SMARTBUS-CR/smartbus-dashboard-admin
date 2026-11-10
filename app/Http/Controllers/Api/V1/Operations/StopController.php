@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Api\V1\Operations;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\Operations\StopIndexRequest;
 use App\Http\Resources\Api\V1\Operations\StopResource;
 use App\Models\Stop;
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -17,13 +17,8 @@ class StopController extends Controller
      *
      * @response AnonymousResourceCollection<StopResource>
      */
-    public function index(Request $request): AnonymousResourceCollection
+    public function index(StopIndexRequest $request): AnonymousResourceCollection
     {
-        $request->validate([
-            'page.size' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'page.number' => ['nullable', 'integer', 'min:1'],
-        ]);
-
         $pageSize = (int) $request->input('page.size', 20);
         $pageNumber = (int) $request->input('page.number', 1);
 
@@ -32,10 +27,14 @@ class StopController extends Controller
             ->allowedFilters(
                 AllowedFilter::scope('company_id', 'forCatalogueCompanies'),
                 AllowedFilter::partial('name'),
+                AllowedFilter::scope('bbox', 'withinBoundingBox'),
+                AllowedFilter::scope('near', 'withinRadius'),
             )
             ->allowedSorts('name', 'created_at')
             ->defaultSort('name')
-            ->paginate($pageSize, ['*'], 'page[number]', $pageNumber);
+            ->orderBy('id')
+            ->paginate($pageSize, ['*'], 'page[number]', $pageNumber)
+            ->withQueryString();
 
         return StopResource::collection($stops);
     }

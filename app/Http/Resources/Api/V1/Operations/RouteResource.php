@@ -36,7 +36,7 @@ class RouteResource extends JsonApiResource
     {
         return [
             'company' => fn () => $this->company,
-            'patterns' => fn () => $this->patterns,
+            'patterns' => RoutePatternResource::class,
         ];
     }
 }

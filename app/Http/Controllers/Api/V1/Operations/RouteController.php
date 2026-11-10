@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Api\V1\Operations;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\Operations\CatalogueIndexRequest;
 use App\Http\Resources\Api\V1\Operations\RoutePatternResource;
 use App\Http\Resources\Api\V1\Operations\RouteResource;
 use App\Models\Route;
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -18,13 +18,8 @@ class RouteController extends Controller
      *
      * @response AnonymousResourceCollection<RouteResource>
      */
-    public function index(Request $request): AnonymousResourceCollection
+    public function index(CatalogueIndexRequest $request): AnonymousResourceCollection
     {
-        $request->validate([
-            'page.size' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'page.number' => ['nullable', 'integer', 'min:1'],
-        ]);
-
         $pageSize = (int) $request->input('page.size', 20);
         $pageNumber = (int) $request->input('page.number', 1);
 
@@ -38,7 +33,12 @@ class RouteController extends Controller
             ->allowedSorts('name', 'code', 'created_at')
             ->allowedIncludes('company', 'patterns')
             ->defaultSort('code')
-            ->paginate($pageSize, ['*'], 'page[number]', $pageNumber);
+            ->orderBy('id')
+            ->paginate($pageSize, ['*'], 'page[number]', $pageNumber)
+            ->withQueryString();
+
+        $routes->getCollection()->filter(fn (Route $route): bool => $route->relationLoaded('patterns'))
+            ->loadMissing('patterns.stopOccurrences.stop');
 
         return RouteResource::collection($routes);
     }
@@ -50,7 +50,7 @@ class RouteController extends Controller
     {
         $route = Route::query()
             ->inPublicCatalogue()
-            ->with(['company', 'patterns'])
+            ->with(['company', 'patterns.stopOccurrences.stop'])
             ->find($id);
 
         if (! $route) {
@@ -75,6 +75,7 @@ class RouteController extends Controller
 
         $patterns = $route->patterns()
             ->whereNull('deleted_at')
+            ->with('stopOccurrences.stop')
             ->orderBy('code')
             ->get();
 
