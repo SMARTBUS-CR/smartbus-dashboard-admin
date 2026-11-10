@@ -29,7 +29,7 @@ class RouteController extends Controller
         $pageNumber = (int) $request->input('page.number', 1);
 
         $routes = QueryBuilder::for(Route::query()->with('company'))
-            ->whereNull('deleted_at')
+            ->inPublicCatalogue()
             ->allowedFilters(
                 AllowedFilter::exact('company_id'),
                 AllowedFilter::partial('name'),
@@ -49,7 +49,7 @@ class RouteController extends Controller
     public function show(string $id): RouteResource
     {
         $route = Route::query()
-            ->whereNull('deleted_at')
+            ->inPublicCatalogue()
             ->with(['company', 'patterns'])
             ->find($id);
 
@@ -67,7 +67,7 @@ class RouteController extends Controller
      */
     public function patterns(string $id): AnonymousResourceCollection
     {
-        $route = Route::query()->whereNull('deleted_at')->find($id);
+        $route = Route::query()->inPublicCatalogue()->find($id);
 
         if (! $route) {
             abort(404, __('The requested route does not exist or has been archived.'));

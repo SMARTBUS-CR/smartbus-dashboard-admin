@@ -2,7 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\CompanyStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -20,6 +23,27 @@ use Illuminate\Validation\ValidationException;
 class Stop extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
+
+    /** @param Builder<Stop> $query */
+    #[Scope]
+    protected function inPublicCatalogue(Builder $query): void
+    {
+        $query->where(fn (Builder $stops): Builder => $stops->whereNull('company_id')
+            ->orWhereHas('company', fn (Builder $company): Builder => $company->where('status', CompanyStatus::ACTIVE)));
+    }
+
+    /** @param Builder<Stop> $query */
+    #[Scope]
+    protected function forCatalogueCompanies(Builder $query, string ...$companyIds): void
+    {
+        $sharedStopIds = RoutePatternStop::query()->select('stop_id')
+            ->whereHas('pattern', fn (Builder $pattern): Builder => $pattern->inPublicCatalogue()
+                ->whereHas('route', fn (Builder $route): Builder => $route->whereIn('company_id', $companyIds)));
+
+        $query->where(fn (Builder $stops): Builder => $stops->whereIn('company_id', $companyIds)
+            ->orWhere(fn (Builder $shared): Builder => $shared->whereNull('company_id')
+                ->whereIn('id', $sharedStopIds)));
+    }
 
     protected function casts(): array
     {

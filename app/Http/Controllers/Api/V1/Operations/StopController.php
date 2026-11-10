@@ -28,9 +28,9 @@ class StopController extends Controller
         $pageNumber = (int) $request->input('page.number', 1);
 
         $stops = QueryBuilder::for(Stop::query())
-            ->whereNull('deleted_at')
+            ->inPublicCatalogue()
             ->allowedFilters(
-                AllowedFilter::exact('company_id'),
+                AllowedFilter::scope('company_id', 'forCatalogueCompanies'),
                 AllowedFilter::partial('name'),
             )
             ->allowedSorts('name', 'created_at')
@@ -45,7 +45,7 @@ class StopController extends Controller
      */
     public function show(string $id): StopResource
     {
-        $stop = Stop::query()->whereNull('deleted_at')->find($id);
+        $stop = Stop::query()->inPublicCatalogue()->find($id);
 
         if (! $stop) {
             abort(404, __('The requested stop does not exist or has been archived.'));

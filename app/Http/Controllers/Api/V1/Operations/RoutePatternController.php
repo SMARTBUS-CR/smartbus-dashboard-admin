@@ -18,7 +18,7 @@ class RoutePatternController extends Controller
     public function show(string $id): RoutePatternResource
     {
         $pattern = RoutePattern::query()
-            ->whereNull('deleted_at')
+            ->inPublicCatalogue()
             ->with(['stopOccurrences' => function ($query) {
                 $query->orderBy('stop_sequence')->with('stop');
             }])
@@ -42,7 +42,7 @@ class RoutePatternController extends Controller
             'date' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
-        $pattern = RoutePattern::query()->with('route.company')->whereNull('deleted_at')->find($id);
+        $pattern = RoutePattern::query()->with('route.company')->inPublicCatalogue()->find($id);
 
         if (! $pattern) {
             abort(404, __('The requested route pattern does not exist or has been archived.'));
