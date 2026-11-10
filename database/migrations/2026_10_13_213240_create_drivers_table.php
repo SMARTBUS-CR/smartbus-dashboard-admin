@@ -17,21 +17,21 @@ return new class extends Migration
             $table->foreignUuidFor(Company::class)
                 ->constrained('companies')
                 ->restrictOnDelete();
-            
+
             $table->uuid('user_id');
 
             $table->string('license', 50);
             $table->date('license_expires_at');
-            
+
             $table->date('employment_starts_on');
             $table->date('employment_ends_on')->nullable();
-            
+
             $table->decimal('salary_amount', 12, 2);
             $table->char('salary_currency', 3);
             $table->string('salary_period', 20)->default('monthly');
-            
+
             $table->string('status', 20)->default('active');
-            
+
             $table->timestamps();
             $table->softDeletes();
 
