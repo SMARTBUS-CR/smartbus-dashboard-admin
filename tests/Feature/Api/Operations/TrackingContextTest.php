@@ -34,6 +34,7 @@ describe('Trip Tracking Context Retrieval', function (): void {
                         'company_id',
                         'bus_id',
                         'driver_id',
+                        'driver_user_id',
                         'route_pattern_id',
                         'status',
                         'scheduled_departure_at',
@@ -44,13 +45,37 @@ describe('Trip Tracking Context Retrieval', function (): void {
             ]);
 
         expect($response->json('data.id'))->toBe($trip->id)
+            ->and($response->json('data.attributes.driver_id'))->toBe($trip->driver_id)
+            ->and($response->json('data.attributes.driver_user_id'))->toBe($trip->driver->user_id)
             ->and($response->json('data.attributes.status'))->toBe(TripStatus::SCHEDULED->value)
             ->and($response->json('data.attributes.route_pattern_id'))->toBe($trip->route_pattern_id);
 
         $internalUri = "/api/internal/v1/trips/{$trip->id}/tracking-context";
         $internalResponse = $this->get($internalUri, $signedHeaders($internalUri));
         $internalResponse->assertOk()
-            ->assertJsonPath('data.id', $trip->id);
+            ->assertJsonPath('data.id', $trip->id)
+            ->assertJsonPath('data.attributes.driver_user_id', $trip->driver->user_id)
+            ->assertJsonMissingPath('data.relationships.driver')
+            ->assertJsonMissingPath('included');
+        Http::assertNothingSent();
+    });
+
+    it('retains the assigned user UUID for an archived driver without exposing the employee record', function (): void {
+        $trip = Trip::factory()->withDriverAvailability()->completed()->create()->refresh();
+        $driver = $trip->driver;
+        $driver->delete();
+        $uri = '/api/internal/v1/trips/'.$trip->id.'/tracking-context';
+        $timestamp = (string) now()->timestamp;
+
+        $this->get($uri, [
+            'X-Service-Timestamp' => $timestamp,
+            'X-Service-Signature' => hash_hmac('sha256', $timestamp."\nGET\n".$uri."\n".hash('sha256', ''), 'gps-test-secret'),
+        ])->assertOk()
+            ->assertJsonPath('data.attributes.driver_id', $driver->id)
+            ->assertJsonPath('data.attributes.driver_user_id', $driver->user_id)
+            ->assertJsonMissingPath('data.relationships.driver')
+            ->assertJsonMissingPath('included');
+
         Http::assertNothingSent();
     });
 

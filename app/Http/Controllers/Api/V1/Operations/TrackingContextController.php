@@ -13,7 +13,7 @@ class TrackingContextController extends Controller
      */
     public function show(string $tripId): TripTrackingContextResource
     {
-        $trip = Trip::query()->find($tripId);
+        $trip = Trip::query()->withAggregate('driver', 'user_id')->find($tripId);
 
         if (! $trip) {
             abort(404, __('The requested trip was not found.'));
