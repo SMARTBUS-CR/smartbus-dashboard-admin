@@ -2,6 +2,7 @@
 
 use App\Enums\TripStatus;
 use App\Enums\UserRole;
+use App\Models\CompanyUser;
 use App\Models\Trip;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -55,6 +56,38 @@ describe('Trip Details Retrieval', function (): void {
 
         $response = $this->getJson("/api/v1/operations/trips/{$trip->id}");
         $response->assertStatus(403);
+    });
+
+    it('rejects an assigned driver after membership or role revocation', function (string $revocation): void {
+        $trip = Trip::factory()->withEligibleDriver()->create()->refresh();
+        $driverUser = $trip->driver->user;
+
+        if ($revocation === 'membership') {
+            CompanyUser::query()->where('company_id', $trip->company_id)->where('user_id', $driverUser->id)->delete();
+        } else {
+            $previousTeam = getPermissionsTeamId();
+            setPermissionsTeamId($trip->company_id);
+            try {
+                $driverUser->removeRole(UserRole::Driver->value);
+            } finally {
+                setPermissionsTeamId($previousTeam);
+            }
+        }
+
+        $this->actingAs($driverUser);
+        $this->getJson("/api/v1/operations/trips/{$trip->id}")->assertForbidden();
+    })->with(['membership', 'role']);
+
+    it('allows a company member with trip view permission to inspect its trip', function (): void {
+        $trip = Trip::factory()->withEligibleDriver()->create()->refresh();
+        $viewer = User::factory()->create();
+        CompanyUser::factory()->create(['company_id' => $trip->company_id, 'user_id' => $viewer->id]);
+        grantShield($viewer, ['View:Trip'], $trip->company);
+
+        $this->actingAs($viewer);
+        $this->getJson("/api/v1/operations/trips/{$trip->id}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $trip->id);
     });
 });
 
@@ -126,7 +159,9 @@ describe('Trip Start Endpoint', function (): void {
         $this->actingAs($completedTrip->driver->user);
 
         $response = $this->postJson("/api/v1/operations/trips/{$completedTrip->id}/start");
-        $response->assertStatus(409);
+        $response->assertStatus(409)
+            ->assertHeader('Content-Type', 'application/vnd.api+json')
+            ->assertJsonPath('errors.0.status', '409');
     });
 });
 
@@ -191,7 +226,9 @@ describe('Trip Completion Endpoint', function (): void {
         $this->actingAs($driverUser);
 
         $response = $this->postJson("/api/v1/operations/trips/{$trip->id}/complete");
-        $response->assertStatus(409);
+        $response->assertStatus(409)
+            ->assertHeader('Content-Type', 'application/vnd.api+json')
+            ->assertJsonPath('errors.0.status', '409');
     });
 
     it('rejects completion attempt by an unauthorized driver with 403', function (): void {

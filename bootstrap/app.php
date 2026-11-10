@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AuthenticateExternalApiToken;
+use App\Http\Middleware\AuthenticateTrackingService;
 use App\Http\Middleware\SetLocale;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'auth.api' => AuthenticateExternalApiToken::class,
+            'auth.gps' => AuthenticateTrackingService::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

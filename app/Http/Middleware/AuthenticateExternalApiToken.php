@@ -44,16 +44,20 @@ class AuthenticateExternalApiToken
             $status = $this->authService->validateToken($token);
 
             if ($status !== TokenValidationStatus::Valid) {
-                $httpStatus = $status === TokenValidationStatus::Forbidden
-                    ? Response::HTTP_FORBIDDEN
-                    : Response::HTTP_UNAUTHORIZED;
+                $httpStatus = match ($status) {
+                    TokenValidationStatus::Forbidden => Response::HTTP_FORBIDDEN,
+                    TokenValidationStatus::Unavailable => Response::HTTP_SERVICE_UNAVAILABLE,
+                    default => Response::HTTP_UNAUTHORIZED,
+                };
 
                 return response()->json([
                     'errors' => [
                         [
                             'status' => (string) $httpStatus,
-                            'title' => $status === TokenValidationStatus::Forbidden ? 'Forbidden' : 'Unauthorized',
-                            'detail' => __('The access token is invalid or expired.'),
+                            'title' => Response::$statusTexts[$httpStatus],
+                            'detail' => $status === TokenValidationStatus::Unavailable
+                                ? __('Authentication could not be confirmed. Please try again shortly.')
+                                : __('The access token is invalid or expired.'),
                         ],
                     ],
                 ], $httpStatus, ['Content-Type' => 'application/vnd.api+json']);
@@ -66,12 +70,12 @@ class AuthenticateExternalApiToken
                 return response()->json([
                     'errors' => [
                         [
-                            'status' => '401',
-                            'title' => 'Unauthorized',
-                            'detail' => __('Unable to resolve user from authentication service.'),
+                            'status' => '503',
+                            'title' => 'Service Unavailable',
+                            'detail' => __('Authentication could not be confirmed. Please try again shortly.'),
                         ],
                     ],
-                ], Response::HTTP_UNAUTHORIZED, ['Content-Type' => 'application/vnd.api+json']);
+                ], Response::HTTP_SERVICE_UNAVAILABLE, ['Content-Type' => 'application/vnd.api+json']);
             }
 
             $user = User::query()->find($userData['id']);

@@ -8,6 +8,7 @@ use App\Models\Trip;
 use App\Services\TripManagementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -29,11 +30,12 @@ class TripExecutionController extends Controller
             abort(401, __('Authentication required.'));
         }
 
-        $isAssignedDriver = $trip->driver && (string) $trip->driver->user_id === (string) $user->id;
-        $isAuthorized = $user->isSuperAdmin() || $isAssignedDriver || $user->can('view', [$trip, $trip->company]);
-
-        if (! $isAuthorized) {
-            abort(403, __('You are not authorized to view this trip.'));
+        $previousTeam = getPermissionsTeamId();
+        try {
+            setPermissionsTeamId($trip->company_id);
+            Gate::forUser($user)->authorize('view', [Trip::class, $trip]);
+        } finally {
+            setPermissionsTeamId($previousTeam);
         }
 
         return TripResource::make($trip);
@@ -61,10 +63,7 @@ class TripExecutionController extends Controller
             return TripResource::make($started);
         } catch (ValidationException $exception) {
             if ($exception->errors()['status'] ?? false) {
-                return response()->json([
-                    'message' => $exception->getMessage(),
-                    'errors' => $exception->errors(),
-                ], 409);
+                return $this->conflictResponse($exception);
             }
 
             throw $exception;
@@ -93,13 +92,21 @@ class TripExecutionController extends Controller
             return TripResource::make($completed);
         } catch (ValidationException $exception) {
             if ($exception->errors()['status'] ?? false) {
-                return response()->json([
-                    'message' => $exception->getMessage(),
-                    'errors' => $exception->errors(),
-                ], 409);
+                return $this->conflictResponse($exception);
             }
 
             throw $exception;
         }
+    }
+
+    private function conflictResponse(ValidationException $exception): JsonResponse
+    {
+        return response()->json([
+            'errors' => [[
+                'status' => '409',
+                'title' => 'Conflict',
+                'detail' => (string) $exception->errors()['status'][0],
+            ]],
+        ], 409, ['Content-Type' => 'application/vnd.api+json']);
     }
 }

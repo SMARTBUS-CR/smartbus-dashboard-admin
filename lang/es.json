@@ -600,5 +600,8 @@
     "The selected departure is currently suspended.": "La salida seleccionada está suspendida actualmente.",
     "Only in-progress trips can be completed.": "Solo se pueden completar viajes en curso.",
     "The actual arrival cannot be before the actual departure.": "La llegada real no puede ser anterior a la salida real.",
-    "Only scheduled trips can be cancelled.": "Solo se pueden cancelar viajes programados."
+    "Only scheduled trips can be cancelled.": "Solo se pueden cancelar viajes programados.",
+    "A valid GPS service signature is required.": "Se requiere una firma válida del servicio GPS.",
+    "Tracking service authentication is not configured.": "La autenticación del servicio de seguimiento no está configurada.",
+    "The bounding box must be ordered west, south, east, north and span at most one degree per axis.": "El área debe indicarse en orden oeste, sur, este, norte y abarcar como máximo un grado por eje."
 }

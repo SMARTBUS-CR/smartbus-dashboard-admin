@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Api\V1\Operations;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\Operations\CatalogueIndexRequest;
 use App\Http\Resources\Api\V1\Operations\RoutePatternResource;
 use App\Http\Resources\Api\V1\Operations\RouteResource;
 use App\Models\Route;
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -18,18 +18,13 @@ class RouteController extends Controller
      *
      * @response AnonymousResourceCollection<RouteResource>
      */
-    public function index(Request $request): AnonymousResourceCollection
+    public function index(CatalogueIndexRequest $request): AnonymousResourceCollection
     {
-        $request->validate([
-            'page.size' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'page.number' => ['nullable', 'integer', 'min:1'],
-        ]);
-
         $pageSize = (int) $request->input('page.size', 20);
         $pageNumber = (int) $request->input('page.number', 1);
 
         $routes = QueryBuilder::for(Route::query()->with('company'))
-            ->whereNull('deleted_at')
+            ->inPublicCatalogue()
             ->allowedFilters(
                 AllowedFilter::exact('company_id'),
                 AllowedFilter::partial('name'),
@@ -38,7 +33,12 @@ class RouteController extends Controller
             ->allowedSorts('name', 'code', 'created_at')
             ->allowedIncludes('company', 'patterns')
             ->defaultSort('code')
-            ->paginate($pageSize, ['*'], 'page[number]', $pageNumber);
+            ->orderBy('id')
+            ->paginate($pageSize, ['*'], 'page[number]', $pageNumber)
+            ->withQueryString();
+
+        $routes->getCollection()->filter(fn (Route $route): bool => $route->relationLoaded('patterns'))
+            ->loadMissing('patterns.stopOccurrences.stop');
 
         return RouteResource::collection($routes);
     }
@@ -49,8 +49,8 @@ class RouteController extends Controller
     public function show(string $id): RouteResource
     {
         $route = Route::query()
-            ->whereNull('deleted_at')
-            ->with(['company', 'patterns'])
+            ->inPublicCatalogue()
+            ->with(['company', 'patterns.stopOccurrences.stop'])
             ->find($id);
 
         if (! $route) {
@@ -67,7 +67,7 @@ class RouteController extends Controller
      */
     public function patterns(string $id): AnonymousResourceCollection
     {
-        $route = Route::query()->whereNull('deleted_at')->find($id);
+        $route = Route::query()->inPublicCatalogue()->find($id);
 
         if (! $route) {
             abort(404, __('The requested route does not exist or has been archived.'));
@@ -75,6 +75,7 @@ class RouteController extends Controller
 
         $patterns = $route->patterns()
             ->whereNull('deleted_at')
+            ->with('stopOccurrences.stop')
             ->orderBy('code')
             ->get();
 

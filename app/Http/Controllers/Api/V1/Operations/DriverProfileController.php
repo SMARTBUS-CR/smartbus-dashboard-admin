@@ -35,7 +35,9 @@ class DriverProfileController extends Controller
             ->allowedIncludes('company')
             ->defaultSort('-created_at')
             ->allowedSorts('employment_starts_on', 'status', 'created_at')
-            ->paginate($pageSize, ['*'], 'page[number]', $pageNumber);
+            ->orderBy('id')
+            ->paginate($pageSize, ['*'], 'page[number]', $pageNumber)
+            ->withQueryString();
 
         return DriverProfileResource::collection($profiles);
     }

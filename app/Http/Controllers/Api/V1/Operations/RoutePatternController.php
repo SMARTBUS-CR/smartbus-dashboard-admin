@@ -7,6 +7,7 @@ use App\Http\Resources\Api\V1\Operations\RoutePatternResource;
 use App\Http\Resources\Api\V1\Operations\RouteScheduleResource;
 use App\Models\RoutePattern;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -18,7 +19,7 @@ class RoutePatternController extends Controller
     public function show(string $id): RoutePatternResource
     {
         $pattern = RoutePattern::query()
-            ->whereNull('deleted_at')
+            ->inPublicCatalogue()
             ->with(['stopOccurrences' => function ($query) {
                 $query->orderBy('stop_sequence')->with('stop');
             }])
@@ -42,13 +43,13 @@ class RoutePatternController extends Controller
             'date' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
-        $pattern = RoutePattern::query()->with('route.company')->whereNull('deleted_at')->find($id);
+        $pattern = RoutePattern::query()->with('route.company')->inPublicCatalogue()->find($id);
 
         if (! $pattern) {
             abort(404, __('The requested route pattern does not exist or has been archived.'));
         }
 
-        $query = $pattern->schedules();
+        $query = $pattern->schedules()->with(['exceptions' => fn (HasMany $exceptions): HasMany => $exceptions->orderBy('service_date')]);
 
         if ($request->filled('date')) {
             $companyTz = $pattern->route?->company?->timezone ?? 'UTC';
