@@ -13,6 +13,7 @@ class RoutePatternResource extends JsonApiResource
 {
     /**
      * Transform the resource into an array.
+     * The revision identifies the published plan fields, excluding timestamps.
      *
      * @return array<string, mixed>
      */
@@ -33,7 +34,7 @@ class RoutePatternResource extends JsonApiResource
             })->all();
         }
 
-        return [
+        $attributes = [
             'code' => $this->code,
             'name' => $this->name,
             'headsign' => $this->headsign,
@@ -42,6 +43,11 @@ class RoutePatternResource extends JsonApiResource
             'distance_meters' => $this->distance_meters !== null ? (float) $this->distance_meters : null,
             'driving_duration_seconds' => $this->driving_duration_seconds !== null ? (float) $this->driving_duration_seconds : null,
             'stops' => $orderedStops,
+        ];
+
+        return [
+            ...$attributes,
+            'revision_hash' => hash('sha256', json_encode($attributes, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR)),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

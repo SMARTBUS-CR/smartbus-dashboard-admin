@@ -2,7 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\CompanyStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +18,13 @@ use Illuminate\Validation\ValidationException;
 class Route extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
+
+    /** @param Builder<Route> $query */
+    #[Scope]
+    protected function inPublicCatalogue(Builder $query): void
+    {
+        $query->whereHas('company', fn (Builder $company): Builder => $company->where('status', CompanyStatus::ACTIVE));
+    }
 
     protected static function booted(): void
     {

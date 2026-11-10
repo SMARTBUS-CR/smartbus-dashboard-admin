@@ -21,7 +21,7 @@ class RouteFareController extends Controller
             'date' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
-        $route = Route::query()->whereNull('deleted_at')->find($routeId);
+        $route = Route::query()->inPublicCatalogue()->find($routeId);
 
         if (! $route) {
             abort(404, __('The requested route does not exist or has been archived.'));
