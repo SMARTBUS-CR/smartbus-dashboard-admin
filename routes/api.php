@@ -1,10 +1,13 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Operations\DriverProfileController;
+use App\Http\Controllers\Api\V1\Operations\DriverTripController;
 use App\Http\Controllers\Api\V1\Operations\RouteController;
 use App\Http\Controllers\Api\V1\Operations\RouteFareController;
 use App\Http\Controllers\Api\V1\Operations\RoutePatternController;
 use App\Http\Controllers\Api\V1\Operations\StopController;
 use App\Http\Controllers\Api\V1\Operations\TrackingContextController;
+use App\Http\Controllers\Api\V1\Operations\TripExecutionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -31,6 +34,16 @@ Route::prefix('v1/operations')->group(function (): void {
     // Stops Catalogue
     Route::get('stops', [StopController::class, 'index'])->name('operations.stops.index');
     Route::get('stops/{id}', [StopController::class, 'show'])->whereUuid('id')->name('operations.stops.show');
+
+    // Driver Profiles, Assigned Trips & Trip Execution (Authenticated)
+    Route::middleware('auth.api')->group(function (): void {
+        Route::get('driver/profiles', [DriverProfileController::class, 'index'])->name('operations.driver.profiles');
+        Route::get('driver/trips', [DriverTripController::class, 'index'])->name('operations.driver.trips');
+
+        Route::get('trips/{id}', [TripExecutionController::class, 'show'])->whereUuid('id')->name('operations.trips.show');
+        Route::post('trips/{id}/start', [TripExecutionController::class, 'start'])->whereUuid('id')->name('operations.trips.start');
+        Route::post('trips/{id}/complete', [TripExecutionController::class, 'complete'])->whereUuid('id')->name('operations.trips.complete');
+    });
 
     // Telemetry Tracking Context (for GPS Service)
     Route::get('trips/{id}/tracking-context', [TrackingContextController::class, 'show'])
