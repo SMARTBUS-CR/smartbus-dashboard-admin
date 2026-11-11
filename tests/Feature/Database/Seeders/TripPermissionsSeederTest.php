@@ -6,10 +6,12 @@ use App\Models\CompanyUser;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Trip;
+use App\Services\TripReadService;
 use Database\Seeders\TripPermissionsSeeder;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
 
-test('creates the web permissions needed for trip planning and execution', function (): void {
+test('creates the web permissions needed for trip planning execution and history', function (): void {
     $this->seed(TripPermissionsSeeder::class);
 
     expect(Permission::query()->orderBy('name')->get(['name', 'guard_name'])->toArray())->toBe([
@@ -18,6 +20,8 @@ test('creates the web permissions needed for trip planning and execution', funct
         ['name' => 'Create:Trip', 'guard_name' => 'web'],
         ['name' => 'Start:Trip', 'guard_name' => 'web'],
         ['name' => 'Update:Trip', 'guard_name' => 'web'],
+        ['name' => 'View:Trip', 'guard_name' => 'web'],
+        ['name' => 'ViewAny:Trip', 'guard_name' => 'web'],
     ]);
     $this->assertDatabaseCount('trips', 0);
 });
@@ -25,7 +29,7 @@ test('creates the web permissions needed for trip planning and execution', funct
 test('preserves identities roles grants and context when trip permissions are seeded repeatedly', function (): void {
     $company = createCompany();
     $actor = createUserWithRole(UserRole::Admin, $company);
-    grantShield($actor, ['Create:Trip', 'Unrelated:Permission'], $company);
+    grantShield($actor, ['Create:Trip', 'View:Trip', 'ViewAny:Trip', 'Unrelated:Permission'], $company);
     $permissionId = Permission::findByName('Create:Trip', 'web')->getKey();
     $roles = Role::withoutGlobalScopes()->orderBy('id')->get()->map->getAttributes()->all();
     $previousTeam = getPermissionsTeamId();
@@ -48,6 +52,30 @@ test('preserves identities roles grants and context when trip permissions are se
         $actor->unsetRelation('roles')->unsetRelation('permissions');
     }
 });
+
+test('uses independently granted seeded history permissions without Filament', function (string $permission, string $operation): void {
+    $trip = Trip::factory()->create();
+    $company = $trip->company;
+    $actor = createUserWithRole(UserRole::Admin, $company);
+    CompanyUser::factory()->create(['company_id' => $company->id, 'user_id' => $actor->id]);
+    $this->seed(TripPermissionsSeeder::class);
+    $role = Role::withoutGlobalScopes()->where('company_id', $company->id)->where('name', UserRole::Admin->value)->sole();
+    $service = app(TripReadService::class);
+    $list = fn () => $service->listFor($actor, $company, '2026-10-26', '2026-10-26')->sole();
+    $detail = fn () => $service->findFor($actor, $company, $trip->id);
+    $read = $operation === 'list' ? $list : $detail;
+    $otherRead = $operation === 'list' ? $detail : $list;
+
+    expect($read)->toThrow(AuthorizationException::class);
+    $role->givePermissionTo(Permission::findByName($permission, 'web'));
+    expect($read()['id'])->toBe($trip->id);
+    expect($otherRead)->toThrow(AuthorizationException::class);
+
+    $this->seed(TripPermissionsSeeder::class);
+    expect($read()['id'])->toBe($trip->id);
+    $role->revokePermissionTo($permission);
+    expect($read)->toThrow(AuthorizationException::class);
+})->with(['list' => ['ViewAny:Trip', 'list'], 'detail' => ['View:Trip', 'detail']]);
 
 test('requires explicit role grants to use seeded planning permissions without Filament', function (): void {
     $company = createCompany();
