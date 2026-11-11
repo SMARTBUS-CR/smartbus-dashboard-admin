@@ -11,49 +11,49 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class);
+pest()->use(WithDriverRegistration::class);
 
 describe('Driver Seeder', function (): void {
-    test('creates offline demo employment and preserves manual edits and archives on reruns', function (): void {
+    test('uses only the authentication driver and preserves identity edits and archives on reruns', function (): void {
         Http::preventStrayRequests();
         $company = createCompany(['slug' => 'smartbus-demo']);
         $actor = $this->createWorkforceAdministrator($company);
+        $user = User::factory()->create(['name' => 'Driver User', 'email' => 'user@driver.com', 'password' => 'driver123']);
+        User::factory()->create(['email' => 'demo.driver.001@example.invalid']);
+        $beforeUsers = User::withTrashed()->orderBy('id')->get()->map->getAttributes()->all();
         $previousTeam = createCompany()->id;
         setPermissionsTeamId($previousTeam);
 
         $this->seed(DriverSeeder::class);
 
-        $drivers = Driver::query()->where('company_id', $company->id)->orderBy('license')->get();
-        expect($drivers)->toHaveCount(3);
-        foreach ($drivers as $driver) {
-            expect($driver->license)->toStartWith('DEMO-DRIVER-')
-                ->and($driver->salary_amount)->toBe('650000.00')
-                ->and($driver->salary_currency)->toBe('CRC')
-                ->and($driver->salary_period)->toBe('monthly')
-                ->and($driver->user->email)->toEndWith('@example.invalid')
-                ->and(DriverSchedule::query()->where('driver_id', $driver->id)->count())->toBe(5);
-            $this->assertDatabaseHas('company_users', ['company_id' => $company->id, 'user_id' => $driver->user_id, 'deleted_at' => null]);
-            expect(DB::connection('mysql')->table('model_has_roles')->where('model_uuid', $driver->user_id)
-                ->where('company_id', $company->id)->count())->toBe(1);
-        }
-        $drivers[0]->update(['salary_amount' => '789123.45', 'license' => 'MANUALLY-EDITED']);
-        DriverSchedule::query()->where('driver_id', $drivers[0]->id)->firstOrFail()->update(['start_time' => '09:00:00']);
-        DriverSchedule::query()->where('driver_id', $drivers[1]->id)->firstOrFail()->delete();
-        $drivers[2]->delete();
-        $membership = CompanyUser::query()->where('user_id', $drivers[2]->user_id)->sole();
-        $membership->delete();
-        $beforeDrivers = Driver::withTrashed()->orderBy('id')->get()->map->getAttributes()->all();
+        $driver = Driver::query()->sole();
+        expect($driver->user_id)->toBe($user->id)
+            ->and($driver->salary_amount)->toBe('650000.00')
+            ->and($driver->salary_currency)->toBe('CRC')
+            ->and($driver->salary_period)->toBe('monthly');
+        $this->assertDatabaseCount('driver_schedules', 5);
+        $this->assertDatabaseHas('company_users', ['company_id' => $company->id, 'user_id' => $user->id, 'deleted_at' => null]);
+        expect(DB::connection('mysql')->table('model_has_roles')->where('model_uuid', $user->id)
+            ->where('company_id', $company->id)->count())->toBe(1);
+        $driver->update(['salary_amount' => '789123.45', 'license' => 'MANUALLY-EDITED']);
+        DriverSchedule::query()->where('driver_id', $driver->id)->firstOrFail()->update(['start_time' => '09:00:00']);
+        DriverSchedule::query()->where('driver_id', $driver->id)->firstOrFail()->delete();
+        $beforeDrivers = Driver::withTrashed()->get()->map->getAttributes()->all();
         $beforeSchedules = DriverSchedule::query()->orderBy('id')->get()->map->getAttributes()->all();
-        $beforeUsers = User::withTrashed()->orderBy('id')->get()->map->getAttributes()->all();
 
         $this->seed(DriverSeeder::class);
 
-        expect(Driver::withTrashed()->orderBy('id')->get()->map->getAttributes()->all())->toBe($beforeDrivers)
-            ->and(DriverSchedule::query()->orderBy('id')->get()->map->getAttributes()->all())->toBe($beforeSchedules)
-            ->and(User::withTrashed()->orderBy('id')->get()->map->getAttributes()->all())->toBe($beforeUsers)
-            ->and(getPermissionsTeamId())->toBe($previousTeam);
+        expect(Driver::withTrashed()->get()->map->getAttributes()->all())->toBe($beforeDrivers)
+            ->and(DriverSchedule::query()->orderBy('id')->get()->map->getAttributes()->all())->toBe($beforeSchedules);
+        $driver->delete();
+        $membership = CompanyUser::query()->where('user_id', $user->id)->sole();
+        $membership->delete();
+        $this->seed(DriverSeeder::class);
+
+        $this->assertSoftDeleted($driver);
         $this->assertSoftDeleted($membership);
-        $this->assertDatabaseCount('users', 4, 'mysql');
+        expect(User::withTrashed()->orderBy('id')->get()->map->getAttributes()->all())->toBe($beforeUsers)
+            ->and(getPermissionsTeamId())->toBe($previousTeam);
         $this->assertModelExists($actor);
         Http::assertNothingSent();
     });
@@ -64,6 +64,7 @@ describe('Driver Seeder', function (): void {
         $existing = Driver::factory()->for($company)->withMembership()->create();
         $before = $existing->fresh()->getAttributes();
         $rolesBefore = DB::connection('mysql')->table('roles')->count();
+        User::factory()->create(['email' => 'user@driver.com']);
         $this->app->instance('env', $environment);
 
         try {
@@ -75,23 +76,27 @@ describe('Driver Seeder', function (): void {
         expect($existing->fresh()->getAttributes())->toBe($before);
         $this->assertDatabaseCount('drivers', 1);
         $this->assertDatabaseCount('driver_schedules', 0);
-        $this->assertDatabaseCount('users', 2, 'mysql');
+        $this->assertDatabaseCount('users', 3, 'mysql');
         $this->assertDatabaseCount('roles', $rolesBefore, 'mysql');
     })->with(['production', 'staging', 'preview']);
 
     test('does not create missing companies or administrators', function (): void {
         $this->seed(DriverSeeder::class);
-        createCompany(['slug' => 'smartbus-demo']);
+        $company = createCompany(['slug' => 'smartbus-demo']);
         $this->seed(DriverSeeder::class);
+        $this->createWorkforceAdministrator($company);
+        $this->artisan('db:seed', ['--class' => DriverSeeder::class, '--force' => true])
+            ->expectsOutputToContain('run the authentication seeders')->assertSuccessful();
 
         $this->assertDatabaseCount('companies', 1);
         $this->assertDatabaseCount('drivers', 0);
-        $this->assertDatabaseCount('users', 0, 'mysql');
+        $this->assertDatabaseCount('users', 1, 'mysql');
     });
 
     test('supports approved development environments', function (string $environment): void {
         $company = createCompany(['slug' => 'smartbus-demo']);
         $this->createWorkforceAdministrator($company);
+        User::factory()->create(['email' => 'user@driver.com']);
         $this->app->instance('env', $environment);
 
         try {
@@ -100,16 +105,16 @@ describe('Driver Seeder', function (): void {
             $this->app->instance('env', 'testing');
         }
 
-        $this->assertDatabaseCount('drivers', 3);
-        $this->assertDatabaseCount('driver_schedules', 15);
+        $this->assertDatabaseCount('drivers', 1);
+        $this->assertDatabaseCount('driver_schedules', 5);
     })->with(['local', 'development']);
 
-    test('reuses owned demo identities and preserves credentials roles and unrelated employment', function (): void {
+    test('reuses the authentication identity and preserves credentials roles and unrelated employment', function (): void {
         $company = createCompany(['slug' => 'smartbus-demo']);
         $this->createWorkforceAdministrator($company);
         $other = createCompany();
         $user = User::factory()->create([
-            'id' => 'd3000000-0000-4000-8000-000000000001', 'email' => 'demo.driver.001@example.invalid',
+            'email' => 'user@driver.com',
         ]);
         $otherDriver = Driver::factory()->for($other)->for($user)->withMembership()->create();
         $membership = CompanyUser::factory()->create(['company_id' => $company->id, 'user_id' => $user->id]);
@@ -127,19 +132,19 @@ describe('Driver Seeder', function (): void {
             ->and($otherDriver->fresh()->getAttributes())->toBe($beforeEmployment)
             ->and(getPermissionsTeamId())->toBe($other->id);
         $this->assertDatabaseHas('model_has_roles', ['role_id' => $role->id, 'model_uuid' => $user->id, 'company_id' => $other->id], 'mysql');
-        $this->assertDatabaseCount('drivers', 4);
-        $this->assertDatabaseCount('users', 4, 'mysql');
+        $this->assertDatabaseCount('drivers', 2);
+        $this->assertDatabaseCount('users', 2, 'mysql');
     });
 
-    test('does not take reserved demo identities licenses or revoked memberships', function (string $scenario): void {
+    test('skips unrelated identities reserved licenses and revoked memberships', function (string $scenario): void {
         $company = createCompany(['slug' => 'smartbus-demo']);
         $this->createWorkforceAdministrator($company);
         $id = 'd3000000-0000-4000-8000-000000000001';
         $email = 'demo.driver.001@example.invalid';
         $user = match ($scenario) {
-            'foreign email' => User::factory()->create(['email' => $email]),
-            'foreign UUID' => User::factory()->create(['id' => $id]),
-            default => User::factory()->create(['id' => $id, 'email' => $email]),
+            'unrelated user' => User::factory()->create(['email' => $email]),
+            'unrelated UUID' => User::factory()->create(['id' => $id]),
+            default => User::factory()->create(['id' => $id, 'email' => 'user@driver.com']),
         };
         if ($scenario === 'archived user') {
             $user->delete();
@@ -148,7 +153,7 @@ describe('Driver Seeder', function (): void {
             CompanyUser::factory()->create(['company_id' => $company->id, 'user_id' => $id])->delete();
         }
         if ($scenario === 'reserved license') {
-            Driver::factory()->for($company)->archived()->create(['license' => ' demo-driver-001 ']);
+            Driver::factory()->for($company)->archived()->create(['license' => ' auth-driver-user ']);
         }
         $before = $user->fresh()->getAttributes();
 
@@ -156,12 +161,12 @@ describe('Driver Seeder', function (): void {
 
         expect($user->fresh()->getAttributes())->toBe($before)
             ->and(Driver::withTrashed()->where('company_id', $company->id)->where('user_id', $id)->exists())->toBeFalse();
-        $this->assertDatabaseCount('driver_schedules', 10);
+        $this->assertDatabaseCount('driver_schedules', 0);
         if ($scenario === 'revoked membership') {
             $this->assertDatabaseHas('company_users', ['company_id' => $company->id, 'user_id' => $id]);
             expect(CompanyUser::onlyTrashed()->where('user_id', $id)->exists())->toBeTrue();
         }
-    })->with(['foreign email', 'foreign UUID', 'archived user', 'revoked membership', 'reserved license']);
+    })->with(['unrelated user', 'unrelated UUID', 'archived user', 'revoked membership', 'reserved license']);
 
     test('skips inactive or archived demo companies', function (bool $archived): void {
         $company = createCompany(['slug' => 'smartbus-demo']);
@@ -178,10 +183,12 @@ describe('Driver Seeder', function (): void {
         $this->assertDatabaseCount('users', 1, 'mysql');
     })->with(['inactive' => false, 'archived' => true]);
 
-    test('removes only its new identity on failed registration and allows retry', function (): void {
+    test('preserves the authentication identity on failed registration and allows retry', function (): void {
         $company = createCompany(['slug' => 'smartbus-demo']);
         $actor = $this->createWorkforceAdministrator($company);
         setPermissionsTeamId($company->id);
+        $user = User::factory()->create(['email' => 'user@driver.com']);
+        $before = $user->fresh()->getAttributes();
         $dispatcher = Driver::getEventDispatcher();
         Driver::setEventDispatcher(clone $dispatcher);
         Driver::creating(function (): void {
@@ -194,12 +201,27 @@ describe('Driver Seeder', function (): void {
             Driver::setEventDispatcher($dispatcher);
         }
 
-        $this->assertDatabaseCount('users', 1, 'mysql');
+        $this->assertDatabaseCount('users', 2, 'mysql');
+        expect($user->fresh()->getAttributes())->toBe($before);
         $this->assertDatabaseCount('drivers', 0);
         $this->assertModelExists($actor);
         expect(getPermissionsTeamId())->toBe($company->id);
         $this->seed(DriverSeeder::class);
-        $this->assertDatabaseCount('drivers', 3);
-        $this->assertDatabaseCount('driver_schedules', 15);
+        $this->assertDatabaseCount('drivers', 1);
+        $this->assertDatabaseCount('driver_schedules', 5);
     });
+    test('registers the authentication driver even when legacy demo employment exists', function (): void {
+        $company = createCompany(['slug' => 'smartbus-demo']);
+        $this->createWorkforceAdministrator($company);
+        $legacy = Driver::factory()->for($company)->withMembership()->create(['license' => 'DEMO-DRIVER-001']);
+        $user = User::factory()->create(['name' => 'Driver User', 'email' => 'user@driver.com']);
+        $users = User::query()->count();
+
+        $this->seed(DriverSeeder::class);
+
+        $this->assertDatabaseHas('drivers', ['company_id' => $company->id, 'user_id' => $user->id, 'license' => 'AUTH-DRIVER-USER']);
+        $this->assertModelExists($legacy);
+        $this->assertDatabaseCount('users', $users, 'mysql');
+    });
+
 });
