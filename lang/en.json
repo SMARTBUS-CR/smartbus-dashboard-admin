@@ -629,5 +629,11 @@
     "Driver Employment Restored": "Driver Employment Restored",
     "No Driver Employment Available": "No Driver Employment Available",
     "Driver employment profiles for the selected company will appear here.": "Driver employment profiles for the selected company will appear here.",
-    "Employment Change Rejected": "Employment Change Rejected"
+    "Employment Change Rejected": "Employment Change Rejected",
+    "View Salary": "View Salary",
+    "Manage Salary": "Manage Salary",
+    "Confidential Salary": "Confidential Salary",
+    "Salary information is restricted to explicitly authorized company administrators.": "Salary information is restricted to explicitly authorized company administrators.",
+    "Salary Updated": "Salary Updated",
+    "Period": "Period"
 }
