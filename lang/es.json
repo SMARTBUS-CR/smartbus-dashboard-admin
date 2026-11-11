@@ -1,4 +1,7 @@
 {
+    "The selected route is unavailable or does not belong to an active company.": "La ruta seleccionada no está disponible o no pertenece a una empresa activa.",
+    "This route is already in your favorites.": "Esta ruta ya se encuentra en tus favoritos.",
+    "Favorite route not found.": "Ruta favorita no encontrada.",
     "This field cannot be supplied when planning a trip.": "Este campo no se puede proporcionar al planificar un viaje.",
     "The selected departure or resource conflicts with an existing trip.": "La salida o el recurso seleccionado entra en conflicto con un viaje existente.",
     "The selected driver does not cover the complete planned interval.": "El conductor seleccionado no tiene disponibilidad para todo el intervalo planificado.",
@@ -17,6 +20,7 @@
     "(and :count more errors)": "(y :count error más)|(y :count errores más)|(y :count errores más)",
     "A decryption key is required.": "Se requiere una clave de descifrado.",
     "A Timeout Occurred": "Se produjo un tiempo de espera",
+    "API Documentation": "Documentación de la API",
     "Accept": "Aceptar",
     "Accepted": "Aceptado",
     "Action": "Acción",
@@ -589,10 +593,18 @@
     "The selected driver is unavailable or ineligible for the planned dates.": "El conductor seleccionado no está disponible o no cumple los requisitos para las fechas planificadas.",
     "Buses with scheduled or in-progress trips cannot be deactivated or archived.": "No se pueden desactivar ni archivar autobuses con viajes programados o en curso.",
     "This change would invalidate an assigned trip.": "Este cambio invalidaría un viaje asignado.",
+    "The requested route does not exist or has been archived.": "La ruta solicitada no existe o ha sido archivada.",
+    "The requested route pattern does not exist or has been archived.": "El trazado de ruta solicitado no existe o ha sido archivado.",
+    "The requested stop does not exist or has been archived.": "La parada solicitada no existe o ha sido archivada.",
+    "The requested trip was not found.": "El viaje solicitado no fue encontrado.",
+    "The requested resource was not found.": "El recurso solicitado no fue encontrado.",
     "Only scheduled trips can be started.": "Solo se pueden iniciar viajes programados.",
     "The assigned driver is unavailable at the actual start instant.": "El conductor asignado no tiene disponibilidad en el instante real de inicio.",
     "The selected departure is currently suspended.": "La salida seleccionada está suspendida actualmente.",
     "Only in-progress trips can be completed.": "Solo se pueden completar viajes en curso.",
     "The actual arrival cannot be before the actual departure.": "La llegada real no puede ser anterior a la salida real.",
-    "Only scheduled trips can be cancelled.": "Solo se pueden cancelar viajes programados."
+    "Only scheduled trips can be cancelled.": "Solo se pueden cancelar viajes programados.",
+    "A valid GPS service signature is required.": "Se requiere una firma válida del servicio GPS.",
+    "Tracking service authentication is not configured.": "La autenticación del servicio de seguimiento no está configurada.",
+    "The bounding box must be ordered west, south, east, north and span at most one degree per axis.": "El área debe indicarse en orden oeste, sur, este, norte y abarcar como máximo un grado por eje."
 }

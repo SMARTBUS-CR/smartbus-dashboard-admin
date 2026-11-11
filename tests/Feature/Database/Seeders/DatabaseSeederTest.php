@@ -74,7 +74,7 @@ describe('Database Seeding', function (): void {
         $driverIds = Driver::query()->where('company_id', $demoCompany->id)->orderBy('id')->pluck('id')->all();
         $tripAttributes = Trip::query()->where('company_id', $demoCompany->id)->orderBy('id')->get()->map->getRawOriginal()->all();
         expect(Permission::query()->where('name', 'like', '%:Trip')->orderBy('name')->pluck('name')->all())
-            ->toBe(['Cancel:Trip', 'Complete:Trip', 'Create:Trip', 'Start:Trip', 'Update:Trip']);
+            ->toBe(['Cancel:Trip', 'Complete:Trip', 'Create:Trip', 'Start:Trip', 'Update:Trip', 'View:Trip', 'ViewAny:Trip']);
         $tripPermissionIds = Permission::query()->where('name', 'like', '%:Trip')->orderBy('name')->pluck('id')->all();
 
         $this->seed(DatabaseSeeder::class);

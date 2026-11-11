@@ -1,4 +1,7 @@
 {
+    "The selected route is unavailable or does not belong to an active company.": "The selected route is unavailable or does not belong to an active company.",
+    "This route is already in your favorites.": "This route is already in your favorites.",
+    "Favorite route not found.": "Favorite route not found.",
     "This field cannot be supplied when planning a trip.": "This field cannot be supplied when planning a trip.",
     "The selected departure or resource conflicts with an existing trip.": "The selected departure or resource conflicts with an existing trip.",
     "The selected driver does not cover the complete planned interval.": "The selected driver does not cover the complete planned interval.",
@@ -17,6 +20,7 @@
     "(and :count more errors)": "(and :count more error)|(and :count more errors)|(and :count more errors)",
     "A decryption key is required.": "A decryption key is required.",
     "A Timeout Occurred": "A Timeout Occurred",
+    "API Documentation": "API Documentation",
     "Accept": "Accept",
     "Accepted": "Accepted",
     "Action": "Action",
@@ -549,10 +553,18 @@
     "This license is already reserved by a driver in this company.": "This license is already reserved by a driver in this company.",
     "Buses with scheduled or in-progress trips cannot be deactivated or archived.": "Buses with scheduled or in-progress trips cannot be deactivated or archived.",
     "This change would invalidate an assigned trip.": "This change would invalidate an assigned trip.",
+    "The requested route does not exist or has been archived.": "The requested route does not exist or has been archived.",
+    "The requested route pattern does not exist or has been archived.": "The requested route pattern does not exist or has been archived.",
+    "The requested stop does not exist or has been archived.": "The requested stop does not exist or has been archived.",
+    "The requested trip was not found.": "The requested trip was not found.",
+    "The requested resource was not found.": "The requested resource was not found.",
     "Only scheduled trips can be started.": "Only scheduled trips can be started.",
     "The assigned driver is unavailable at the actual start instant.": "The assigned driver is unavailable at the actual start instant.",
     "The selected departure is currently suspended.": "The selected departure is currently suspended.",
     "Only in-progress trips can be completed.": "Only in-progress trips can be completed.",
     "The actual arrival cannot be before the actual departure.": "The actual arrival cannot be before the actual departure.",
-    "Only scheduled trips can be cancelled.": "Only scheduled trips can be cancelled."
+    "Only scheduled trips can be cancelled.": "Only scheduled trips can be cancelled.",
+    "A valid GPS service signature is required.": "A valid GPS service signature is required.",
+    "Tracking service authentication is not configured.": "Tracking service authentication is not configured.",
+    "The bounding box must be ordered west, south, east, north and span at most one degree per axis.": "The bounding box must be ordered west, south, east, north and span at most one degree per axis."
 }
