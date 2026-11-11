@@ -40,8 +40,8 @@ test('rejects another profile of the same person across companies without reveal
     expect(fn () => app(TripManagementService::class)->schedule($actor, $candidate->company, $data))
         ->toThrow(function (ValidationException $exception): void {
             expect($exception->errors())->toBe(['driver_id' => [__('The selected departure or resource conflicts with an existing trip.')]]);
-        });
-    expect($existing->fresh()->getRawOriginal())->toBe($before);
+        })
+        ->and($existing->fresh()->getRawOriginal())->toBe($before);
     $this->assertDatabaseCount('trips', 1);
 })->with(['en', 'es'])->with(['visible trip' => false, 'archived trip' => true]);
 
@@ -63,9 +63,8 @@ test('preserves assigned trips when employment changes would make the driver ine
         default => $service->updateEmployment($actor, $trip->company, $driver, [$operation => '2026-10-25']),
     })->toThrow(function (ValidationException $exception): void {
         expect($exception->errors())->toBe(['driver' => [__('This change would invalidate an assigned trip.')]]);
-    });
-
-    expect($driver->fresh()->getRawOriginal())->toBe($before);
+    })
+        ->and($driver->fresh()->getRawOriginal())->toBe($before);
     $this->assertModelExists($trip);
 })->with(['deactivate', 'archive', 'license_expires_at', 'employment_ends_on'])->with(['visible trip' => false, 'archived trip' => true]);
 
@@ -82,9 +81,8 @@ test('rolls back an availability mutation that would uncover an assigned trip', 
     expect(fn () => $operation === 'delete'
         ? $service->delete($actor, $trip->company, $trip->driver, $schedule)
         : $service->update($actor, $trip->company, $trip->driver, $schedule, ['end_time' => '06:45', 'ends_next_day' => false]))
-        ->toThrow(ValidationException::class);
-
-    expect($schedule->fresh()->getRawOriginal())->toBe($before);
+        ->toThrow(ValidationException::class)
+        ->and($schedule->fresh()->getRawOriginal())->toBe($before);
     $this->assertModelExists($trip);
 })->with(['delete', 'update'])->with(['visible trip' => false, 'archived trip' => true]);
 
@@ -107,11 +105,10 @@ test('rejects license changes for assigned drivers whose identity access was rev
     expect(fn () => app(DriverManagementService::class)->updateEmployment($actor, $trip->company, $driver, $changes))
         ->toThrow(function (ValidationException $exception): void {
             expect($exception->errors())->toBe(['driver' => [__('This change would invalidate an assigned trip.')]]);
-        });
-
-    expect($driver->fresh()->getRawOriginal())->toBe($before);
-    expect($trip->fresh()->getRawOriginal())->toBe($tripBefore);
-    expect(getPermissionsTeamId())->toBe($previousTeam);
+        })
+        ->and($driver->fresh()->getRawOriginal())->toBe($before)
+        ->and($trip->fresh()->getRawOriginal())->toBe($tripBefore)
+        ->and(getPermissionsTeamId())->toBe($previousTeam);
 })->with(['identity', 'membership', 'role'])->with([
     'license number' => [['license' => 'UPDATED-LICENSE']],
     'license expiry' => [['license_expires_at' => '2030-12-31']],
@@ -127,9 +124,9 @@ test('allows license changes that preserve assigned driver eligibility', functio
         'employment_starts_on' => '2026-10-26', 'employment_ends_on' => '2026-10-26',
     ]);
 
-    expect($updated->fresh()->license)->toBe('UPDATED-LICENSE');
-    expect($updated->fresh()->license_expires_at->toDateString())->toBe('2026-10-26');
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+    expect($updated->fresh()->license)->toBe('UPDATED-LICENSE')
+        ->and($updated->fresh()->license_expires_at->toDateString())->toBe('2026-10-26')
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 });
 
 test('allows salary and availability changes that preserve assigned coverage', function (): void {
@@ -140,8 +137,8 @@ test('allows salary and availability changes that preserve assigned coverage', f
     $updated = app(DriverManagementService::class)->updateEmployment($actor, $trip->company, $trip->driver, ['salary_amount' => '700000.00']);
     app(DriverScheduleService::class)->update($actor, $trip->company, $trip->driver, $schedule, ['end_time' => '08:00', 'ends_next_day' => false]);
 
-    expect($updated->salary_amount)->toBe('700000.00');
-    expect($schedule->fresh()->end_time)->toBe('08:00:00');
+    expect($updated->salary_amount)->toBe('700000.00')
+        ->and($schedule->fresh()->end_time)->toBe('08:00:00');
     $this->assertModelExists($trip);
 });
 

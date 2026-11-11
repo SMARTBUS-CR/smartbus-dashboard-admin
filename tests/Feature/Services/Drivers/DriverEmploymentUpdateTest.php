@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class);
+pest()->use(WithDriverRegistration::class);
 
 beforeEach(function (): void {
     $this->company = createCompany();
@@ -25,13 +25,13 @@ describe('Driver Employment Update', function (): void {
             'salary_amount' => '9999999999.99', 'salary_currency' => ' usd ', 'salary_period' => 'monthly',
         ]);
 
-        expect($updated->only(['id', 'company_id', 'user_id']))->toBe($before);
-        expect($updated->license)->toBe('UPDATED-LICENSE');
-        expect($updated->salary_amount)->toBe('9999999999.99');
-        expect($updated->salary_currency)->toBe('USD');
-        expect($updated->employment_ends_on->toDateString())->toBe('2026-11-01');
-        expect($updated->toArray())->not->toHaveKeys(['salary_amount', 'salary_currency', 'salary_period', 'user']);
-        expect($updated->fresh()->salary_amount)->toBe('9999999999.99');
+        expect($updated->only(['id', 'company_id', 'user_id']))->toBe($before)
+            ->and($updated->license)->toBe('UPDATED-LICENSE')
+            ->and($updated->salary_amount)->toBe('9999999999.99')
+            ->and($updated->salary_currency)->toBe('USD')
+            ->and($updated->employment_ends_on->toDateString())->toBe('2026-11-01')
+            ->and($updated->toArray())->not->toHaveKeys(['salary_amount', 'salary_currency', 'salary_period', 'user'])
+            ->and($updated->fresh()->salary_amount)->toBe('9999999999.99');
     });
 
     test('rejects invalid values and preserves all stored attributes', function (array $changes, string $field): void {
@@ -40,8 +40,8 @@ describe('Driver Employment Update', function (): void {
         expect(fn () => app(DriverManagementService::class)->updateEmployment($this->actor, $this->company, $this->driver, $changes))
             ->toThrow(function (ValidationException $exception) use ($field): void {
                 expect($exception->errors())->toHaveKey($field);
-            });
-        expect($this->driver->fresh()->getRawOriginal())->toBe($before);
+            })
+            ->and($this->driver->fresh()->getRawOriginal())->toBe($before);
     })->with([
         'negative amount' => [['salary_amount' => '-0.01'], 'salary_amount'],
         'excess precision' => [['salary_amount' => '1.005'], 'salary_amount'],
@@ -62,8 +62,8 @@ describe('Driver Employment Update', function (): void {
         expect(fn () => app(DriverManagementService::class)->updateEmployment($this->actor, $this->company, $this->driver, [$field => $value]))
             ->toThrow(function (ValidationException $exception) use ($field): void {
                 expect(array_keys($exception->errors()))->toBe([$field]);
-            });
-        expect($this->driver->fresh()->getRawOriginal())->toBe($before);
+            })
+            ->and($this->driver->fresh()->getRawOriginal())->toBe($before);
     })->with(['license_expires_at', 'employment_starts_on', 'employment_ends_on'])
         ->with(['2026-02-30', '2026-13-01', 'not-a-date']);
 
@@ -74,8 +74,8 @@ describe('Driver Employment Update', function (): void {
             'license' => 'MUST-NOT-SAVE', $field => $this->driver->getAttribute($field),
         ]))->toThrow(function (ValidationException $exception) use ($field): void {
             expect($exception->errors())->toHaveKey($field);
-        });
-        expect($this->driver->fresh()->getRawOriginal())->toBe($before);
+        })
+            ->and($this->driver->fresh()->getRawOriginal())->toBe($before);
     })->with(['id', 'company_id', 'user_id', 'status', 'deleted_at', 'created_at', 'updated_at', 'role', 'email', 'unknown']);
 
     test('rejects a normalized license reserved by another employment including archived records', function (bool $archived): void {
@@ -88,16 +88,16 @@ describe('Driver Employment Update', function (): void {
         expect(fn () => app(DriverManagementService::class)->updateEmployment($this->actor, $this->company, $this->driver, ['license' => '  reserved  ']))
             ->toThrow(function (ValidationException $exception): void {
                 expect($exception->errors())->toHaveKey('license');
-            });
-        expect($this->driver->fresh()->getRawOriginal())->toBe($before);
+            })
+            ->and($this->driver->fresh()->getRawOriginal())->toBe($before);
     })->with([false, true]);
 
     test('merges partial updates with persisted values rather than dirty caller attributes', function (): void {
         $this->driver->salary_amount = '-100';
         $updated = app(DriverManagementService::class)->updateEmployment($this->actor, $this->company, $this->driver, ['license' => 'PARTIAL']);
 
-        expect($updated->salary_amount)->toBe('650000.00');
-        expect($updated->license)->toBe('PARTIAL');
+        expect($updated->salary_amount)->toBe('650000.00')
+            ->and($updated->license)->toBe('PARTIAL');
         $same = app(DriverManagementService::class)->updateEmployment($this->actor, $this->company, $updated, ['license' => ' partial ']);
         expect($same->license)->toBe('PARTIAL');
     });
@@ -134,14 +134,14 @@ describe('Driver Employment Update', function (): void {
             expect(fn () => app(DriverManagementService::class)->updateEmployment($this->actor, $this->company, $this->driver, ['license' => 'AVAILABLE']))
                 ->toThrow(function (Exception $exception) use ($licenseConflict): void {
                     if ($licenseConflict) {
-                        expect($exception)->toBeInstanceOf(ValidationException::class);
-                        expect($exception->errors())->toBe(['license' => [__('This license is already reserved by a driver in this company.')]]);
+                        expect($exception)->toBeInstanceOf(ValidationException::class)
+                            ->and($exception->errors())->toBe(['license' => [__('This license is already reserved by a driver in this company.')]]);
                     } else {
-                        expect($exception)->toBeInstanceOf(QueryException::class);
-                        expect($exception->errorInfo[0])->toBe('23514');
+                        expect($exception)->toBeInstanceOf(QueryException::class)
+                            ->and($exception->errorInfo[0])->toBe('23514');
                     }
-                });
-            expect($this->driver->fresh()->getRawOriginal())->toBe($before);
+                })
+                ->and($this->driver->fresh()->getRawOriginal())->toBe($before);
         } finally {
             DB::unprepared('DROP TRIGGER test_driver_update_failure ON drivers');
             DB::unprepared('DROP FUNCTION pg_temp.test_driver_update_failure()');

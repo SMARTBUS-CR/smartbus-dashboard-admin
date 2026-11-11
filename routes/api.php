@@ -2,10 +2,12 @@
 
 use App\Http\Controllers\Api\V1\Operations\DriverProfileController;
 use App\Http\Controllers\Api\V1\Operations\DriverTripController;
+use App\Http\Controllers\Api\V1\Operations\JourneyController;
 use App\Http\Controllers\Api\V1\Operations\RouteController;
 use App\Http\Controllers\Api\V1\Operations\RouteFareController;
 use App\Http\Controllers\Api\V1\Operations\RoutePatternController;
 use App\Http\Controllers\Api\V1\Operations\StopController;
+use App\Http\Controllers\Api\V1\Operations\StopDepartureController;
 use App\Http\Controllers\Api\V1\Operations\TrackingContextController;
 use App\Http\Controllers\Api\V1\Operations\TripExecutionController;
 use Illuminate\Support\Facades\Route;
@@ -34,6 +36,10 @@ Route::prefix('v1/operations')->group(function (): void {
     // Stops Catalogue
     Route::get('stops', [StopController::class, 'index'])->name('operations.stops.index');
     Route::get('stops/{id}', [StopController::class, 'show'])->whereUuid('id')->name('operations.stops.show');
+    Route::get('stops/{id}/departures', [StopDepartureController::class, 'index'])->whereUuid('id')->name('operations.stops.departures');
+
+    // Direct Journey Search
+    Route::get('journeys', [JourneyController::class, 'index'])->name('operations.journeys.index');
 
     // Driver Profiles, Assigned Trips & Trip Execution (Authenticated)
     Route::middleware('auth.api')->group(function (): void {

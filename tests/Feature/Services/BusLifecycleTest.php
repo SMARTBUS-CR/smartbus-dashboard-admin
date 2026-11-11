@@ -35,8 +35,8 @@ describe('Bus Lifecycle', function (): void {
         $before = $bus->fresh()->getAttributes();
 
         expect(fn () => app(BusManagementService::class)->setActive($actor, $company, $bus->getKey(), $active))
-            ->toThrow(AuthorizationException::class);
-        expect($bus->fresh()->getAttributes())->toBe($before);
+            ->toThrow(AuthorizationException::class)
+            ->and($bus->fresh()->getAttributes())->toBe($before);
     })->with([
         'missing membership', 'driver', 'passenger', 'archived membership', 'archived actor',
     ])->with(['activation' => [true], 'deactivation' => [false]]);
@@ -69,8 +69,8 @@ describe('Bus Lifecycle', function (): void {
             try {
                 $id = $outcome === 'missing' ? '00000000-0000-4000-8000-000000000001' : $bus->getKey();
                 $updated = app(BusManagementService::class)->setActive($actor, $company, $id, $active);
-                expect($outcome)->toBe('success');
-                expect($updated->getKey())->toBe($bus->getKey())
+                expect($outcome)->toBe('success')
+                    ->and($updated->getKey())->toBe($bus->getKey())
                     ->and($updated->is_active)->toBe($active);
                 $this->assertDatabaseHas('buses', [
                     'id' => $bus->getKey(), 'company_id' => $company->getKey(),
@@ -79,8 +79,8 @@ describe('Bus Lifecycle', function (): void {
             } catch (AuthorizationException $exception) {
                 expect($outcome)->toBeIn(['denied', 'archived company']);
             } catch (ValidationException $exception) {
-                expect($outcome)->toBe('inactive company');
-                expect($exception->errors())->toHaveKey('company');
+                expect($outcome)->toBe('inactive company')
+                    ->and($exception->errors())->toHaveKey('company');
             } catch (ModelNotFoundException $exception) {
                 expect($outcome)->toBeIn(['missing', 'foreign', 'archived bus']);
             }
@@ -107,8 +107,8 @@ describe('Bus Lifecycle', function (): void {
         $before = $bus->fresh()->getAttributes();
 
         expect(fn () => app(BusManagementService::class)->setActive($actor, $company, $bus->getKey(), $active))
-            ->toThrow(ModelNotFoundException::class);
-        expect($bus->fresh()->getAttributes())->toBe($before);
+            ->toThrow(ModelNotFoundException::class)
+            ->and($bus->fresh()->getAttributes())->toBe($before);
     })->with(['activation' => [true], 'deactivation' => [false]]);
 
     test('rolls back persisted state changes and side effects when saving fails', function (bool $active): void {
@@ -133,9 +133,9 @@ describe('Bus Lifecycle', function (): void {
             });
 
             expect(fn () => app(BusManagementService::class)->setActive($actor, $company, $bus->getKey(), $active))
-                ->toThrow(RuntimeException::class, 'State change interrupted.');
-            expect($bus->fresh()->getAttributes())->toBe($before);
-            expect(getPermissionsTeamId())->toBe($previousCompany->getKey())
+                ->toThrow(RuntimeException::class, 'State change interrupted.')
+                ->and($bus->fresh()->getAttributes())->toBe($before)
+                ->and(getPermissionsTeamId())->toBe($previousCompany->getKey())
                 ->and($actor->relationLoaded('roles'))->toBeFalse()
                 ->and($actor->relationLoaded('permissions'))->toBeFalse();
         } finally {
@@ -172,8 +172,8 @@ describe('Bus Lifecycle', function (): void {
         $before = $bus->fresh()->getAttributes();
 
         expect(fn () => app(BusManagementService::class)->restore($actor, $company, $bus->getKey()))
-            ->toThrow(AuthorizationException::class);
-        expect($bus->fresh()->getAttributes())->toBe($before);
+            ->toThrow(AuthorizationException::class)
+            ->and($bus->fresh()->getAttributes())->toBe($before);
     })->with([
         'missing permission', 'missing membership', 'foreign admin', 'driver', 'passenger',
         'archived membership', 'archived actor',
@@ -186,8 +186,8 @@ describe('Bus Lifecycle', function (): void {
         $before = $bus->fresh()->getAttributes();
 
         expect(fn () => app(BusManagementService::class)->restore($actor, $company, $bus->getKey()))
-            ->toThrow(ModelNotFoundException::class);
-        expect($bus->fresh()->getAttributes())->toBe($before);
+            ->toThrow(ModelNotFoundException::class)
+            ->and($bus->fresh()->getAttributes())->toBe($before);
     });
 
     test('rejects restoration for nonoperational companies even with a stale company object', function (bool $archived): void {
@@ -206,8 +206,8 @@ describe('Bus Lifecycle', function (): void {
             app(BusManagementService::class)->restore($actor, $company, $bus->getKey());
             $this->fail('Expected a validation exception.');
         } catch (ValidationException $exception) {
-            expect($exception->errors())->toHaveKey('company');
-            expect($bus->fresh()->getAttributes())->toBe($before);
+            expect($exception->errors())->toHaveKey('company')
+                ->and($bus->fresh()->getAttributes())->toBe($before);
         }
     })->with(['inactive' => [false], 'archived' => [true]]);
 
@@ -219,8 +219,8 @@ describe('Bus Lifecycle', function (): void {
         $id = $missing ? '00000000-0000-4000-8000-000000000001' : $bus->getKey();
 
         expect(fn () => app(BusManagementService::class)->restore($actor, $company, $id))
-            ->toThrow(ModelNotFoundException::class);
-        expect($bus->fresh()->getAttributes())->toBe($before);
+            ->toThrow(ModelNotFoundException::class)
+            ->and($bus->fresh()->getAttributes())->toBe($before);
     })->with(['missing' => [true], 'unarchived' => [false]]);
 
     test('restores permission context after restoration outcomes', function (string $outcome): void {
@@ -282,9 +282,9 @@ describe('Bus Lifecycle', function (): void {
             });
 
             expect(fn () => app(BusManagementService::class)->restore($actor, $company, $bus->getKey()))
-                ->toThrow(RuntimeException::class, 'Restoration interrupted.');
-            expect($bus->fresh()->getAttributes())->toBe($before);
-            expect(getPermissionsTeamId())->toBe($previousCompany->getKey());
+                ->toThrow(RuntimeException::class, 'Restoration interrupted.')
+                ->and($bus->fresh()->getAttributes())->toBe($before)
+                ->and(getPermissionsTeamId())->toBe($previousCompany->getKey());
         } finally {
             Bus::setEventDispatcher($dispatcher);
             setPermissionsTeamId($originalTeam);
@@ -345,9 +345,8 @@ describe('Bus Lifecycle', function (): void {
         $before = $bus->fresh()->getAttributes();
 
         expect(fn () => app(BusManagementService::class)->archive($actor, $company, $bus->getKey()))
-            ->toThrow(AuthorizationException::class);
-
-        expect($bus->fresh()->getAttributes())->toBe($before);
+            ->toThrow(AuthorizationException::class)
+            ->and($bus->fresh()->getAttributes())->toBe($before);
     })->with([
         'missing permission', 'missing membership', 'foreign admin', 'driver', 'passenger',
         'archived membership', 'archived actor',
@@ -360,9 +359,8 @@ describe('Bus Lifecycle', function (): void {
         $before = $bus->fresh()->getAttributes();
 
         expect(fn () => app(BusManagementService::class)->archive($actor, $company, $bus->getKey()))
-            ->toThrow(ModelNotFoundException::class);
-
-        expect($bus->fresh()->getAttributes())->toBe($before);
+            ->toThrow(ModelNotFoundException::class)
+            ->and($bus->fresh()->getAttributes())->toBe($before);
     });
 
     test('rejects archival for a nonoperational company using stored state', function (bool $archived): void {
@@ -381,8 +379,8 @@ describe('Bus Lifecycle', function (): void {
             app(BusManagementService::class)->archive($actor, $company, $bus->getKey());
             $this->fail('Expected a validation exception.');
         } catch (ValidationException $exception) {
-            expect($exception->errors())->toHaveKey('company');
-            expect($bus->fresh()->getAttributes())->toBe($before);
+            expect($exception->errors())->toHaveKey('company')
+                ->and($bus->fresh()->getAttributes())->toBe($before);
         }
     })->with(['inactive' => [false], 'archived' => [true]]);
 
@@ -401,8 +399,8 @@ describe('Bus Lifecycle', function (): void {
 
         $unchanged = array_diff_key($before, array_flip(['deleted_at', 'updated_at']));
         expect(array_diff_key($archived->fresh()->getAttributes(), array_flip(['deleted_at', 'updated_at'])))
-            ->toBe($unchanged);
-        expect($archived->getKey())->toBe($bus->getKey())
+            ->toBe($unchanged)
+            ->and($archived->getKey())->toBe($bus->getKey())
             ->and($archived->is_active)->toBe($active)
             ->and($archived->deleted_at->format('Y-m-d H:i:s'))->toBe('2026-10-21 12:01:00');
         $this->assertSoftDeleted($archived);
@@ -416,9 +414,8 @@ describe('Bus Lifecycle', function (): void {
         $before = $bus->fresh()->getAttributes();
 
         expect(fn () => app(BusManagementService::class)->archive($actor, $company, $bus->getKey()))
-            ->toThrow(ModelNotFoundException::class);
-
-        expect($bus->fresh()->getAttributes())->toBe($before);
+            ->toThrow(ModelNotFoundException::class)
+            ->and($bus->fresh()->getAttributes())->toBe($before);
     });
 
     test('restores permission context after archival outcomes', function (string $outcome): void {
@@ -447,8 +444,8 @@ describe('Bus Lifecycle', function (): void {
             } catch (AuthorizationException $exception) {
                 expect($outcome)->toBe('denied');
             } catch (ValidationException $exception) {
-                expect($outcome)->toBe('inactive company');
-                expect($exception->errors())->toHaveKey('company');
+                expect($outcome)->toBe('inactive company')
+                    ->and($exception->errors())->toHaveKey('company');
             } catch (ModelNotFoundException $exception) {
                 expect($outcome)->toBeIn(['missing', 'foreign']);
             }
@@ -483,10 +480,9 @@ describe('Bus Lifecycle', function (): void {
             });
 
             expect(fn () => app(BusManagementService::class)->archive($actor, $company, $bus->getKey()))
-                ->toThrow(RuntimeException::class, 'Archival interrupted.');
-
-            expect($bus->fresh()->getAttributes())->toBe($before);
-            expect(getPermissionsTeamId())->toBe($previousCompany->getKey())
+                ->toThrow(RuntimeException::class, 'Archival interrupted.')
+                ->and($bus->fresh()->getAttributes())->toBe($before)
+                ->and(getPermissionsTeamId())->toBe($previousCompany->getKey())
                 ->and($actor->relationLoaded('roles'))->toBeFalse()
                 ->and($actor->relationLoaded('permissions'))->toBeFalse();
         } finally {

@@ -11,11 +11,11 @@ describe('Driver Schedule Values', function (): void {
         $driver = Driver::factory()->create();
         $schedule = DriverSchedule::factory()->for($driver)->create(['start_time' => '08:30', 'end_time' => '16:45']);
 
-        expect($schedule->start_time)->toBe('08:30:00');
-        expect($schedule->end_time)->toBe('16:45:00');
-        expect($schedule->id)->toBeUuid();
-        expect($schedule->fresh()->driver->id)->toBe($driver->id);
-        expect($schedule->fresh()->toArray())->not->toHaveKeys(['route_id', 'route_pattern_id', 'bus_id', 'driver']);
+        expect($schedule->start_time)->toBe('08:30:00')
+            ->and($schedule->end_time)->toBe('16:45:00')
+            ->and($schedule->id)->toBeUuid()
+            ->and($schedule->fresh()->driver->id)->toBe($driver->id)
+            ->and($schedule->fresh()->toArray())->not->toHaveKeys(['route_id', 'route_pattern_id', 'bus_id', 'driver']);
     });
 
     test('rejects invalid values on creation and update while preserving stored schedules', function (array $data, string $field, bool $update): void {
@@ -74,9 +74,9 @@ describe('Driver Schedule Values', function (): void {
             'valid_from' => '2026-10-19', 'valid_until' => '2026-10-19',
         ])->fresh();
 
-        expect($schedule->ends_next_day)->toBeTrue();
-        expect($schedule->valid_from->toDateString())->toBe('2026-10-19');
-        expect($schedule->start_time)->toBe($schedule->end_time);
+        expect($schedule->ends_next_day)->toBeTrue()
+            ->and($schedule->valid_from->toDateString())->toBe('2026-10-19')
+            ->and($schedule->start_time)->toBe($schedule->end_time);
     });
 
     test('prevents persisted schedule identity and ownership reassignment', function (string $field): void {
@@ -84,8 +84,8 @@ describe('Driver Schedule Values', function (): void {
         $before = $schedule->fresh()->getRawOriginal();
         $schedule->{$field} = Driver::factory()->create()->id;
 
-        expect(fn () => $schedule->save())->toThrow(ValidationException::class);
-        expect(DriverSchedule::findOrFail($before['id'])->getRawOriginal())->toBe($before);
+        expect(fn () => $schedule->save())->toThrow(ValidationException::class)
+            ->and(DriverSchedule::findOrFail($before['id'])->getRawOriginal())->toBe($before);
     })->with(['id', 'driver_id']);
 
     test('retains the physical foreign key restriction on employment deletion', function (): void {
@@ -93,8 +93,8 @@ describe('Driver Schedule Values', function (): void {
 
         expect(fn () => DB::transaction(fn () => DB::table('drivers')->where('id', $schedule->driver_id)->delete()))
             ->toThrow(function (QueryException $exception): void {
-                expect($exception->errorInfo[0])->toBeIn(['23001', '23503']);
-                expect($exception->errorInfo[2])->toContain('driver_schedules_driver_id_foreign');
+                expect($exception->errorInfo[0])->toBeIn(['23001', '23503'])
+                    ->and($exception->errorInfo[2])->toContain('driver_schedules_driver_id_foreign');
             });
         $this->assertModelExists($schedule);
         $this->assertModelExists($schedule->driver);

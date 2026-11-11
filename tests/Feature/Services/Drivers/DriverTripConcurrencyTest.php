@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\Support\WithDriverConcurrency;
 
-uses(WithDriverConcurrency::class);
+pest()->use(WithDriverConcurrency::class);
 
 afterEach(function (): void {
     $this->finishDriverConcurrency();
@@ -47,8 +47,8 @@ describe('Driver Trip Concurrency', function (): void {
         $winner = $first->await('result');
         $loser = $second->await('result');
 
-        expect($winner['status'])->toBe('success')->and($loser['status'])->toBe('validation');
-        expect(Trip::query()->where('company_id', $company->id)->count())->toBe($reservationFirst ? 1 : 0);
+        expect($winner['status'])->toBe('success')->and($loser['status'])->toBe('validation')
+            ->and(Trip::query()->where('company_id', $company->id)->count())->toBe($reservationFirst ? 1 : 0);
         foreach ([$winner, $loser] as $result) {
             expect($result['team_restored'])->toBeTrue()
                 ->and($result['actor_cache_cleared'])->toBeTrue()
@@ -56,8 +56,8 @@ describe('Driver Trip Concurrency', function (): void {
                 ->and($result['pgsql_transaction'])->toBeFalse();
         }
         if ($reservationFirst) {
-            expect($loser['errors'])->toHaveKey('driver');
-            expect($schedule->fresh()->getRawOriginal())->toBe($schedule->getRawOriginal());
+            expect($loser['errors'])->toHaveKey('driver')
+                ->and($schedule->fresh()->getRawOriginal())->toBe($schedule->getRawOriginal());
         }
     })->with([
         'employment starts too late' => ['driver_update', ['employment_starts_on' => '2026-10-27']],
@@ -98,8 +98,8 @@ describe('Driver Trip Concurrency', function (): void {
         expect($first->await('result')['status'])->toBe('success')
             ->and($second->await('result')['status'])->toBe('success')
             ->and($otherDriver->fresh()->status->value)->toBe('inactive')
-            ->and($fixture->driver->fresh()->status->value)->toBe('active');
-        expect(Trip::query()->where('company_id', $company->id)->count())->toBe(1);
+            ->and($fixture->driver->fresh()->status->value)->toBe('active')
+            ->and(Trip::query()->where('company_id', $company->id)->count())->toBe(1);
     })->with([true, false]);
 
     test('serializes the real late start against workforce changes that preserve only its planned window', function (string $operation, array $changes, string $instant, bool $startFirst): void {

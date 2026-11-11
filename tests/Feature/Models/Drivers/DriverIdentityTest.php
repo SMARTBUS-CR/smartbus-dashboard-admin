@@ -19,10 +19,10 @@ describe('Driver Identity', function (): void {
 
         $second->update(['salary_amount' => '2000.50']);
 
-        expect($first->fresh()->salary_amount)->toBe('650000.00');
-        expect($second->fresh()->salary_amount)->toBe('2000.50');
-        expect($first->company_id)->not->toBe($second->company_id);
-        expect($user->fresh()->getRawOriginal('password'))->toBe($passwordHash);
+        expect($first->fresh()->salary_amount)->toBe('650000.00')
+            ->and($second->fresh()->salary_amount)->toBe('2000.50')
+            ->and($first->company_id)->not->toBe($second->company_id)
+            ->and($user->fresh()->getRawOriginal('password'))->toBe($passwordHash);
         $this->assertDatabaseCount('users', 1, 'mysql');
         $this->assertDatabaseCount('drivers', 2);
     });
@@ -37,8 +37,8 @@ describe('Driver Identity', function (): void {
 
         expect(fn () => $driver->update([$field => $replacement]))->toThrow(function (ValidationException $exception) use ($field): void {
             expect($exception->errors())->toHaveKey($field);
-        });
-        expect($driver->fresh()->getAttributes()[$field])->toBe($originalIdentity);
+        })
+            ->and($driver->fresh()->getAttributes()[$field])->toBe($originalIdentity);
     })->with([
         'active company' => ['company_id', false],
         'active user' => ['user_id', false],
@@ -52,8 +52,8 @@ describe('Driver Identity', function (): void {
         $replacement = $field === 'company_id' ? createCompany()->getKey() : User::factory()->create()->getKey();
 
         expect(fn () => DB::transaction(fn () => DB::table('drivers')->where('id', $driver->id)->update([$field => $replacement])))
-            ->toThrow(QueryException::class, 'drivers_identity_immutable');
-        expect($driver->fresh()->getAttributes()[$field])->toBe($originalIdentity);
+            ->toThrow(QueryException::class, 'drivers_identity_immutable')
+            ->and($driver->fresh()->getAttributes()[$field])->toBe($originalIdentity);
     })->with(['company_id', 'user_id']);
 
     test('rejects a nonexistent or archived MySQL identity on creation', function (bool $archived): void {

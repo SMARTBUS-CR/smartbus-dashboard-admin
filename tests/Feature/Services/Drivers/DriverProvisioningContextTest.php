@@ -13,7 +13,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class);
+pest()->use(WithDriverRegistration::class);
 
 describe('Driver Provisioning Context', function (): void {
     test('preserves credentials admin roles other memberships and independent employment while clearing loaded permissions', function (): void {
@@ -34,21 +34,21 @@ describe('Driver Provisioning Context', function (): void {
 
         $driver = app(DriverManagementService::class)->createForExistingUser($actor, $company, $target, $this->validDriverEmployment());
 
-        expect(Arr::only($target->fresh()->getAttributes(), array_keys($originalIdentity)))->toBe($originalIdentity);
-        expect($driver->company_id)->toBe($company->id);
-        expect($otherEmployment->fresh()->salary_amount)->toBe('1000.25');
-        expect($otherEmployment->fresh()->salary_currency)->toBe('USD');
+        expect(Arr::only($target->fresh()->getAttributes(), array_keys($originalIdentity)))->toBe($originalIdentity)
+            ->and($driver->company_id)->toBe($company->id)
+            ->and($otherEmployment->fresh()->salary_amount)->toBe('1000.25')
+            ->and($otherEmployment->fresh()->salary_currency)->toBe('USD');
         $this->assertNotSoftDeleted($membership);
         $this->assertNotSoftDeleted($otherMembership);
         foreach ($assignments as $assignment) {
             $this->assertDatabaseHas('model_has_roles', (array) $assignment, 'mysql');
         }
-        expect(DB::connection('mysql')->table('model_has_roles')->where('model_uuid', $target->id)->count())->toBe(3);
-        expect(getPermissionsTeamId())->toBe($otherCompany->id);
-        expect($target->relationLoaded('roles'))->toBeFalse();
-        expect($target->relationLoaded('permissions'))->toBeFalse();
-        expect($actor->relationLoaded('roles'))->toBeFalse();
-        expect($actor->relationLoaded('permissions'))->toBeFalse();
+        expect(DB::connection('mysql')->table('model_has_roles')->where('model_uuid', $target->id)->count())->toBe(3)
+            ->and(getPermissionsTeamId())->toBe($otherCompany->id)
+            ->and($target->relationLoaded('roles'))->toBeFalse()
+            ->and($target->relationLoaded('permissions'))->toBeFalse()
+            ->and($actor->relationLoaded('roles'))->toBeFalse()
+            ->and($actor->relationLoaded('permissions'))->toBeFalse();
         $this->assertDatabaseCount('users', 2, 'mysql');
     });
 
@@ -86,9 +86,9 @@ describe('Driver Provisioning Context', function (): void {
             $role = Role::withoutGlobalScopes()->where('company_id', $company->id)->where('name', 'driver')->where('guard_name', 'web')->sole();
             expect($role->id)->not->toBeIn([$globalRole->id, $apiRole->id]);
             $assignment = DB::connection('mysql')->table('model_has_roles')->where('model_uuid', $target->id)->sole();
-            expect($assignment->role_id)->toBe($role->id);
-            expect($assignment->company_id)->toBe($company->id);
-            expect(getPermissionsTeamId())->toBe($otherCompany->id);
+            expect($assignment->role_id)->toBe($role->id)
+                ->and($assignment->company_id)->toBe($company->id)
+                ->and(getPermissionsTeamId())->toBe($otherCompany->id);
         } finally {
             Filament::setTenant(null, isQuiet: true);
         }
@@ -114,14 +114,13 @@ describe('Driver Provisioning Context', function (): void {
                 } else {
                     $service->createForExistingUser($actor, $company, $target, $this->validDriverEmployment());
                 }
-            })->toThrow(QueryException::class, 'Driver role provisioning failed');
-
-            expect(getPermissionsTeamId())->toBe($previousTeam);
-            expect($actor->relationLoaded('roles'))->toBeFalse();
-            expect($actor->relationLoaded('permissions'))->toBeFalse();
+            })->toThrow(QueryException::class, 'Driver role provisioning failed')
+                ->and(getPermissionsTeamId())->toBe($previousTeam)
+                ->and($actor->relationLoaded('roles'))->toBeFalse()
+                ->and($actor->relationLoaded('permissions'))->toBeFalse();
             if ($target !== null) {
-                expect($target->relationLoaded('roles'))->toBeFalse();
-                expect($target->relationLoaded('permissions'))->toBeFalse();
+                expect($target->relationLoaded('roles'))->toBeFalse()
+                    ->and($target->relationLoaded('permissions'))->toBeFalse();
             }
             $this->assertDatabaseCount('drivers', 0);
             $this->assertDatabaseCount('company_users', 1);

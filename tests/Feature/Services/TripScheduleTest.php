@@ -46,18 +46,17 @@ test('persists a fully validated scheduled trip and restores the explicit permis
 
     $trip = app(TripManagementService::class)->schedule($actor, $company, $data)->fresh();
 
-    expect($trip->getKey())->toBeUuid();
-    expect($trip->status)->toBe(TripStatus::SCHEDULED);
-    expect($trip->company_id)->toBe($company->getKey());
-    expect($trip->driver_id)->toBe($data['driver_id']);
-    expect($trip->service_date->toDateString())->toBe('2026-10-26');
-    expect($trip->scheduled_departure_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-10-26 12:30:00');
-    expect($trip->scheduled_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-10-26 13:30:00');
-    expect($trip->only(['actual_departure_at', 'actual_arrival_at', 'cancelled_at', 'cancellation_reason']))
-        ->toBe(['actual_departure_at' => null, 'actual_arrival_at' => null, 'cancelled_at' => null, 'cancellation_reason' => null]);
-    expect($trip->planned_route_snapshot['occurrences'])->toHaveCount(2);
-    expect($trip->planned_route_snapshot['revision_hash'])->toBe(app(TripPlanSnapshotService::class)->revisionHash($trip->planned_route_snapshot));
-    expect(getPermissionsTeamId())->toBe($team);
+    expect($trip->getKey())->toBeUuid()
+        ->and($trip->status)->toBe(TripStatus::SCHEDULED)
+        ->and($trip->company_id)->toBe($company->getKey())
+        ->and($trip->driver_id)->toBe($data['driver_id'])
+        ->and($trip->service_date->toDateString())->toBe('2026-10-26')
+        ->and($trip->scheduled_departure_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-10-26 12:30:00')
+        ->and($trip->scheduled_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-10-26 13:30:00')
+        ->and($trip->only(['actual_departure_at', 'actual_arrival_at', 'cancelled_at', 'cancellation_reason']))->toBe(['actual_departure_at' => null, 'actual_arrival_at' => null, 'cancelled_at' => null, 'cancellation_reason' => null])
+        ->and($trip->planned_route_snapshot['occurrences'])->toHaveCount(2)
+        ->and($trip->planned_route_snapshot['revision_hash'])->toBe(app(TripPlanSnapshotService::class)->revisionHash($trip->planned_route_snapshot))
+        ->and(getPermissionsTeamId())->toBe($team);
     $this->assertDatabaseCount('trips', 1);
     Http::assertNothingSent();
 });
@@ -81,8 +80,8 @@ test('authorizes before validating payload or inspecting protected resources', f
     setPermissionsTeamId($team);
 
     expect(fn () => app(TripManagementService::class)->schedule($actor, $company, ['driver_id' => 'invalid']))
-        ->toThrow(AuthorizationException::class);
-    expect(getPermissionsTeamId())->toBe($team);
+        ->toThrow(AuthorizationException::class)
+        ->and(getPermissionsTeamId())->toBe($team);
     $this->assertDatabaseCount('trips', 0);
     Http::assertNothingSent();
 })->with(['archived actor', 'missing membership', 'missing permission', 'foreign admin', 'driver', 'passenger']);
@@ -126,8 +125,8 @@ test('rejects invalid planning inputs atomically even for super admins', functio
     expect(fn () => app(TripManagementService::class)->schedule($actor, $company, $data))
         ->toThrow(function (ValidationException $exception) use ($field): void {
             expect($exception->errors())->toHaveKey($field);
-        });
-    expect(getPermissionsTeamId())->toBe($team);
+        })
+        ->and(getPermissionsTeamId())->toBe($team);
     $this->assertDatabaseCount('trips', 0);
     Http::assertNothingSent();
 })->with([
@@ -153,8 +152,8 @@ test('maps existing database identity conflicts privately and preserves the orig
     expect(fn () => $service->schedule($actor, $company, $data))
         ->toThrow(function (ValidationException $exception) use ($field): void {
             expect($exception->errors())->toHaveKey($field);
-        });
-    expect($original->fresh()->getRawOriginal())->toBe($before);
+        })
+        ->and($original->fresh()->getRawOriginal())->toBe($before);
     $this->assertDatabaseCount('trips', 1);
     Http::assertNothingSent();
 })->with([['departure', 'service_date'], ['bus', 'bus_id'], ['driver', 'driver_id']]);
@@ -178,8 +177,8 @@ test('rolls back inserted trips and database side effects when persistence fails
         Trip::setEventDispatcher($dispatcher);
     }
     $this->assertDatabaseCount('trips', 0);
-    expect(Bus::query()->findOrFail($data['bus_id'])->capacity)->toBe($capacity);
-    expect(getPermissionsTeamId())->toBe($team);
+    expect(Bus::query()->findOrFail($data['bus_id'])->capacity)->toBe($capacity)
+        ->and(getPermissionsTeamId())->toBe($team);
     Http::assertNothingSent();
 });
 

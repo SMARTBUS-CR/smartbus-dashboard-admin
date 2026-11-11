@@ -20,10 +20,10 @@ describe('Driver Policy', function (): void {
 
         expect(Gate::forUser($actor)->allows($ability, $arguments))->toBeFalse();
         grantShield($actor, [$permission], $company);
-        expect(Gate::forUser($actor)->allows($ability, $arguments))->toBeTrue();
-        expect(getPermissionsTeamId())->toBe($other->id);
-        expect($actor->relationLoaded('roles'))->toBeFalse();
-        expect($actor->relationLoaded('permissions'))->toBeFalse();
+        expect(Gate::forUser($actor)->allows($ability, $arguments))->toBeTrue()
+            ->and(getPermissionsTeamId())->toBe($other->id)
+            ->and($actor->relationLoaded('roles'))->toBeFalse()
+            ->and($actor->relationLoaded('permissions'))->toBeFalse();
 
         CompanyUser::where('company_id', $company->id)->where('user_id', $actor->id)->sole()->delete();
         expect(Gate::forUser($actor)->allows($ability, $arguments))->toBeFalse();
@@ -49,8 +49,8 @@ describe('Driver Policy', function (): void {
         $actor = createUserWithRole(UserRole::SuperAdmin);
         $driver = Driver::factory()->for($company)->create();
 
-        expect(Gate::forUser($actor)->allows($ability, [Driver::class, $company, $driver]))->toBeTrue();
-        expect(Gate::forUser($actor)->allows($ability, [Driver::class, $other, $driver]))->toBeFalse();
+        expect(Gate::forUser($actor)->allows($ability, [Driver::class, $company, $driver]))->toBeTrue()
+            ->and(Gate::forUser($actor)->allows($ability, [Driver::class, $other, $driver]))->toBeFalse();
         $company->update(['status' => CompanyStatus::INACTIVE]);
         expect(Gate::forUser($actor)->allows($ability, [Driver::class, $company, $driver]))->toBeFalse();
     })->with(['view', 'update', 'delete', 'restore', 'viewSalary', 'viewAttendance']);
@@ -74,8 +74,8 @@ describe('Driver Policy', function (): void {
         $driver = Driver::factory()->for($company)->create();
         $driver->delete();
 
-        expect(Gate::forUser($actor)->allows('restore', [Driver::class, $company, $driver]))->toBeTrue();
-        expect(Gate::forUser($actor)->allows('forceDelete', [Driver::class, $company, $driver]))->toBeFalse();
-        expect(Gate::forUser($actor)->allows('forceDeleteAny', [Driver::class, $company]))->toBeFalse();
+        expect(Gate::forUser($actor)->allows('restore', [Driver::class, $company, $driver]))->toBeTrue()
+            ->and(Gate::forUser($actor)->allows('forceDelete', [Driver::class, $company, $driver]))->toBeFalse()
+            ->and(Gate::forUser($actor)->allows('forceDeleteAny', [Driver::class, $company]))->toBeFalse();
     });
 });
