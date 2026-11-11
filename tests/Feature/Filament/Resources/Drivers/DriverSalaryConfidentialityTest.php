@@ -95,6 +95,27 @@ describe('Driver Salary Confidentiality', function (): void {
             ->and($updated->salary_period)->toBe('monthly');
     });
 
+    test('maps service validation errors to the salary modal fields', function (): void {
+        ($this->authorizeSalaryActor)([
+            'ViewAny:Driver', 'View:Driver', 'Update:Driver', 'ViewSalary:Driver',
+        ]);
+        $before = $this->driver->fresh()->getRawOriginal();
+
+        Livewire::test(EditDriver::class, ['record' => $this->driver->getKey()])
+            ->mountAction('manageSalary')
+            ->setActionData([
+                'salary_amount' => 1.25,
+                'salary_currency' => 'USD',
+                'salary_period' => 'monthly',
+            ])
+            ->callMountedAction()
+            ->assertHasActionErrors([
+                'salary_amount' => __('Salary amounts must be provided as decimal strings or integers.'),
+            ]);
+
+        expect($this->driver->fresh()->getRawOriginal())->toBe($before);
+    });
+
     test('rejects a forged salary action when salary permission is missing', function (): void {
         ($this->authorizeSalaryActor)([
             'ViewAny:Driver', 'View:Driver', 'Update:Driver',
