@@ -49,12 +49,12 @@ return new class extends Migration
                 ->references(['id', 'company_id'])
                 ->on('buses')
                 ->restrictOnDelete();
-                
+
             $table->foreign(['driver_id', 'company_id'], 'trips_driver_company_foreign')
                 ->references(['id', 'company_id'])
                 ->on('drivers')
                 ->restrictOnDelete();
-                
+
             $table->index(['company_id', 'service_date', 'status']);
             $table->index(['route_pattern_id', 'scheduled_departure_at']);
             $table->index(['driver_id', 'scheduled_departure_at']);
