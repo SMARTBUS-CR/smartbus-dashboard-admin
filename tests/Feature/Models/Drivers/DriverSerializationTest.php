@@ -12,12 +12,12 @@ describe('Driver Serialization', function (): void {
             expect($keys)->toBe([
                 'company_id', 'created_at', 'deleted_at', 'employment_ends_on', 'employment_starts_on',
                 'id', 'license', 'license_expires_at', 'status', 'updated_at', 'user_id',
-            ]);
-            expect($serialized['status'])->toBe('active');
+            ])
+                ->and($serialized['status'])->toBe('active');
         }
 
-        expect($driver->salary_amount)->toBe('650000.25');
-        expect($driver->salary_currency)->toBe('CRC');
-        expect($driver->salary_period)->toBe('monthly');
+        expect($driver->salary_amount)->toBe('650000.25')
+            ->and($driver->salary_currency)->toBe('CRC')
+            ->and($driver->salary_period)->toBe('monthly');
     });
 });

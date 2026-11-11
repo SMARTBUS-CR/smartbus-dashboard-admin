@@ -5,6 +5,7 @@ use App\Filament\Resources\Buses\Pages\EditBus;
 use App\Filament\Resources\Buses\Pages\ListBuses;
 use App\Models\Bus;
 use App\Models\CompanyUser;
+use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
 
 describe('Bus Resource Access', function (): void {
@@ -74,5 +75,34 @@ describe('Bus Resource Access', function (): void {
 
         Livewire::test(EditBus::class, ['record' => $foreignBus->getKey()])
             ->assertStatus(404);
+    });
+
+    test('renders native record actions for an authorized fleet administrator', function (): void {
+        $company = createCompany();
+        $bus = Bus::factory()->for($company)->create();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+        CompanyUser::create([
+            'company_id' => $company->getKey(),
+            'user_id' => $actor->getKey(),
+        ]);
+        grantShield($actor, ['ViewAny:Bus', 'View:Bus', 'Update:Bus'], $company);
+        actingAsInCompany($actor, $company);
+
+        Livewire::test(ListBuses::class)
+            ->assertActionVisible(TestAction::make('edit')->table($bus));
+    });
+
+    test('renders the native create action for an authorized fleet administrator', function (): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+        CompanyUser::create([
+            'company_id' => $company->getKey(),
+            'user_id' => $actor->getKey(),
+        ]);
+        grantShield($actor, ['ViewAny:Bus', 'Create:Bus'], $company);
+        actingAsInCompany($actor, $company);
+
+        Livewire::test(ListBuses::class)
+            ->assertActionVisible('create');
     });
 });

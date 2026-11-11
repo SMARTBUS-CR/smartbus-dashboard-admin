@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\Support\WithDriverConcurrency;
 
-uses(WithDriverConcurrency::class);
+pest()->use(WithDriverConcurrency::class);
 
 afterEach(function (): void {
     $this->finishDriverConcurrency();
@@ -48,10 +48,10 @@ test('maps a real duplicate departure race to a private service date error', fun
     $winner = $first->await('result');
     $loser = $second->await('result');
 
-    expect($winner['status'])->toBe('success');
-    expect($loser['status'])->toBe('validation');
-    expect($loser['errors'])->toBe(['service_date' => ['The selected departure or resource conflicts with an existing trip.']]);
-    expect(Trip::query()->where('company_id', $company->id)->count())->toBe(1);
+    expect($winner['status'])->toBe('success')
+        ->and($loser['status'])->toBe('validation')
+        ->and($loser['errors'])->toBe(['service_date' => ['The selected departure or resource conflicts with an existing trip.']])
+        ->and(Trip::query()->where('company_id', $company->id)->count())->toBe(1);
 });
 
 test('serializes reservation against resource mutations and revalidates after waiting', function (string $mutation, bool $reservationFirst): void {
@@ -91,17 +91,17 @@ test('serializes reservation against resource mutations and revalidates after wa
     $firstResult = $first->await('result');
     $secondResult = $second->await('result');
 
-    expect($firstResult['status'])->toBe('success');
-    expect($secondResult['status'])->toBe('validation');
-    expect(Trip::query()->where('company_id', $company->id)->count())->toBe($reservationFirst ? 1 : 0);
+    expect($firstResult['status'])->toBe('success')
+        ->and($secondResult['status'])->toBe('validation')
+        ->and(Trip::query()->where('company_id', $company->id)->count())->toBe($reservationFirst ? 1 : 0);
     if ($bus) {
         $persistedBus = Bus::withTrashed()->findOrFail($fixture->bus_id);
         expect($mutation === 'bus_archive' ? ! $persistedBus->trashed() : $persistedBus->is_active)->toBe($reservationFirst);
     }
     foreach ([$firstResult, $secondResult] as $result) {
-        expect($result['team_restored'])->toBeTrue();
-        expect($result['pgsql_level'])->toBe(0);
-        expect($result['pgsql_transaction'])->toBeFalse();
+        expect($result['team_restored'])->toBeTrue()
+            ->and($result['pgsql_level'])->toBe(0)
+            ->and($result['pgsql_transaction'])->toBeFalse();
     }
 })->with(['bus_deactivate', 'bus_archive', 'driver_deactivate', 'driver_archive', 'license_shorten', 'schedule_delete', 'schedule_update'])->with([true, false]);
 
@@ -147,10 +147,10 @@ test('serializes the same person across different companies and driver profiles'
     $winner = $first->await('result');
     $loser = $second->await('result');
 
-    expect($winner['status'])->toBe('success');
-    expect($loser['status'])->toBe('validation');
-    expect($loser['errors'])->toBe(['driver_id' => ['The selected departure or resource conflicts with an existing trip.']]);
-    expect(Trip::query()->whereIn('company_id', [$firstCompany->id, $secondCompany->id])->count())->toBe(1);
+    expect($winner['status'])->toBe('success')
+        ->and($loser['status'])->toBe('validation')
+        ->and($loser['errors'])->toBe(['driver_id' => ['The selected departure or resource conflicts with an existing trip.']])
+        ->and(Trip::query()->whereIn('company_id', [$firstCompany->id, $secondCompany->id])->count())->toBe(1);
 });
 
 test('preserves the losing original plan when two real replans compete for one bus', function (): void {
@@ -188,9 +188,9 @@ test('preserves the losing original plan when two real replans compete for one b
     $winner = $first->await('result');
     $loser = $second->await('result');
 
-    expect($winner['status'])->toBe('success');
-    expect($loser['status'])->toBe('validation');
-    expect($loser['errors'])->toHaveKey('bus_id');
-    expect($originals[0]->fresh()->bus_id)->toBe($target->id);
-    expect($originals[1]->fresh()->getRawOriginal())->toBe($before);
+    expect($winner['status'])->toBe('success')
+        ->and($loser['status'])->toBe('validation')
+        ->and($loser['errors'])->toHaveKey('bus_id')
+        ->and($originals[0]->fresh()->bus_id)->toBe($target->id)
+        ->and($originals[1]->fresh()->getRawOriginal())->toBe($before);
 });

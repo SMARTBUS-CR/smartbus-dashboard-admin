@@ -13,7 +13,7 @@ use Tests\Support\DriverRegistrationProcess;
 use Tests\Support\WithDriverConcurrency;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class, WithDriverConcurrency::class);
+pest()->use(WithDriverRegistration::class, WithDriverConcurrency::class);
 
 afterEach(function (): void {
     $this->finishDriverConcurrency();
@@ -48,17 +48,17 @@ describe('Driver Registration Concurrency', function (): void {
         $removed = $removal->await('result');
         $registered = $registration->await('result');
 
-        expect($removalReady['pgsql_pid'])->not->toBe($registrationReady['pgsql_pid']);
-        expect($removed)->toMatchArray(['status' => 'success']);
-        expect($registered['status'])->toBe('success');
+        expect($removalReady['pgsql_pid'])->not->toBe($registrationReady['pgsql_pid'])
+            ->and($removed)->toMatchArray(['status' => 'success'])
+            ->and($registered['status'])->toBe('success');
         foreach ([$removed, $registered] as $result) {
-            expect($result['team_restored'])->toBeTrue();
-            expect($result['actor_cache_cleared'])->toBeTrue();
-            expect($result['target_cache_cleared'])->toBeTrue();
-            expect($result['pgsql_level'])->toBe(0);
-            expect($result['mysql_level'])->toBe(0);
-            expect($result['pgsql_transaction'])->toBeFalse();
-            expect($result['mysql_transaction'])->toBeFalse();
+            expect($result['team_restored'])->toBeTrue()
+                ->and($result['actor_cache_cleared'])->toBeTrue()
+                ->and($result['target_cache_cleared'])->toBeTrue()
+                ->and($result['pgsql_level'])->toBe(0)
+                ->and($result['mysql_level'])->toBe(0)
+                ->and($result['pgsql_transaction'])->toBeFalse()
+                ->and($result['mysql_transaction'])->toBeFalse();
         }
         expect($target->fresh()->getRawOriginal())->toBe($identityBefore);
         $this->assertDatabaseCount('drivers', 1);
@@ -105,19 +105,19 @@ describe('Driver Registration Concurrency', function (): void {
         expect($firstReady['pgsql_pid'])->not->toBe($secondReady['pgsql_pid']);
         $successes = array_filter($results, fn (array $result): bool => $result['status'] === 'success');
         $failures = array_filter($results, fn (array $result): bool => $result['status'] !== 'success');
-        expect($successes)->toHaveCount(1);
-        expect($failures)->toHaveCount(1);
+        expect($successes)->toHaveCount(1)
+            ->and($failures)->toHaveCount(1);
         $failure = array_values($failures)[0];
-        expect($failure['status'])->toBe('validation');
-        expect($failure['errors'])->toBe(['license' => [__('This license is already reserved by a driver in this company.', locale: $locale)]]);
+        expect($failure['status'])->toBe('validation')
+            ->and($failure['errors'])->toBe(['license' => [__('This license is already reserved by a driver in this company.', locale: $locale)]]);
         foreach ($results as $result) {
-            expect($result['team_restored'])->toBeTrue();
-            expect($result['actor_cache_cleared'])->toBeTrue();
-            expect($result['target_cache_cleared'])->toBeTrue();
-            expect($result['pgsql_level'])->toBe(0);
-            expect($result['mysql_level'])->toBe(0);
-            expect($result['pgsql_transaction'])->toBeFalse();
-            expect($result['mysql_transaction'])->toBeFalse();
+            expect($result['team_restored'])->toBeTrue()
+                ->and($result['actor_cache_cleared'])->toBeTrue()
+                ->and($result['target_cache_cleared'])->toBeTrue()
+                ->and($result['pgsql_level'])->toBe(0)
+                ->and($result['mysql_level'])->toBe(0)
+                ->and($result['pgsql_transaction'])->toBeFalse()
+                ->and($result['mysql_transaction'])->toBeFalse();
         }
         $winner = array_values($successes)[0];
         $this->assertDatabaseCount('drivers', 1);
@@ -193,9 +193,9 @@ describe('Driver Registration Concurrency', function (): void {
 
             $result = $worker->await('result');
 
-            expect($result['status'])->toBe('validation');
-            expect($result['errors'])->toHaveKey('company_id');
-            expect($result['team_restored'])->toBeTrue();
+            expect($result['status'])->toBe('validation')
+                ->and($result['errors'])->toHaveKey('company_id')
+                ->and($result['team_restored'])->toBeTrue();
             $this->assertDatabaseCount('drivers', 0);
             $this->assertDatabaseCount('company_users', 1);
             $this->assertDatabaseCount('users', $newIdentity ? 1 : 2, 'mysql');
@@ -215,9 +215,7 @@ describe('Driver Registration Concurrency', function (): void {
 
         try {
             $failure = $worker->await('failure');
-
-            expect($failure['class'])->toBe(RuntimeException::class);
-            expect($failure['message'])->toBe('Concurrency workers require isolated testing databases.');
+            expect($failure)->toMatchArray(['class' => RuntimeException::class, 'message' => 'Concurrency workers require isolated testing databases.']);
         } finally {
             $worker->close();
         }

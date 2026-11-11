@@ -22,20 +22,20 @@ describe('Driver Persistence', function (): void {
             'salary_currency' => 'CRC',
         ])->fresh();
 
-        expect(Str::isUuid($driver->getKey()))->toBeTrue();
-        expect($driver->getConnection()->getName())->toBe('pgsql');
-        expect($driver->company->is($company))->toBeTrue();
-        expect($driver->user->is($user))->toBeTrue();
-        expect($driver->user->getConnection()->getName())->toBe('mysql');
-        expect($driver->license_expires_at)->toBeInstanceOf(CarbonImmutable::class);
-        expect($driver->license_expires_at->toDateString())->toBe('2030-12-31');
-        expect($driver->employment_starts_on->toDateString())->toBe('2026-10-01');
-        expect($driver->employment_ends_on->toDateString())->toBe('2027-10-01');
-        expect($driver->salary_amount)->toBe('650000.25');
-        expect($driver->salary_currency)->toBe('CRC');
-        expect($driver->salary_period)->toBe('monthly');
-        expect($driver->status)->toBe(DriverStatus::ACTIVE);
-        expect($user->fresh()->getRawOriginal('password'))->toBe($passwordHash);
+        expect(Str::isUuid($driver->getKey()))->toBeTrue()
+            ->and($driver->getConnection()->getName())->toBe('pgsql')
+            ->and($driver->company->is($company))->toBeTrue()
+            ->and($driver->user->is($user))->toBeTrue()
+            ->and($driver->user->getConnection()->getName())->toBe('mysql')
+            ->and($driver->license_expires_at)->toBeInstanceOf(CarbonImmutable::class)
+            ->and($driver->license_expires_at->toDateString())->toBe('2030-12-31')
+            ->and($driver->employment_starts_on->toDateString())->toBe('2026-10-01')
+            ->and($driver->employment_ends_on->toDateString())->toBe('2027-10-01')
+            ->and($driver->salary_amount)->toBe('650000.25')
+            ->and($driver->salary_currency)->toBe('CRC')
+            ->and($driver->salary_period)->toBe('monthly')
+            ->and($driver->status)->toBe(DriverStatus::ACTIVE)
+            ->and($user->fresh()->getRawOriginal('password'))->toBe($passwordHash);
         $this->assertDatabaseCount('users', 1, 'mysql');
         $this->assertModelExists($driver);
     });
@@ -43,8 +43,8 @@ describe('Driver Persistence', function (): void {
     test('persists an inactive employment with an open ended date', function (): void {
         $driver = Driver::factory()->create(['status' => DriverStatus::INACTIVE])->fresh();
 
-        expect($driver->status)->toBe(DriverStatus::INACTIVE);
-        expect($driver->employment_ends_on)->toBeNull();
+        expect($driver->status)->toBe(DriverStatus::INACTIVE)
+            ->and($driver->employment_ends_on)->toBeNull();
     });
 
     test('eager loads identity on MySQL separately from PostgreSQL employment and company queries', function (): void {
@@ -59,11 +59,11 @@ describe('Driver Persistence', function (): void {
         try {
             $loaded = Driver::with(['company', 'user'])->findOrFail($driver->id);
 
-            expect($loaded->user->getKey())->toBe($driver->user_id);
-            expect($loaded->company->getKey())->toBe($driver->company_id);
-            expect($pgsql->getQueryLog())->toHaveCount(2);
-            expect($mysql->getQueryLog())->toHaveCount(1);
-            expect($mysql->getQueryLog()[0]['query'])->toContain('users')->not->toContain('drivers', 'companies');
+            expect($loaded->user->getKey())->toBe($driver->user_id)
+                ->and($loaded->company->getKey())->toBe($driver->company_id)
+                ->and($pgsql->getQueryLog())->toHaveCount(2)
+                ->and($mysql->getQueryLog())->toHaveCount(1)
+                ->and($mysql->getQueryLog()[0]['query'])->toContain('users')->not->toContain('drivers', 'companies');
             foreach ($pgsql->getQueryLog() as $query) {
                 expect($query['query'])->not->toContain('users');
             }

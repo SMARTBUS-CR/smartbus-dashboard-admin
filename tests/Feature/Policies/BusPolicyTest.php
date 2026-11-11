@@ -69,3 +69,76 @@ describe('Bus Read Permissions', function (): void {
         }
     });
 });
+
+describe('Bus Record Authorization Contracts', function (): void {
+    test('resolves the active tenant for native collection authorization', function (
+        string $ability,
+        string $permission,
+    ): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+        CompanyUser::create(['company_id' => $company->getKey(), 'user_id' => $actor->getKey()]);
+        grantShield($actor, [$permission], $company);
+        actingAsInCompany($actor, $company);
+
+        $allowed = Gate::forUser($actor)->allows($ability, Bus::class);
+
+        expect($allowed)->toBeTrue();
+    })->with([
+        'listing' => ['viewAny', 'ViewAny:Bus'],
+        'creating' => ['create', 'Create:Bus'],
+    ]);
+
+    test('supports native model and explicit company authorization', function (
+        string $ability,
+        string $permission,
+        bool $archived,
+    ): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+        CompanyUser::create(['company_id' => $company->getKey(), 'user_id' => $actor->getKey()]);
+        grantShield($actor, [$permission], $company);
+        $bus = Bus::factory()->for($company)->create();
+        if ($archived) {
+            $bus->delete();
+        }
+        actingAsInCompany($actor, $company);
+
+        $nativeAuthorization = Gate::forUser($actor)->allows($ability, $bus);
+        $explicitAuthorization = Gate::forUser($actor)->allows($ability, [Bus::class, $company, $bus]);
+
+        expect($nativeAuthorization)->toBeTrue()
+            ->and($explicitAuthorization)->toBeTrue();
+    })->with([
+        'viewing' => ['view', 'View:Bus', false],
+        'updating' => ['update', 'Update:Bus', false],
+        'archiving' => ['delete', 'Delete:Bus', false],
+        'restoring' => ['restore', 'Restore:Bus', true],
+    ]);
+
+    test('denies native model authorization for a bus outside the actor company', function (): void {
+        [$company, $otherCompany] = createTenantPair();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+        CompanyUser::create(['company_id' => $company->getKey(), 'user_id' => $actor->getKey()]);
+        grantShield($actor, ['Update:Bus'], $company);
+        $foreignBus = Bus::factory()->for($otherCompany)->create();
+        actingAsInCompany($actor, $company);
+
+        $allowed = Gate::forUser($actor)->allows('update', $foreignBus);
+
+        expect($allowed)->toBeFalse();
+    });
+
+    test('denies permanent deletion through native and explicit authorization', function (): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::SuperAdmin);
+        $bus = Bus::factory()->for($company)->create();
+        actingAsInCompany($actor, $company);
+
+        $nativeAuthorization = Gate::forUser($actor)->allows('forceDelete', $bus);
+        $explicitAuthorization = Gate::forUser($actor)->allows('forceDelete', [Bus::class, $company, $bus]);
+
+        expect($nativeAuthorization)->toBeFalse()
+            ->and($explicitAuthorization)->toBeFalse();
+    });
+});

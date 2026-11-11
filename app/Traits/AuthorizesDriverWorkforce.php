@@ -3,6 +3,7 @@
 namespace App\Traits;
 
 use App\Enums\CompanyStatus;
+use App\Enums\UserRole;
 use App\Models\Company;
 use App\Models\CompanyUser;
 use App\Models\Driver;
@@ -31,6 +32,13 @@ trait AuthorizesDriverWorkforce
 
             setPermissionsTeamId($company->getKey());
             $persistedActor->unsetRelation('roles')->unsetRelation('permissions');
+
+            if (! $persistedActor->isSuperAdmin() && $persistedActor->hasAnyRole([
+                UserRole::Driver->value,
+                UserRole::Passenger->value,
+            ])) {
+                return false;
+            }
 
             return $persistedActor->can($permission);
         } finally {

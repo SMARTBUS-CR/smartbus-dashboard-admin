@@ -86,9 +86,9 @@ test('validates real relationships eligibility and trusted plans atomically in b
     expect(fn () => runPersistedPlanning($operation, $actor, $company, $trip, $data))
         ->toThrow(function (ValidationException $exception) use ($field): void {
             expect($exception->errors())->toHaveKey($field);
-        });
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
-    expect(getPermissionsTeamId())->toBe($team);
+        })
+        ->and($trip->fresh()->getRawOriginal())->toBe($before)
+        ->and(getPermissionsTeamId())->toBe($team);
     $this->assertDatabaseCount('trips', 1);
     Http::assertNothingSent();
 })->with([
@@ -109,9 +109,9 @@ test('persists complete saved detours without inferring arrival or contacting ro
 
     $result = runPersistedPlanning($operation, $actor, $company, $trip, $data);
 
-    expect($result->planned_route_snapshot['distance_meters'])->toBe('900000.00');
-    expect($result->planned_route_snapshot['routing_leg_distances'])->toBeNull();
-    expect($result->scheduled_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-02 13:30:00');
+    expect($result->planned_route_snapshot['distance_meters'])->toBe('900000.00')
+        ->and($result->planned_route_snapshot['routing_leg_distances'])->toBeNull()
+        ->and($result->scheduled_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-02 13:30:00');
     $this->assertModelExists($result);
     Http::assertNothingSent();
 })->with(['schedule', 'replan']);
@@ -130,12 +130,12 @@ test('persists resolved DST departures and rejects nonexistent or unresolved loc
         expect(fn () => runPersistedPlanning($operation, $actor, $company, $trip, $data))
             ->toThrow(function (ValidationException $exception) use ($field): void {
                 expect($exception->errors())->toHaveKey($field);
-            });
-        expect($trip->fresh()->getRawOriginal())->toBe($before);
+            })
+            ->and($trip->fresh()->getRawOriginal())->toBe($before);
     } else {
         $result = runPersistedPlanning($operation, $actor, $company, $trip, $data);
-        expect($result->scheduled_departure_at->utc()->format('Y-m-d H:i:s'))->toBe($utc);
-        expect($result->service_date->toDateString())->toBe($date);
+        expect($result->scheduled_departure_at->utc()->format('Y-m-d H:i:s'))->toBe($utc)
+            ->and($result->service_date->toDateString())->toBe($date);
         $this->assertModelExists($result);
     }
     Http::assertNothingSent();
@@ -156,15 +156,15 @@ test('uses every touched local date while excluding an exact midnight arrival', 
 
     if ($valid) {
         $result = runPersistedPlanning($operation, $actor, $company, $trip, $data);
-        expect($result->service_date->toDateString())->toBe('2026-11-02');
-        expect($result->scheduled_departure_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-03 05:00:00');
-        expect($result->scheduled_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-03 06:00:00');
+        expect($result->service_date->toDateString())->toBe('2026-11-02')
+            ->and($result->scheduled_departure_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-03 05:00:00')
+            ->and($result->scheduled_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-03 06:00:00');
     } else {
         expect(fn () => runPersistedPlanning($operation, $actor, $company, $trip, $data))
             ->toThrow(function (ValidationException $exception): void {
                 expect($exception->errors())->toHaveKey('driver_id');
-            });
-        expect($trip->fresh()->getRawOriginal())->toBe($before);
+            })
+            ->and($trip->fresh()->getRawOriginal())->toBe($before);
     }
     Http::assertNothingSent();
 })->with([['2026-11-03T00:00:00-06:00', true], ['2026-11-03T00:01:00-06:00', false]])->with(['schedule', 'replan']);
@@ -186,11 +186,11 @@ test('persists repeated stop occurrences and nullable estimates without merging 
     $result = runPersistedPlanning($operation, $actor, $company, $trip, $data);
 
     $visits = $result->planned_route_snapshot['occurrences'];
-    expect($visits)->toHaveCount(3);
-    expect(array_column($visits, 'stop_sequence'))->toBe([1, 2, 3]);
-    expect($visits[0]['stop_id'])->toBe($visits[2]['stop_id']);
-    expect($visits[0]['occurrence_id'])->toBe($first->getKey());
-    expect($visits[2]['occurrence_id'])->toBe($last->getKey());
-    expect($visits[2]['minutes_from_start'])->toBeNull();
+    expect($visits)->toHaveCount(3)
+        ->and(array_column($visits, 'stop_sequence'))->toBe([1, 2, 3])
+        ->and($visits[0]['stop_id'])->toBe($visits[2]['stop_id'])
+        ->and($visits[0]['occurrence_id'])->toBe($first->getKey())
+        ->and($visits[2]['occurrence_id'])->toBe($last->getKey())
+        ->and($visits[2]['minutes_from_start'])->toBeNull();
     Http::assertNothingSent();
 })->with(['schedule', 'replan']);

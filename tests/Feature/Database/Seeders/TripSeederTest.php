@@ -39,20 +39,20 @@ test('seeds a deterministic validated demo trip without creating identities or g
     $this->seed(TripSeeder::class);
 
     $trip = Trip::query()->sole();
-    expect($trip->getKey())->toBe('b0700000-0000-4000-8000-000000000001');
-    expect($trip->company_id)->toBe($company->getKey());
-    expect($trip->bus_id)->toBe($fixture->bus_id);
-    expect($trip->driver_id)->toBe($fixture->driver_id);
-    expect($trip->status)->toBe(TripStatus::SCHEDULED);
-    expect($trip->service_date->toDateString())->toBe('2026-11-02');
-    expect($trip->scheduled_departure_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-02 15:00:00');
-    expect($trip->scheduled_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-02 16:00:00');
-    expect($trip->planned_route_snapshot['revision_hash'])->toBe(app(TripPlanSnapshotService::class)->revisionHash($trip->planned_route_snapshot));
-    expect($trip->actual_departure_at)->toBeNull();
-    expect($trip->actual_arrival_at)->toBeNull();
-    expect(User::query()->orderBy('id')->get()->map->getRawOriginal()->all())->toBe($users);
-    expect(Role::query()->orderBy('id')->get()->map->getRawOriginal()->all())->toBe($roles);
-    expect(getPermissionsTeamId())->toBe($team);
+    expect($trip->getKey())->toBe('b0700000-0000-4000-8000-000000000001')
+        ->and($trip->company_id)->toBe($company->getKey())
+        ->and($trip->bus_id)->toBe($fixture->bus_id)
+        ->and($trip->driver_id)->toBe($fixture->driver_id)
+        ->and($trip->status)->toBe(TripStatus::SCHEDULED)
+        ->and($trip->service_date->toDateString())->toBe('2026-11-02')
+        ->and($trip->scheduled_departure_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-02 15:00:00')
+        ->and($trip->scheduled_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-02 16:00:00')
+        ->and($trip->planned_route_snapshot['revision_hash'])->toBe(app(TripPlanSnapshotService::class)->revisionHash($trip->planned_route_snapshot))
+        ->and($trip->actual_departure_at)->toBeNull()
+        ->and($trip->actual_arrival_at)->toBeNull()
+        ->and(User::query()->orderBy('id')->get()->map->getRawOriginal()->all())->toBe($users)
+        ->and(Role::query()->orderBy('id')->get()->map->getRawOriginal()->all())->toBe($roles)
+        ->and(getPermissionsTeamId())->toBe($team);
     $before = $trip->getRawOriginal();
     $this->seed(TripSeeder::class);
     expect($trip->fresh()->getRawOriginal())->toBe($before);
@@ -207,14 +207,13 @@ test('seeds all covered lifecycle examples and preserves their original history 
     $trips = Trip::query()->orderBy('id')->get();
     expect($trips->pluck('status')->all())->toBe([
         TripStatus::SCHEDULED, TripStatus::IN_PROGRESS, TripStatus::COMPLETED, TripStatus::CANCELLED,
-    ]);
-    expect($trips->pluck('service_date')->map->toDateString()->all())
-        ->toBe(['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23']);
-    expect($trips[1]->actual_departure_at->equalTo($trips[1]->scheduled_departure_at))->toBeTrue();
-    expect($trips[1]->actual_arrival_at)->toBeNull();
-    expect($trips[2]->actual_arrival_at->equalTo($trips[2]->scheduled_arrival_at))->toBeTrue();
-    expect($trips[3]->cancellation_reason)->toBe('Demo cancellation');
-    expect($trips[3]->actual_departure_at)->toBeNull();
+    ])
+        ->and($trips->pluck('service_date')->map->toDateString()->all())->toBe(['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23'])
+        ->and($trips[1]->actual_departure_at->equalTo($trips[1]->scheduled_departure_at))->toBeTrue()
+        ->and($trips[1]->actual_arrival_at)->toBeNull()
+        ->and($trips[2]->actual_arrival_at->equalTo($trips[2]->scheduled_arrival_at))->toBeTrue()
+        ->and($trips[3]->cancellation_reason)->toBe('Demo cancellation')
+        ->and($trips[3]->actual_departure_at)->toBeNull();
     $before = $trips->map->getRawOriginal()->all();
 
     $this->seed(TripSeeder::class);

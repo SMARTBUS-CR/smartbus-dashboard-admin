@@ -16,19 +16,19 @@ test('persists a complete scheduled factory graph and canonical historical plan 
 
     $trip = Trip::factory()->create()->fresh();
 
-    expect($trip->status)->toBe(TripStatus::SCHEDULED);
-    expect($trip->getKey())->toBeUuid();
+    expect($trip->status)->toBe(TripStatus::SCHEDULED)
+        ->and($trip->getKey())->toBeUuid();
     foreach ([$trip->pattern->route, $trip->bus, $trip->driver] as $resource) {
         expect($resource->company_id)->toBe($trip->company_id);
     }
-    expect($trip->schedule->route_pattern_id)->toBe($trip->route_pattern_id);
-    expect($trip->planned_route_snapshot['occurrences'])->toHaveCount(2);
-    expect($trip->planned_route_snapshot['revision_hash'])->toBe(app(TripPlanSnapshotService::class)->revisionHash($trip->planned_route_snapshot));
-    expect($trip->scheduled_departure_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-10-26 12:30:00');
-    expect($trip->scheduled_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-10-26 13:30:00');
-    expect($trip->actual_departure_at)->toBeNull();
-    expect($trip->actual_arrival_at)->toBeNull();
-    expect(CompanyUser::query()->where('user_id', $trip->driver->user_id)->exists())->toBeFalse();
+    expect($trip->schedule->route_pattern_id)->toBe($trip->route_pattern_id)
+        ->and($trip->planned_route_snapshot['occurrences'])->toHaveCount(2)
+        ->and($trip->planned_route_snapshot['revision_hash'])->toBe(app(TripPlanSnapshotService::class)->revisionHash($trip->planned_route_snapshot))
+        ->and($trip->scheduled_departure_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-10-26 12:30:00')
+        ->and($trip->scheduled_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-10-26 13:30:00')
+        ->and($trip->actual_departure_at)->toBeNull()
+        ->and($trip->actual_arrival_at)->toBeNull()
+        ->and(CompanyUser::query()->where('user_id', $trip->driver->user_id)->exists())->toBeFalse();
     $this->assertModelExists($trip);
     Http::assertNothingSent();
 });
@@ -41,8 +41,8 @@ test('explicit eligible driver state preserves permission context and supports a
     $trip = Trip::factory()->for($company)->withEligibleDriver()->create([
         'scheduled_arrival_at' => $arrival,
     ])->fresh();
-    expect(app(TripDriverEligibilityService::class)->validate($company, $trip->driver_id, ['2026-10-26', '2026-10-27'])->getKey())->toBe($trip->driver_id);
-    expect($trip->driver->user->permissions)->toHaveCount(0);
+    expect(app(TripDriverEligibilityService::class)->validate($company, $trip->driver_id, ['2026-10-26', '2026-10-27'])->getKey())->toBe($trip->driver_id)
+        ->and($trip->driver->user->permissions)->toBeEmpty();
     $trip->driver->update(['employment_ends_on' => '2026-10-26', 'license_expires_at' => '2026-10-26']);
     $plan = app(TripPlanPreparationService::class)->prepare($company, [
         'route_pattern_id' => $trip->route_pattern_id, 'route_schedule_id' => $trip->route_schedule_id,
@@ -75,9 +75,9 @@ test('retains the persisted factory snapshot and times after catalogue edits', f
     $trip->pattern->stopOccurrences()->firstOrFail()->stop->update(['name' => 'Changed catalogue stop']);
     $trip->refresh();
 
-    expect($trip->planned_route_snapshot)->toBe($snapshot);
-    expect($trip->scheduled_departure_at->equalTo($departure))->toBeTrue();
-    expect($trip->scheduled_arrival_at->equalTo($arrival))->toBeTrue();
+    expect($trip->planned_route_snapshot)->toBe($snapshot)
+        ->and($trip->scheduled_departure_at->equalTo($departure))->toBeTrue()
+        ->and($trip->scheduled_arrival_at->equalTo($arrival))->toBeTrue();
     Http::assertNothingSent();
 });
 
@@ -90,16 +90,16 @@ test('explicit availability fixtures cover the real local window without changin
     $trip = Trip::factory()->for($company)->withDriverAvailability()->create(['scheduled_arrival_at' => $arrival])->refresh();
 
     $slots = DriverSchedule::query()->where('driver_id', $trip->driver_id)->orderBy('valid_from')->get();
-    expect($slots->pluck('valid_from')->map->toDateString()->all())->toBe($dates);
-    expect($slots->pluck('valid_until')->map->toDateString()->all())->toBe($dates);
-    expect(app(DriverAvailabilityService::class)->covers($trip->driver, $trip->scheduled_departure_at->utc(), $trip->scheduled_arrival_at->utc()))->toBeTrue();
+    expect($slots->pluck('valid_from')->map->toDateString()->all())->toBe($dates)
+        ->and($slots->pluck('valid_until')->map->toDateString()->all())->toBe($dates)
+        ->and(app(DriverAvailabilityService::class)->covers($trip->driver, $trip->scheduled_departure_at->utc(), $trip->scheduled_arrival_at->utc()))->toBeTrue();
     $plan = app(TripPlanPreparationService::class)->prepare($company, [
         'route_pattern_id' => $trip->route_pattern_id, 'route_schedule_id' => $trip->route_schedule_id,
         'bus_id' => $trip->bus_id, 'service_date' => $trip->service_date->toDateString(),
         'arrival_at' => $trip->scheduled_arrival_at->setTimezone($company->timezone)->format('Y-m-d\TH:i:sP'),
     ]);
-    expect(app(TripDriverEligibilityService::class)->validateForPlan($company, $trip->driver_id, $plan)->getKey())->toBe($trip->driver_id);
-    expect(getPermissionsTeamId())->toBe($team);
+    expect(app(TripDriverEligibilityService::class)->validateForPlan($company, $trip->driver_id, $plan)->getKey())->toBe($trip->driver_id)
+        ->and(getPermissionsTeamId())->toBe($team);
     Http::assertNothingSent();
 })->with([
     ['2026-10-26T13:30:00Z', ['2026-10-26']],
@@ -119,15 +119,15 @@ test('default trip fixtures do not create driver availability', function (): voi
 test('persists lifecycle factory states without weakening direct model guards', function (string $method, TripStatus $status): void {
     Http::preventStrayRequests();
     $trip = Trip::factory()->{$method}()->create()->refresh();
-    expect($trip->status)->toBe($status);
-    expect($trip->actual_departure_at?->equalTo($trip->scheduled_departure_at))->toBe($status !== TripStatus::CANCELLED ? true : null);
-    expect($trip->actual_arrival_at?->equalTo($trip->scheduled_arrival_at))->toBe($status === TripStatus::COMPLETED ? true : null);
-    expect($trip->cancelled_at?->equalTo($trip->scheduled_departure_at->subHour()))->toBe($status === TripStatus::CANCELLED ? true : null);
-    expect($trip->cancellation_reason)->toBe($status === TripStatus::CANCELLED ? 'Demo cancellation' : null);
+    expect($trip->status)->toBe($status)
+        ->and($trip->actual_departure_at?->equalTo($trip->scheduled_departure_at))->toBe($status !== TripStatus::CANCELLED ? true : null)
+        ->and($trip->actual_arrival_at?->equalTo($trip->scheduled_arrival_at))->toBe($status === TripStatus::COMPLETED ? true : null)
+        ->and($trip->cancelled_at?->equalTo($trip->scheduled_departure_at->subHour()))->toBe($status === TripStatus::CANCELLED ? true : null)
+        ->and($trip->cancellation_reason)->toBe($status === TripStatus::CANCELLED ? 'Demo cancellation' : null);
     $before = $trip->getRawOriginal();
     $trip->forceFill(['status' => TripStatus::SCHEDULED]);
-    expect(fn () => $trip->saveQuietly())->toThrow(ValidationException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+    expect(fn () => $trip->saveQuietly())->toThrow(ValidationException::class)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
     Http::assertNothingSent();
 })->with([
     ['inProgress', TripStatus::IN_PROGRESS],

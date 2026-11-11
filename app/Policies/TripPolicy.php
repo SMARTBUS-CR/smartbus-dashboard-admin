@@ -12,16 +12,43 @@ use App\Models\User;
 
 class TripPolicy
 {
-    public function view(User $user, Company|Trip $target, Company|Trip|null $extra = null): bool
+    public function viewAny(User $user, Company $company): bool
     {
-        $trip = $target instanceof Trip ? $target : ($extra instanceof Trip ? $extra : null);
-        $company = $target instanceof Company ? $target : ($extra instanceof Company ? $extra : $trip?->company);
+        return $this->allowsReading($user, $company, null, 'ViewAny:Trip');
+    }
 
-        if ($company === null) {
+    public function view(User $user, Company $company, ?Trip $trip = null): bool
+    {
+        return $this->allowsReading($user, $company, $trip, 'View:Trip');
+    }
+
+    private function allowsReading(User $user, Company $company, ?Trip $trip, string $permission): bool
+    {
+        if (($trip !== null && (string) $trip->company_id !== (string) $company->getKey())
+            || ! Company::withTrashed()->whereKey($company->getKey())->exists()) {
             return false;
         }
 
-        return $this->allowsExecution($user, $company, $trip, 'View:Trip', true);
+        $user = User::query()->find($user->getKey());
+        if ($user === null) {
+            return false;
+        }
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+        if (! CompanyUser::query()->where('company_id', $company->getKey())->where('user_id', $user->getKey())->exists()) {
+            return false;
+        }
+
+        $roles = $this->companyRoles($user, $company);
+        if (in_array(UserRole::Driver->value, $roles, true)) {
+            return $trip === null || Driver::withTrashed()->whereKey($trip->driver_id)
+                ->where('company_id', $company->getKey())->where('user_id', $user->getKey())->exists();
+        }
+
+        return $roles !== []
+            && ! in_array(UserRole::Passenger->value, $roles, true)
+            && $user->can($permission);
     }
 
     public function create(User $user, Company $company): bool
@@ -75,17 +102,23 @@ class TripPolicy
         if (! CompanyUser::query()->where('company_id', $company->getKey())->where('user_id', $user->getKey())->exists()) {
             return false;
         }
-        $roles = $user->getConnection()->table('model_has_roles as assignments')
-            ->join('roles', 'roles.id', '=', 'assignments.role_id')
-            ->where('assignments.model_uuid', $user->getKey())->where('assignments.model_type', $user->getMorphClass())
-            ->where('assignments.company_id', $company->getKey())->where('roles.company_id', $company->getKey())
-            ->where('roles.guard_name', 'web')->pluck('roles.name')->all();
+        $roles = $this->companyRoles($user, $company);
         if (in_array(UserRole::Driver->value, $roles, true)) {
             return $allowDriver && ($trip === null || Driver::withTrashed()->whereKey($trip->driver_id)
                 ->where('company_id', $company->getKey())->where('user_id', $user->getKey())->exists());
         }
 
         return $user->canAccessTenant($company) && $user->can($permission);
+    }
+
+    /** @return list<string> */
+    private function companyRoles(User $user, Company $company): array
+    {
+        return $user->getConnection()->table('model_has_roles as assignments')
+            ->join('roles', 'roles.id', '=', 'assignments.role_id')
+            ->where('assignments.model_uuid', $user->getKey())->where('assignments.model_type', $user->getMorphClass())
+            ->where('assignments.company_id', $company->getKey())->where('roles.company_id', $company->getKey())
+            ->where('roles.guard_name', 'web')->pluck('roles.name')->all();
     }
 
     public function deleteAny(User $user): bool
