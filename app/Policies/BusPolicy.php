@@ -35,9 +35,12 @@ class BusPolicy
             ));
     }
 
-    public function viewAny(User $user, Company $company): bool
+    public function viewAny(User $user, ?Company $company = null): bool
     {
-        return $user->canAccessTenant($company)
+        $company ??= Filament::getTenant();
+
+        return $company instanceof Company
+            && $user->canAccessTenant($company)
             && $user->can('ViewAny:Bus');
     }
 
@@ -67,9 +70,12 @@ class BusPolicy
             && ($bus === null || (string) $bus->company_id === (string) $company->getKey());
     }
 
-    public function create(User $user, Company $company): bool
+    public function create(User $user, ?Company $company = null): bool
     {
-        return $user->canAccessTenant($company)
+        $company ??= Filament::getTenant();
+
+        return $company instanceof Company
+            && $user->canAccessTenant($company)
             && $user->can('Create:Bus');
     }
 
