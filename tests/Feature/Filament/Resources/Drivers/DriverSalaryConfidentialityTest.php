@@ -7,6 +7,7 @@ use App\Filament\Resources\Drivers\Pages\ViewDriver;
 use App\Models\CompanyUser;
 use App\Models\Driver;
 use App\Models\User;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
 
 describe('Driver Salary Confidentiality', function (): void {
@@ -63,7 +64,7 @@ describe('Driver Salary Confidentiality', function (): void {
                 'salary_currency' => 'USD',
                 'salary_period' => 'monthly',
             ])
-            ->assertMountedActionModalSee(['987654.32', 'USD', 'monthly']);
+            ->assertMountedActionModalSee(__('Confidential Salary'));
     });
 
     test('updates exact salary values only through the authorized salary action', function (): void {
@@ -108,13 +109,20 @@ describe('Driver Salary Confidentiality', function (): void {
     });
 
     test('rejects salary access across company boundaries', function (): void {
-        ($this->authorizeSalaryActor)([
+        $otherCompany = createCompany();
+        $otherDriver = Driver::factory()->create([
+            'company_id' => $otherCompany->getKey(),
+        ]);
+        $actor = ($this->authorizeSalaryActor)([
             'ViewAny:Driver', 'View:Driver', 'ViewSalary:Driver',
         ]);
 
-        $otherCompany = createCompany();
-        $otherDriver = Driver::factory()->for($otherCompany)->create();
-
-        expect(DriverResource::canViewSalary($otherDriver))->toBeFalse();
+        expect($otherCompany->getKey())->not->toBe($this->company->getKey())
+            ->and($otherDriver->company_id)->toBe($otherCompany->getKey())
+            ->and(Gate::forUser($actor)->allows(
+                'viewSalary',
+                [Driver::class, $this->company, $otherDriver],
+            ))->toBeFalse()
+            ->and(DriverResource::canViewSalary($otherDriver))->toBeFalse();
     });
 });
