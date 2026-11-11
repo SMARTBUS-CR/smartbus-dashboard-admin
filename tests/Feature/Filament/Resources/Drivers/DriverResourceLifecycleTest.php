@@ -7,6 +7,7 @@ use App\Filament\Resources\Drivers\Pages\ListDrivers;
 use App\Models\CompanyUser;
 use App\Models\Driver;
 use App\Models\Trip;
+use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
 
@@ -37,7 +38,7 @@ describe('Driver Resource Lifecycle', function (): void {
                 'employment_ends_on' => '2030-12-31',
             ])
             ->set('data.company_id', $otherCompany->getKey())
-            ->set('data.user_id', createUserWithRole(UserRole::Driver)->getKey())
+            ->set('data.user_id', User::factory()->create()->getKey())
             ->set('data.status', DriverStatus::INACTIVE->value)
             ->call('save')
             ->assertHasNoFormErrors()
