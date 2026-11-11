@@ -14,7 +14,7 @@ use Illuminate\Validation\ValidationException;
 use Tests\Support\WithDriverCompensation;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class, WithDriverCompensation::class);
+pest()->use(WithDriverRegistration::class, WithDriverCompensation::class);
 
 describe('Driver Registration Compensation', function (): void {
     test('recovers partial persistence and permits one consistent retry', function (string $phase, bool $newIdentity, bool $missingRole): void {
@@ -52,19 +52,19 @@ describe('Driver Registration Compensation', function (): void {
         try {
             expect($register)->toThrow(function (Exception $exception): void {
                 expect($exception->getMessage())->toContain('Injected registration failure');
-            });
-            expect($observed)->toBeTrue();
-            expect($this->registrationDatabaseSnapshot())->toBe($before);
-            expect(getPermissionsTeamId())->toBe($previousTeam);
-            expect($actor->relationLoaded('roles'))->toBeFalse();
-            expect($actor->relationLoaded('permissions'))->toBeFalse();
+            })
+                ->and($observed)->toBeTrue()
+                ->and($this->registrationDatabaseSnapshot())->toBe($before)
+                ->and(getPermissionsTeamId())->toBe($previousTeam)
+                ->and($actor->relationLoaded('roles'))->toBeFalse()
+                ->and($actor->relationLoaded('permissions'))->toBeFalse();
             if ($target !== null) {
-                expect($target->relationLoaded('roles'))->toBeFalse();
-                expect($target->relationLoaded('permissions'))->toBeFalse();
+                expect($target->relationLoaded('roles'))->toBeFalse()
+                    ->and($target->relationLoaded('permissions'))->toBeFalse();
             }
             foreach (['pgsql', 'mysql'] as $name) {
-                expect(DB::connection($name)->transactionLevel())->toBe(0);
-                expect(DB::connection($name)->getPdo()->inTransaction())->toBeFalse();
+                expect(DB::connection($name)->transactionLevel())->toBe(0)
+                    ->and(DB::connection($name)->getPdo()->inTransaction())->toBeFalse();
             }
         } finally {
             $disarm();
@@ -77,9 +77,9 @@ describe('Driver Registration Compensation', function (): void {
         $this->assertDatabaseCount('users', 2, 'mysql');
         $this->assertDatabaseCount('company_users', 2);
         $this->assertDatabaseCount('model_has_roles', 3, 'mysql');
-        expect($driver->user->email)->toBe($newIdentity ? 'new-driver@example.test' : $target->email);
-        expect(getPermissionsTeamId())->toBe($previousTeam);
-        expect($register)->toThrow(ValidationException::class);
+        expect($driver->user->email)->toBe($newIdentity ? 'new-driver@example.test' : $target->email)
+            ->and(getPermissionsTeamId())->toBe($previousTeam)
+            ->and($register)->toThrow(ValidationException::class);
         $this->assertDatabaseCount('drivers', 1);
         $this->assertDatabaseCount('users', 2, 'mysql');
     })->with(['pgsql deferred commit', 'pgsql committed', 'mysql committing', 'mysql committed'])
@@ -107,9 +107,9 @@ describe('Driver Registration Compensation', function (): void {
 
         try {
             expect(fn () => app(DriverManagementService::class)->createForExistingUser($actor, $company, $target, $this->validDriverEmployment()))
-                ->toThrow(RuntimeException::class, 'Injected registration failure');
-            expect($this->registrationDatabaseSnapshot())->toBe($before);
-            expect(getPermissionsTeamId())->toBe($otherCompany->id);
+                ->toThrow(RuntimeException::class, 'Injected registration failure')
+                ->and($this->registrationDatabaseSnapshot())->toBe($before)
+                ->and(getPermissionsTeamId())->toBe($otherCompany->id);
         } finally {
             $disarm();
         }
@@ -139,8 +139,8 @@ describe('Driver Registration Compensation', function (): void {
             : app(DriverManagementService::class)->createForExistingUser($actor, $company, $target, $this->validDriverEmployment());
 
         try {
-            expect($register)->toThrow(QueryException::class, 'Injected employment insert failure');
-            expect($this->registrationDatabaseSnapshot())->toBe($before);
+            expect($register)->toThrow(QueryException::class, 'Injected employment insert failure')
+                ->and($this->registrationDatabaseSnapshot())->toBe($before);
         } finally {
             DB::connection('pgsql')->unprepared('DROP TRIGGER reject_driver_registration_insert ON drivers; DROP FUNCTION reject_driver_registration_insert();');
         }
@@ -180,10 +180,10 @@ describe('Driver Registration Compensation', function (): void {
         try {
             expect($register)->toThrow(function (DriverRegistrationCompensationException $exception) use (&$failure): void {
                 $failure = $exception;
-                expect($exception->getPrevious()->getMessage())->toBe('Injected registration failure');
-                expect($exception->recoveryFailures)->toHaveCount(1);
-                expect($exception->recoveryFailures[0]->getMessage())->toContain('Injected compensation failure');
-                expect($exception->context()['driver_id'])->not->toBeNull();
+                expect($exception->getPrevious()->getMessage())->toBe('Injected registration failure')
+                    ->and($exception->recoveryFailures)->toHaveCount(1)
+                    ->and($exception->recoveryFailures[0]->getMessage())->toContain('Injected compensation failure')
+                    ->and($exception->context()['driver_id'])->not->toBeNull();
             });
             $this->assertDatabaseCount('users', 2, 'mysql');
             $this->assertDatabaseCount('drivers', $cleanupConnection === 'pgsql' ? 1 : 0);

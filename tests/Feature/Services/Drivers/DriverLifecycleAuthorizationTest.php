@@ -21,15 +21,15 @@ describe('Driver Lifecycle Authorization', function (): void {
         setPermissionsTeamId($previous->id);
         $actor->load('roles', 'permissions');
 
-        expect(fn () => app(DriverManagementService::class)->{$method}($actor, $company, $driver, $argument))->toThrow(AuthorizationException::class);
-        expect($driver->fresh()->getRawOriginal())->toBe($before);
-        expect(getPermissionsTeamId())->toBe($previous->id);
-        expect($actor->relationLoaded('roles'))->toBeFalse();
+        expect(fn () => app(DriverManagementService::class)->{$method}($actor, $company, $driver, $argument))->toThrow(AuthorizationException::class)
+            ->and($driver->fresh()->getRawOriginal())->toBe($before)
+            ->and(getPermissionsTeamId())->toBe($previous->id)
+            ->and($actor->relationLoaded('roles'))->toBeFalse();
         grantShield($actor, [$permission], $company);
         app(DriverManagementService::class)->{$method}($actor, $company, $driver, $argument);
-        expect(getPermissionsTeamId())->toBe($previous->id);
-        expect($actor->relationLoaded('roles'))->toBeFalse();
-        expect($actor->relationLoaded('permissions'))->toBeFalse();
+        expect(getPermissionsTeamId())->toBe($previous->id)
+            ->and($actor->relationLoaded('roles'))->toBeFalse()
+            ->and($actor->relationLoaded('permissions'))->toBeFalse();
     })->with([
         ['updateEmployment', 'Update:Driver'], ['setActive', 'Update:Driver'],
         ['archive', 'Delete:Driver'], ['restore', 'Restore:Driver'],
@@ -43,8 +43,8 @@ describe('Driver Lifecycle Authorization', function (): void {
         $driver->company_id = $company->id;
         $argument = $method === 'setActive' ? false : [];
 
-        expect(fn () => app(DriverManagementService::class)->{$method}($actor, $company, $driver, $argument))->toThrow(ModelNotFoundException::class);
-        expect($driver->fresh()->getRawOriginal())->toBe($before);
+        expect(fn () => app(DriverManagementService::class)->{$method}($actor, $company, $driver, $argument))->toThrow(ModelNotFoundException::class)
+            ->and($driver->fresh()->getRawOriginal())->toBe($before);
     })->with(['updateEmployment', 'setActive', 'archive', 'restore']);
 
     test('rejects an inactive company without changing employment', function (): void {
@@ -54,8 +54,8 @@ describe('Driver Lifecycle Authorization', function (): void {
         $before = $driver->fresh()->getRawOriginal();
         $company->update(['status' => CompanyStatus::INACTIVE]);
 
-        expect(fn () => app(DriverManagementService::class)->archive($actor, $company, $driver))->toThrow(AuthorizationException::class);
-        expect($driver->fresh()->getRawOriginal())->toBe($before);
+        expect(fn () => app(DriverManagementService::class)->archive($actor, $company, $driver))->toThrow(AuthorizationException::class)
+            ->and($driver->fresh()->getRawOriginal())->toBe($before);
     });
 
     test('requires viewing permission for archived history and preserves salary confidentiality', function (): void {
@@ -69,9 +69,9 @@ describe('Driver Lifecycle Authorization', function (): void {
         expect(fn () => $service->findArchivedFor($actor, $company, $driver->id))->toThrow(AuthorizationException::class);
         grantShield($actor, ['View:Driver'], $company);
         $history = $service->findArchivedFor($actor, $company, $driver->id);
-        expect($history['id'])->toBe($driver->id);
-        expect($history['deleted_at'])->not->toBeNull();
-        expect($history)->not->toHaveKeys(['salary_amount', 'salary_currency', 'salary_period', 'user']);
+        expect($history['id'])->toBe($driver->id)
+            ->and($history['deleted_at'])->not->toBeNull()
+            ->and($history)->not->toHaveKeys(['salary_amount', 'salary_currency', 'salary_period', 'user']);
     });
 
     test('limits historical access to archived records within the explicit company', function (bool $foreign): void {

@@ -5,7 +5,7 @@ use App\Services\DriverScheduleService;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\WithDriverTrips;
 
-uses(WithDriverTrips::class);
+pest()->use(WithDriverTrips::class);
 
 describe('Driver Trip Availability', function (): void {
     test('rolls back invalidating availability changes and preserves the assigned trip', function (string $status, array $data): void {
@@ -15,9 +15,8 @@ describe('Driver Trip Availability', function (): void {
         $history = $trip->getRawOriginal();
 
         expect(fn () => app(DriverScheduleService::class)->update($actor, $trip->company, $trip->driver, $schedule, $data))
-            ->toThrow(ValidationException::class);
-
-        expect($schedule->fresh()->getRawOriginal())->toBe($before)
+            ->toThrow(ValidationException::class)
+            ->and($schedule->fresh()->getRawOriginal())->toBe($before)
             ->and($trip->fresh()->getRawOriginal())->toBe($history);
     })->with(['scheduled', 'in_progress'])->with([
         'late start' => [['start_time' => '07:00', 'end_time' => '09:00', 'ends_next_day' => false]],
@@ -70,9 +69,8 @@ describe('Driver Trip Availability', function (): void {
         $before = $schedule->fresh()->getRawOriginal();
 
         expect(fn () => $service->update($actor, $trip->company, $trip->driver, $schedule, $changes))
-            ->toThrow(ValidationException::class);
-
-        expect($schedule->fresh()->getRawOriginal())->toBe($before);
+            ->toThrow(ValidationException::class)
+            ->and($schedule->fresh()->getRawOriginal())->toBe($before);
         $this->assertModelExists($trip);
     })->with([
         'overnight end before departure' => [['end_time' => '06:00']],

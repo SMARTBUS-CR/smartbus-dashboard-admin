@@ -113,10 +113,10 @@ describe('Driver Availability Service', function (): void {
         $service = app(DriverAvailabilityService::class);
         expect($service->covers($this->driver, $start, $end))->toBeFalse();
         DriverSchedule::factory()->for($this->driver)->create();
-        expect($service->covers($this->driver, $start, $end))->toBeTrue();
-        expect($service->covers($this->driver, $start, $end))->toBeTrue();
-        expect($mysqlQueries)->toBe([]);
-        expect($start->format('Y-m-d H:i:sP'))->toBe('2026-10-19 14:00:00+00:00');
+        expect($service->covers($this->driver, $start, $end))->toBeTrue()
+            ->and($service->covers($this->driver, $start, $end))->toBeTrue()
+            ->and($mysqlQueries)->toBeEmpty()
+            ->and($start->format('Y-m-d H:i:sP'))->toBe('2026-10-19 14:00:00+00:00');
         Http::assertNothingSent();
     });
 

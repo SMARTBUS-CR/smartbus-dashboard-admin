@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Tests\Support\WithDriverConcurrency;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class, WithDriverConcurrency::class);
+pest()->use(WithDriverRegistration::class, WithDriverConcurrency::class);
 
 afterEach(function (): void {
     $this->finishDriverConcurrency();
@@ -49,9 +49,9 @@ describe('Driver Schedule Concurrency', function (): void {
         $firstResult = $first->await('result');
         $secondResult = $second->await('result');
 
-        expect($firstReady['pgsql_pid'])->not->toBe($secondReady['pgsql_pid']);
-        expect($firstResult['status'])->toBe('success');
-        expect($secondResult['status'])->toBe($scenario === 'delete-create' ? 'success' : 'validation');
+        expect($firstReady['pgsql_pid'])->not->toBe($secondReady['pgsql_pid'])
+            ->and($firstResult['status'])->toBe('success')
+            ->and($secondResult['status'])->toBe($scenario === 'delete-create' ? 'success' : 'validation');
         if ($scenario !== 'delete-create') {
             expect($secondResult['errors'])->toHaveKey('schedule');
         }
@@ -60,10 +60,10 @@ describe('Driver Schedule Concurrency', function (): void {
             expect($schedule->fresh()->start_time)->toBe('16:00:00');
         }
         foreach ([$firstResult, $secondResult] as $result) {
-            expect($result['team_restored'])->toBeTrue();
-            expect($result['actor_cache_cleared'])->toBeTrue();
-            expect($result['pgsql_level'])->toBe(0);
-            expect($result['pgsql_transaction'])->toBeFalse();
+            expect($result['team_restored'])->toBeTrue()
+                ->and($result['actor_cache_cleared'])->toBeTrue()
+                ->and($result['pgsql_level'])->toBe(0)
+                ->and($result['pgsql_transaction'])->toBeFalse();
         }
     })->with(['create-create', 'create-update', 'delete-create']);
 });

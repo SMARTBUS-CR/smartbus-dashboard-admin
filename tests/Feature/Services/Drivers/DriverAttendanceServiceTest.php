@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class);
+pest()->use(WithDriverRegistration::class);
 
 function driverAttendanceActor(Company $company): User
 {
@@ -73,8 +73,8 @@ describe('Driver Attendance Service', function (): void {
             CarbonImmutable::parse('2026-10-26', $company->timezone),
         );
 
-        expect(array_keys($summary))->toBe(['company_timezone', 'from_date', 'until_date', 'days']);
-        expect($summary['company_timezone'])->toBe('America/Costa_Rica')
+        expect(array_keys($summary))->toBe(['company_timezone', 'from_date', 'until_date', 'days'])
+            ->and($summary['company_timezone'])->toBe('America/Costa_Rica')
             ->and($summary['from_date'])->toBe('2026-10-26')
             ->and($summary['until_date'])->toBe('2026-10-26')
             ->and($summary['days'])->toHaveCount(1);
@@ -82,42 +82,39 @@ describe('Driver Attendance Service', function (): void {
         expect(array_keys($day))->toBe([
             'service_date', 'assigned_count', 'started_count', 'completed_count', 'cancelled_count',
             'pending_count', 'in_progress_count', 'first_departure_at', 'last_arrival_at', 'trips',
-        ]);
-        expect($day)->toMatchArray([
-            'service_date' => '2026-10-26',
-            'assigned_count' => 4,
-            'started_count' => 2,
-            'completed_count' => 1,
-            'cancelled_count' => 1,
-            'pending_count' => 1,
-            'in_progress_count' => 1,
-            'first_departure_at' => '2026-10-26T13:00:00.000000Z',
-            'last_arrival_at' => '2026-10-26T15:00:00.000000Z',
-        ]);
-        expect($day['trips'])->toHaveCount(4);
-        expect(array_keys($day['trips'][0]))->toBe([
-            'id', 'service_date', 'route_schedule_id', 'bus_id', 'status', 'pattern_code', 'pattern_name',
-            'scheduled_departure_at', 'scheduled_arrival_at', 'actual_departure_at', 'actual_arrival_at', 'cancelled_at',
-        ]);
-        expect($day['trips'][0])->toMatchArray([
-            'id' => $scheduled->id,
-            'route_schedule_id' => $scheduled->route_schedule_id,
-            'bus_id' => $scheduled->bus_id,
-            'status' => 'scheduled',
-            'pattern_code' => 'PAT-S',
-            'pattern_name' => 'Pattern PAT-S',
-            'scheduled_departure_at' => '2026-10-26T12:00:00.000000Z',
-            'scheduled_arrival_at' => '2026-10-26T13:00:00.000000Z',
-            'actual_departure_at' => null,
-            'actual_arrival_at' => null,
-        ]);
-        expect($day['trips'][1]['id'])->toBe($inProgress->id)
+        ])
+            ->and($day)->toMatchArray([
+                'service_date' => '2026-10-26',
+                'assigned_count' => 4,
+                'started_count' => 2,
+                'completed_count' => 1,
+                'cancelled_count' => 1,
+                'pending_count' => 1,
+                'in_progress_count' => 1,
+                'first_departure_at' => '2026-10-26T13:00:00.000000Z',
+                'last_arrival_at' => '2026-10-26T15:00:00.000000Z',
+            ])
+            ->and($day['trips'])->toHaveCount(4)
+            ->and(array_keys($day['trips'][0]))->toBe([
+                'id', 'service_date', 'route_schedule_id', 'bus_id', 'status', 'pattern_code', 'pattern_name',
+                'scheduled_departure_at', 'scheduled_arrival_at', 'actual_departure_at', 'actual_arrival_at', 'cancelled_at',
+            ])
+            ->and($day['trips'][0])->toMatchArray([
+                'id' => $scheduled->id,
+                'route_schedule_id' => $scheduled->route_schedule_id,
+                'bus_id' => $scheduled->bus_id,
+                'status' => 'scheduled',
+                'pattern_code' => 'PAT-S',
+                'pattern_name' => 'Pattern PAT-S',
+                'scheduled_departure_at' => '2026-10-26T12:00:00.000000Z',
+                'scheduled_arrival_at' => '2026-10-26T13:00:00.000000Z',
+                'actual_departure_at' => null,
+                'actual_arrival_at' => null,
+            ])
+            ->and($day['trips'][1]['id'])->toBe($inProgress->id)
             ->and($day['trips'][2]['id'])->toBe($completed->id)
-            ->and($day['trips'][3]['id'])->toBe($cancelled->id);
-        expect(json_encode($summary, JSON_THROW_ON_ERROR))
-            ->not->toContain('9999999999.99')
-            ->not->toContain($actor->email)
-            ->not->toContain($actor->password);
+            ->and($day['trips'][3]['id'])->toBe($cancelled->id)
+            ->and(json_encode($summary, JSON_THROW_ON_ERROR))->not->toContain('9999999999.99')->not->toContain($actor->email)->not->toContain($actor->password);
     });
 
     test('represents empty cancelled-only and pending-only dates truthfully', function (): void {
@@ -135,20 +132,18 @@ describe('Driver Attendance Service', function (): void {
             CarbonImmutable::parse('2026-10-28', $company->timezone),
         )['days'];
 
-        expect($days)->toHaveCount(3);
-        expect($days[0])->toMatchArray([
-            'service_date' => '2026-10-26', 'assigned_count' => 1, 'cancelled_count' => 1,
-            'started_count' => 0, 'pending_count' => 0, 'first_departure_at' => null, 'last_arrival_at' => null,
-        ]);
-        expect($days[1])->toBe([
-            'service_date' => '2026-10-27', 'assigned_count' => 0, 'started_count' => 0,
-            'completed_count' => 0, 'cancelled_count' => 0, 'pending_count' => 0,
-            'in_progress_count' => 0, 'first_departure_at' => null, 'last_arrival_at' => null, 'trips' => [],
-        ]);
-        expect($days[2])->toMatchArray([
-            'service_date' => '2026-10-28', 'assigned_count' => 1, 'pending_count' => 1,
-            'started_count' => 0, 'cancelled_count' => 0, 'first_departure_at' => null, 'last_arrival_at' => null,
-        ]);
+        expect($days)->toHaveCount(3)
+            ->sequence(fn ($e) => $e->toMatchArray([
+                'service_date' => '2026-10-26', 'assigned_count' => 1, 'cancelled_count' => 1,
+                'started_count' => 0, 'pending_count' => 0, 'first_departure_at' => null, 'last_arrival_at' => null,
+            ]), fn ($e) => $e->toBe([
+                'service_date' => '2026-10-27', 'assigned_count' => 0, 'started_count' => 0,
+                'completed_count' => 0, 'cancelled_count' => 0, 'pending_count' => 0,
+                'in_progress_count' => 0, 'first_departure_at' => null, 'last_arrival_at' => null, 'trips' => [],
+            ]), fn ($e) => $e->toMatchArray([
+                'service_date' => '2026-10-28', 'assigned_count' => 1, 'pending_count' => 1,
+                'started_count' => 0, 'cancelled_count' => 0, 'first_departure_at' => null, 'last_arrival_at' => null,
+            ]));
     });
 
     test('groups an overnight trip by its original service date', function (): void {
@@ -168,8 +163,8 @@ describe('Driver Attendance Service', function (): void {
         expect($days[0]['service_date'])->toBe('2026-10-26')
             ->and($days[0]['assigned_count'])->toBe(1)
             ->and($days[0]['trips'][0]['id'])->toBe($trip->id)
-            ->and($days[0]['last_arrival_at'])->toBe('2026-10-27T08:00:00.000000Z');
-        expect($days[1]['service_date'])->toBe('2026-10-27')
+            ->and($days[0]['last_arrival_at'])->toBe('2026-10-27T08:00:00.000000Z')
+            ->and($days[1]['service_date'])->toBe('2026-10-27')
             ->and($days[1]['assigned_count'])->toBe(0);
     });
 
@@ -192,11 +187,9 @@ describe('Driver Attendance Service', function (): void {
         $summary = $service->summarize($actor, $company, $driver, $date, $date);
 
         expect($summary['days'][0]['assigned_count'])->toBe(1)
-            ->and($summary['days'][0]['trips'][0]['id'])->toBe($trip->id);
-        expect(fn () => $service->summarize($unauthorized, $company, $driver, $date, $date))
-            ->toThrow(AuthorizationException::class);
-        expect(fn () => $service->summarize($actor, $company, $otherDriver, $date, $date))
-            ->toThrow(AuthorizationException::class);
+            ->and($summary['days'][0]['trips'][0]['id'])->toBe($trip->id)
+            ->and(fn () => $service->summarize($unauthorized, $company, $driver, $date, $date))->toThrow(AuthorizationException::class)
+            ->and(fn () => $service->summarize($actor, $company, $otherDriver, $date, $date))->toThrow(AuthorizationException::class);
     });
 
     test('normalizes an inclusive local date range and rejects invalid ranges or timezones', function (): void {
@@ -215,16 +208,16 @@ describe('Driver Attendance Service', function (): void {
 
         expect($summary['from_date'])->toBe('2026-10-25')
             ->and($summary['until_date'])->toBe('2026-10-26')
-            ->and($summary['days'])->toHaveCount(2);
-        expect(fn () => $service->summarize(
-            $actor,
-            $company,
-            $driver,
-            CarbonImmutable::parse('2026-10-27', $company->timezone),
-            CarbonImmutable::parse('2026-10-26', $company->timezone),
-        ))->toThrow(function (ValidationException $exception): void {
-            expect($exception->errors())->toHaveKey('until_date');
-        });
+            ->and($summary['days'])->toHaveCount(2)
+            ->and(fn () => $service->summarize(
+                $actor,
+                $company,
+                $driver,
+                CarbonImmutable::parse('2026-10-27', $company->timezone),
+                CarbonImmutable::parse('2026-10-26', $company->timezone),
+            ))->toThrow(function (ValidationException $exception): void {
+                expect($exception->errors())->toHaveKey('until_date');
+            });
 
         $company->timezone = 'Invalid/Timezone';
         expect(fn () => $service->summarize(
@@ -271,7 +264,7 @@ describe('Driver Attendance Service', function (): void {
 
         expect($queryCounts['large'])->toBeLessThanOrEqual($queryCounts['small'])
             ->and($summary['days'])->toHaveCount(31)
-            ->and($writeStatements)->toBe([]);
+            ->and($writeStatements)->toBeEmpty();
         foreach ($trips as $trip) {
             expect($trip->fresh()->getRawOriginal())->toBe($before[$trip->id]);
         }

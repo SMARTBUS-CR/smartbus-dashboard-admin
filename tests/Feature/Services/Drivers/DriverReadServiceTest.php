@@ -25,9 +25,9 @@ describe('Driver Read Service', function (): void {
         $profile = $service->findFor($actor, $company, $driver->id);
         $profiles = $service->listFor($actor, $company);
 
-        expect($profiles)->toHaveCount(1);
-        expect($profiles->sole())->toBe($profile);
-        expect($profile)->toHaveKeys(['id', 'company_id', 'user_id', 'license', 'status']);
+        expect($profiles)->toHaveCount(1)
+            ->and($profiles->sole())->toBe($profile)
+            ->and($profile)->toHaveKeys(['id', 'company_id', 'user_id', 'license', 'status']);
         foreach (['salary_amount', 'salary_currency', 'salary_period', 'user', 'name', 'email', 'password'] as $key) {
             expect($profile)->not->toHaveKey($key);
         }
@@ -48,11 +48,11 @@ describe('Driver Read Service', function (): void {
 
         $salary = app(DriverReadService::class)->salaryFor($actor, $company, $driver->id);
 
-        expect($salary)->toBe(['salary_amount' => $amount, 'salary_currency' => 'CRC', 'salary_period' => 'monthly']);
-        expect(getPermissionsTeamId())->toBe($previous->id);
-        expect($actor->relationLoaded('roles'))->toBeFalse();
-        expect($actor->relationLoaded('permissions'))->toBeFalse();
-        expect($driver->fresh()->toArray())->not->toHaveKeys(['salary_amount', 'salary_currency', 'salary_period']);
+        expect($salary)->toBe(['salary_amount' => $amount, 'salary_currency' => 'CRC', 'salary_period' => 'monthly'])
+            ->and(getPermissionsTeamId())->toBe($previous->id)
+            ->and($actor->relationLoaded('roles'))->toBeFalse()
+            ->and($actor->relationLoaded('permissions'))->toBeFalse()
+            ->and($driver->fresh()->toArray())->not->toHaveKeys(['salary_amount', 'salary_currency', 'salary_period']);
     })->with(['0.00', '650000.25', '9999999999.99']);
 
     test('denies every supported read without its permission and restores context', function (string $method): void {
@@ -63,10 +63,10 @@ describe('Driver Read Service', function (): void {
         setPermissionsTeamId($previous->id);
         $actor->load('roles', 'permissions');
 
-        expect(fn () => app(DriverReadService::class)->{$method}($actor, $company, $driver->id))->toThrow(AuthorizationException::class);
-        expect(getPermissionsTeamId())->toBe($previous->id);
-        expect($actor->relationLoaded('roles'))->toBeFalse();
-        expect($actor->relationLoaded('permissions'))->toBeFalse();
+        expect(fn () => app(DriverReadService::class)->{$method}($actor, $company, $driver->id))->toThrow(AuthorizationException::class)
+            ->and(getPermissionsTeamId())->toBe($previous->id)
+            ->and($actor->relationLoaded('roles'))->toBeFalse()
+            ->and($actor->relationLoaded('permissions'))->toBeFalse();
     })->with(['listFor', 'findFor', 'salaryFor']);
 
     test('does not expose another company record even to global administrators', function (string $method): void {
