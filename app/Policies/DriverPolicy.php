@@ -20,9 +20,12 @@ class DriverPolicy
             && $this->allowsWorkforce($actor, $company, 'ViewAny:Driver');
     }
 
-    public function create(User $actor, Company $company): bool
+    public function create(User $actor, ?Company $company = null): bool
     {
-        return $this->allowsWorkforce($actor, $company, 'Create:Driver');
+        $company ??= Filament::getTenant();
+
+        return $company instanceof Company
+            && $this->allowsWorkforce($actor, $company, 'Create:Driver');
     }
 
     public function view(User $actor, Company|Driver $target, ?Driver $extra = null): bool

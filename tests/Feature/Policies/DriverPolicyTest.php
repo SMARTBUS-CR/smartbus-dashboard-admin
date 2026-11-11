@@ -33,16 +33,20 @@ describe('Driver Policy', function (): void {
         ['viewSalary', 'ViewSalary:Driver'], ['viewAttendance', 'ViewAttendance:Driver'],
     ]);
 
-    test('does not grant administration through a role alone', function (UserRole $role): void {
+    test('does not grant administration through employee roles even with permissions', function (UserRole $role): void {
         $company = createCompany();
         $actor = createUserWithRole($role, $company);
         CompanyUser::create(['company_id' => $company->id, 'user_id' => $actor->id]);
         $driver = Driver::factory()->for($company)->create();
+        grantShield($actor, [
+            'ViewAny:Driver', 'View:Driver', 'Create:Driver', 'Update:Driver',
+            'Delete:Driver', 'Restore:Driver', 'ViewSalary:Driver', 'ViewAttendance:Driver',
+        ], $company);
 
         foreach (['viewAny', 'view', 'create', 'update', 'delete', 'restore', 'viewSalary', 'viewAttendance'] as $ability) {
             expect(Gate::forUser($actor)->allows($ability, [Driver::class, $company, $driver]))->toBeFalse();
         }
-    })->with([UserRole::Admin, UserRole::Driver, UserRole::Passenger]);
+    })->with([UserRole::Driver, UserRole::Passenger]);
 
     test('allows a global administrator only within a valid record company', function (string $ability): void {
         [$company, $other] = createTenantPair();
@@ -81,17 +85,23 @@ describe('Driver Policy', function (): void {
 });
 
 describe('Driver Record Authorization Contracts', function (): void {
-    test('resolves the active tenant for native collection authorization', function (): void {
+    test('resolves the active tenant for native collection authorization', function (
+        string $ability,
+        string $permission,
+    ): void {
         $company = createCompany();
         $actor = User::factory()->create();
         CompanyUser::create(['company_id' => $company->getKey(), 'user_id' => $actor->getKey()]);
-        grantShield($actor, ['ViewAny:Driver'], $company);
+        grantShield($actor, [$permission], $company);
         actingAsInCompany($actor, $company);
 
-        $allowed = Gate::forUser($actor)->allows('viewAny', Driver::class);
+        $allowed = Gate::forUser($actor)->allows($ability, Driver::class);
 
         expect($allowed)->toBeTrue();
-    });
+    })->with([
+        'listing' => ['viewAny', 'ViewAny:Driver'],
+        'creating' => ['create', 'Create:Driver'],
+    ]);
 
     test('supports native model and explicit company authorization', function (
         string $ability,
