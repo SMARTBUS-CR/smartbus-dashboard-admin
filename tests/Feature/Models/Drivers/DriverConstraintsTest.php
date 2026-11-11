@@ -32,8 +32,8 @@ describe('Driver Constraints', function (): void {
         $driver = Driver::factory()->create();
 
         expect(fn () => DB::transaction(fn () => DB::table('drivers')->where('id', $driver->id)->update($changes)))
-            ->toThrow(QueryException::class, $constraint);
-        expect($driver->fresh()->license)->toBe($driver->license);
+            ->toThrow(QueryException::class, $constraint)
+            ->and($driver->fresh()->license)->toBe($driver->license);
     })->with([
         'lowercase license' => [['license' => 'license-001'], 'drivers_license_check'],
         'untrimmed license' => [['license' => ' LICENSE-001 '], 'drivers_license_check'],
@@ -89,7 +89,7 @@ describe('Driver Constraints', function (): void {
         $migration->up();
 
         expect(fn () => DB::transaction(fn () => DB::table('drivers')->where('id', $driver->id)->update(['user_id' => $otherUser->id])))
-            ->toThrow(QueryException::class, 'drivers_identity_immutable');
-        expect($driver->fresh()->user_id)->toBe($driver->user_id);
+            ->toThrow(QueryException::class, 'drivers_identity_immutable')
+            ->and($driver->fresh()->user_id)->toBe($driver->user_id);
     });
 });
