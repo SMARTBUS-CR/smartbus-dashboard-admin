@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Models\Driver;
 use App\Models\RouteSchedule;
 use App\Models\Trip;
+use App\Models\User;
 use App\Services\TripDriverEligibilityService;
 use App\Services\TripPlanSnapshotService;
 use Carbon\CarbonImmutable;
@@ -24,8 +25,8 @@ class TripSeeder extends Seeder
     /**
      * Development fixtures for fixed local Mondays, with explicit one-hour
      * planned window. Reuse the dedicated DEMO-CITY/OUTBOUND Monday 09:00
-     * schedule, the first active demo bus by ID, and the first eligible covered
-     * Driver. Missing or conflicting resources skip insertion. Execution examples
+     * schedule, the first active demo bus by ID, and the existing user@driver.com
+     * driver. Missing or conflicting resources skip insertion. Execution examples
      * use deterministic fixture timestamps. Never create identities, grant
      * permissions or update existing trips.
      */
@@ -85,19 +86,17 @@ class TripSeeder extends Seeder
                     'arrival_at' => $departure->addHour()->format('Y-m-d\TH:i:sP'), 'departure_utc_offset' => $departure->format('P'),
                 ]);
 
-                $driver = null;
-                foreach (Driver::query()->where('company_id', $company->getKey())->where('status', DriverStatus::ACTIVE)
-                    ->orderBy('id')->lockForUpdate()->get() as $candidate) {
-                    try {
-                        $driver = $eligibility->validateForPlan($company, $candidate->getKey(), $plan);
-                        break;
-                    } catch (ValidationException) {
-                        continue;
-                    }
-                }
-                if (! $driver) {
+                $user = User::query()->where('email', 'user@driver.com')->first();
+                if ($user === null) {
                     return false;
                 }
+                $candidate = Driver::query()->where('company_id', $company->getKey())
+                    ->where('user_id', $user->getKey())->where('status', DriverStatus::ACTIVE)
+                    ->lockForUpdate()->first();
+                if ($candidate === null) {
+                    return false;
+                }
+                $driver = $eligibility->validateForPlan($company, $candidate->getKey(), $plan);
 
                 $trip = new Trip([
                     'company_id' => $company->getKey(), 'route_pattern_id' => $plan['pattern']->getKey(),
