@@ -24,6 +24,8 @@ describe('Database Seeding', function (): void {
             'email' => 'admin@company.com',
         ]);
 
+        User::factory()->create(['name' => 'Driver User', 'email' => 'user@driver.com']);
+
         $this->seed(DatabaseSeeder::class);
 
         $company = Company::query()
@@ -52,15 +54,16 @@ describe('Database Seeding', function (): void {
         $demoRoute = Route::query()->where('company_id', $demoCompany->id)->where('code', 'DEMO-CITY')->sole();
         $demoPattern = RoutePattern::query()->where('route_id', $demoRoute->id)->where('code', 'OUTBOUND')->sole();
         expect($demoCompany->buses()->count())->toBe(3)
-            ->and(Driver::query()->where('company_id', $demoCompany->id)->count())->toBe(3)
-            ->and(DriverSchedule::query()->whereIn('driver_id', Driver::query()->where('company_id', $demoCompany->id)->select('id'))->count())->toBe(15)
+            ->and(Driver::query()->where('company_id', $demoCompany->id)->count())->toBe(1)
+            ->and(DriverSchedule::query()->whereIn('driver_id', Driver::query()->where('company_id', $demoCompany->id)->select('id'))->count())->toBe(5)
             ->and(RouteSchedule::query()->where('route_pattern_id', $demoPattern->id)
                 ->where('day_of_week', 1)->where('departure_time', '09:00:00')->count())->toBe(1)
             ->and(Trip::query()->where('company_id', $demoCompany->id)->count())->toBe(4)
             ->and(Permission::query()->where('guard_name', 'web')->where('name', 'like', '%:Bus')
                 ->orderBy('name')->pluck('name')->all())->toBe([
                     'Create:Bus', 'Delete:Bus', 'Restore:Bus', 'Update:Bus', 'View:Bus', 'ViewAny:Bus',
-                ]);
+                ])
+            ->and(Trip::query()->with('driver.user')->get()->every(fn (Trip $trip): bool => $trip->driver->user->email === 'user@driver.com'))->toBeTrue();
 
         $edited = $demoCompany->buses()->where('unit_number', 'DEMO-001')->sole();
         $edited->update(['capacity' => 55, 'unit_number' => 'CUSTOM-001', 'plate_number' => 'CUSTOM-PLATE']);
