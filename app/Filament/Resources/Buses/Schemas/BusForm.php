@@ -19,6 +19,16 @@ class BusForm
                         ->label(__('Country'))
                         ->options(config('countries'))
                         ->searchable()
+                        ->mutateStateForValidationUsing(
+                            fn (?string $state): ?string => $state !== null
+                                ? strtoupper(trim($state))
+                                : null,
+                        )
+                        ->dehydrateStateUsing(
+                            fn (?string $state): ?string => $state !== null
+                                ? strtoupper(trim($state))
+                                : null,
+                        )
                         ->required(),
 
                     TextInput::make('plate_number')

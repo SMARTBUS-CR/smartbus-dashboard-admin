@@ -27,7 +27,7 @@ describe('Bus Resource Management', function (): void {
     test('creates a normalized bus through the canonical fleet workflow', function (): void {
         Livewire::test(CreateBus::class)
             ->fillForm([
-                'country_code' => 'cr',
+                'country_code' => 'CR',
                 'plate_number' => ' bus-123 ',
                 'unit_number' => ' 17 ',
                 'brand' => ' Mercedes-Benz ',
@@ -77,7 +77,7 @@ describe('Bus Resource Management', function (): void {
 
         Livewire::test(EditBus::class, ['record' => $bus->getKey()])
             ->fillForm([
-                'country_code' => 'cr',
+                'country_code' => 'CR',
                 'plate_number' => 'new-plate',
                 'unit_number' => 'NEW-UNIT',
                 'brand' => 'Volvo',

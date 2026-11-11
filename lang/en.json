@@ -1,4 +1,7 @@
 {
+    "The selected route is unavailable or does not belong to an active company.": "The selected route is unavailable or does not belong to an active company.",
+    "This route is already in your favorites.": "This route is already in your favorites.",
+    "Favorite route not found.": "Favorite route not found.",
     "This field cannot be supplied when planning a trip.": "This field cannot be supplied when planning a trip.",
     "The selected departure or resource conflicts with an existing trip.": "The selected departure or resource conflicts with an existing trip.",
     "The selected driver does not cover the complete planned interval.": "The selected driver does not cover the complete planned interval.",
