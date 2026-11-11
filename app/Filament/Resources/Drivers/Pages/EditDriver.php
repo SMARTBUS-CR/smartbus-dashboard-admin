@@ -50,12 +50,19 @@ class EditDriver extends EditRecord
                         403,
                     );
 
-                    app(DriverManagementService::class)->updateEmployment(
-                        $actor,
-                        $company,
-                        $driver,
-                        Arr::only($data, ['salary_amount', 'salary_currency', 'salary_period']),
-                    );
+                    try {
+                        app(DriverManagementService::class)->updateEmployment(
+                            $actor,
+                            $company,
+                            $driver,
+                            Arr::only($data, ['salary_amount', 'salary_currency', 'salary_period']),
+                        );
+                    } catch (ValidationException $exception) {
+                        throw $this->forForm(
+                            $exception,
+                            $this->getMountedActionSchema()?->getStatePath(),
+                        );
+                    }
 
                     Notification::make()
                         ->title(__('Salary Updated'))
@@ -105,14 +112,19 @@ class EditDriver extends EditRecord
                 ]),
             );
         } catch (ValidationException $exception) {
-            $statePath = $this->form->getStatePath();
-            $errors = [];
-
-            foreach ($exception->errors() as $field => $messages) {
-                $errors[filled($statePath) ? "{$statePath}.{$field}" : $field] = $messages;
-            }
-
-            throw ValidationException::withMessages($errors);
+            throw $this->forForm($exception);
         }
+    }
+
+    private function forForm(ValidationException $exception, ?string $statePath = null): ValidationException
+    {
+        $statePath ??= $this->form->getStatePath();
+        $errors = [];
+
+        foreach ($exception->errors() as $field => $messages) {
+            $errors[filled($statePath) ? "{$statePath}.{$field}" : $field] = $messages;
+        }
+
+        return ValidationException::withMessages($errors);
     }
 }
