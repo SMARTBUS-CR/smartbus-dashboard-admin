@@ -1,4 +1,7 @@
 {
+    "The selected route is unavailable or does not belong to an active company.": "La ruta seleccionada no está disponible o no pertenece a una empresa activa.",
+    "This route is already in your favorites.": "Esta ruta ya se encuentra en tus favoritos.",
+    "Favorite route not found.": "Ruta favorita no encontrada.",
     "This field cannot be supplied when planning a trip.": "Este campo no se puede proporcionar al planificar un viaje.",
     "The selected departure or resource conflicts with an existing trip.": "La salida o el recurso seleccionado entra en conflicto con un viaje existente.",
     "The selected driver does not cover the complete planned interval.": "El conductor seleccionado no tiene disponibilidad para todo el intervalo planificado.",

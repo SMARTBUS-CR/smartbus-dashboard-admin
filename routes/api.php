@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\Operations\DriverProfileController;
 use App\Http\Controllers\Api\V1\Operations\DriverTripController;
+use App\Http\Controllers\Api\V1\Operations\FavoriteRouteController;
 use App\Http\Controllers\Api\V1\Operations\JourneyController;
 use App\Http\Controllers\Api\V1\Operations\RouteController;
 use App\Http\Controllers\Api\V1\Operations\RouteFareController;
@@ -49,6 +50,12 @@ Route::prefix('v1/operations')->group(function (): void {
         Route::get('trips/{id}', [TripExecutionController::class, 'show'])->whereUuid('id')->name('operations.trips.show');
         Route::post('trips/{id}/start', [TripExecutionController::class, 'start'])->whereUuid('id')->name('operations.trips.start');
         Route::post('trips/{id}/complete', [TripExecutionController::class, 'complete'])->whereUuid('id')->name('operations.trips.complete');
+
+        // Passenger Favorite Routes
+        Route::get('favorites', [FavoriteRouteController::class, 'index'])->name('operations.favorites.index');
+        Route::post('favorites', [FavoriteRouteController::class, 'store'])->name('operations.favorites.store');
+        Route::patch('favorites/{route_id}', [FavoriteRouteController::class, 'update'])->whereUuid('route_id')->name('operations.favorites.update');
+        Route::delete('favorites/{route_id}', [FavoriteRouteController::class, 'destroy'])->whereUuid('route_id')->name('operations.favorites.destroy');
     });
 
     // Telemetry Tracking Context (for GPS Service)
