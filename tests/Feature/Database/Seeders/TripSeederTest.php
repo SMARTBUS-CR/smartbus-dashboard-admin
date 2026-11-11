@@ -22,6 +22,9 @@ function demoTripResources(): array
     Http::preventStrayRequests();
     $company = createCompany(['slug' => 'smartbus-demo', 'timezone' => 'America/Costa_Rica']);
     $fixture = Trip::factory()->for($company)->withDriverAvailability()->make(['service_date' => '2026-11-02']);
+    $fixture->pattern->route->update(['code' => 'DEMO-CITY']);
+    $fixture->pattern->update(['code' => 'OUTBOUND']);
+    $fixture->schedule->update(['departure_time' => '09:00:00']);
 
     return [$company, $fixture];
 }
@@ -36,20 +39,20 @@ test('seeds a deterministic validated demo trip without creating identities or g
     $this->seed(TripSeeder::class);
 
     $trip = Trip::query()->sole();
-    expect($trip->getKey())->toBe('b0700000-0000-4000-8000-000000000001');
-    expect($trip->company_id)->toBe($company->getKey());
-    expect($trip->bus_id)->toBe($fixture->bus_id);
-    expect($trip->driver_id)->toBe($fixture->driver_id);
-    expect($trip->status)->toBe(TripStatus::SCHEDULED);
-    expect($trip->service_date->toDateString())->toBe('2026-11-02');
-    expect($trip->scheduled_departure_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-02 12:30:00');
-    expect($trip->scheduled_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-02 13:30:00');
-    expect($trip->planned_route_snapshot['revision_hash'])->toBe(app(TripPlanSnapshotService::class)->revisionHash($trip->planned_route_snapshot));
-    expect($trip->actual_departure_at)->toBeNull();
-    expect($trip->actual_arrival_at)->toBeNull();
-    expect(User::query()->orderBy('id')->get()->map->getRawOriginal()->all())->toBe($users);
-    expect(Role::query()->orderBy('id')->get()->map->getRawOriginal()->all())->toBe($roles);
-    expect(getPermissionsTeamId())->toBe($team);
+    expect($trip->getKey())->toBe('b0700000-0000-4000-8000-000000000001')
+        ->and($trip->company_id)->toBe($company->getKey())
+        ->and($trip->bus_id)->toBe($fixture->bus_id)
+        ->and($trip->driver_id)->toBe($fixture->driver_id)
+        ->and($trip->status)->toBe(TripStatus::SCHEDULED)
+        ->and($trip->service_date->toDateString())->toBe('2026-11-02')
+        ->and($trip->scheduled_departure_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-02 15:00:00')
+        ->and($trip->scheduled_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-02 16:00:00')
+        ->and($trip->planned_route_snapshot['revision_hash'])->toBe(app(TripPlanSnapshotService::class)->revisionHash($trip->planned_route_snapshot))
+        ->and($trip->actual_departure_at)->toBeNull()
+        ->and($trip->actual_arrival_at)->toBeNull()
+        ->and(User::query()->orderBy('id')->get()->map->getRawOriginal()->all())->toBe($users)
+        ->and(Role::query()->orderBy('id')->get()->map->getRawOriginal()->all())->toBe($roles)
+        ->and(getPermissionsTeamId())->toBe($team);
     $before = $trip->getRawOriginal();
     $this->seed(TripSeeder::class);
     expect($trip->fresh()->getRawOriginal())->toBe($before);
@@ -65,12 +68,12 @@ test('preserves replanned and terminal demo history when seeded again', function
         $actor = createUserWithRole(UserRole::SuperAdmin);
         app(TripManagementService::class)->replan($actor, $company, $trip->getKey(), [
             ...$trip->only(['route_pattern_id', 'route_schedule_id', 'bus_id', 'driver_id']),
-            'service_date' => '2026-11-02', 'arrival_at' => '2026-11-02T08:30:00-06:00',
+            'service_date' => '2026-11-02', 'arrival_at' => '2026-11-02T10:30:00-06:00',
         ]);
     } else {
         $values = $state === 'completed'
-            ? ['actual_departure_at' => '2026-11-02T12:30:00Z', 'actual_arrival_at' => '2026-11-02T13:30:00Z']
-            : ['cancelled_at' => '2026-11-02T12:00:00Z', 'cancellation_reason' => 'Preserved cancellation'];
+            ? ['actual_departure_at' => '2026-11-02T15:00:00Z', 'actual_arrival_at' => '2026-11-02T16:00:00Z']
+            : ['cancelled_at' => '2026-11-02T14:00:00Z', 'cancellation_reason' => 'Preserved cancellation'];
         Trip::query()->whereKey($trip->getKey())->update(['status' => $state, ...$values]);
     }
     $trip->driver->delete();
@@ -139,17 +142,17 @@ test('never inserts demo trips in production', function (): void {
     $this->assertDatabaseCount('trips', 0);
 });
 
-test('database setup includes repeatable trip fixtures after their existing demo dependencies', function (): void {
-    demoTripResources();
+test('database setup creates repeatable trip fixtures with all demo dependencies', function (): void {
     User::factory()->create(['email' => 'admin@company.com']);
 
     $this->seed(DatabaseSeeder::class);
 
-    $trip = Trip::query()->sole();
-    $before = $trip->getRawOriginal();
+    $trips = Trip::query()->orderBy('id')->get();
+    expect($trips)->toHaveCount(4);
+    $before = $trips->map->getRawOriginal()->all();
     $this->seed(DatabaseSeeder::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
-    $this->assertDatabaseCount('trips', 1);
+    expect(Trip::query()->orderBy('id')->get()->map->getRawOriginal()->all())->toBe($before);
+    $this->assertDatabaseCount('trips', 4);
     Http::assertNothingSent();
 });
 
@@ -204,14 +207,13 @@ test('seeds all covered lifecycle examples and preserves their original history 
     $trips = Trip::query()->orderBy('id')->get();
     expect($trips->pluck('status')->all())->toBe([
         TripStatus::SCHEDULED, TripStatus::IN_PROGRESS, TripStatus::COMPLETED, TripStatus::CANCELLED,
-    ]);
-    expect($trips->pluck('service_date')->map->toDateString()->all())
-        ->toBe(['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23']);
-    expect($trips[1]->actual_departure_at->equalTo($trips[1]->scheduled_departure_at))->toBeTrue();
-    expect($trips[1]->actual_arrival_at)->toBeNull();
-    expect($trips[2]->actual_arrival_at->equalTo($trips[2]->scheduled_arrival_at))->toBeTrue();
-    expect($trips[3]->cancellation_reason)->toBe('Demo cancellation');
-    expect($trips[3]->actual_departure_at)->toBeNull();
+    ])
+        ->and($trips->pluck('service_date')->map->toDateString()->all())->toBe(['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23'])
+        ->and($trips[1]->actual_departure_at->equalTo($trips[1]->scheduled_departure_at))->toBeTrue()
+        ->and($trips[1]->actual_arrival_at)->toBeNull()
+        ->and($trips[2]->actual_arrival_at->equalTo($trips[2]->scheduled_arrival_at))->toBeTrue()
+        ->and($trips[3]->cancellation_reason)->toBe('Demo cancellation')
+        ->and($trips[3]->actual_departure_at)->toBeNull();
     $before = $trips->map->getRawOriginal()->all();
 
     $this->seed(TripSeeder::class);

@@ -6,7 +6,7 @@ use App\Services\DriverScheduleService;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class);
+pest()->use(WithDriverRegistration::class);
 
 describe('Driver Schedule Overlap', function (): void {
     test('checks effective weekly intervals in either insertion order', function (array $first, array $second, bool $conflict, bool $reverse): void {

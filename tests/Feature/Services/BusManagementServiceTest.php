@@ -190,8 +190,8 @@ describe('Bus Creation', function (): void {
                 expect($outcome)->toBe('authorization failure');
                 $this->assertDatabaseCount('buses', 0);
             } catch (ValidationException $exception) {
-                expect($outcome)->toBe('validation failure');
-                expect($exception->errors())->toHaveKey('capacity');
+                expect($outcome)->toBe('validation failure')
+                    ->and($exception->errors())->toHaveKey('capacity');
                 $this->assertDatabaseCount('buses', 0);
             }
 

@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Services\RouteRoutingPointsService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -29,6 +31,13 @@ use InvalidArgumentException;
 class RoutePattern extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
+
+    /** @param Builder<RoutePattern> $query */
+    #[Scope]
+    protected function inPublicCatalogue(Builder $query): void
+    {
+        $query->whereHas('route', fn (Builder $route): Builder => $route->inPublicCatalogue());
+    }
 
     protected function casts(): array
     {

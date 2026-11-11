@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class);
+pest()->use(WithDriverRegistration::class);
 
 beforeEach(function (): void {
     $this->company = createCompany(['timezone' => 'America/Costa_Rica']);
@@ -26,11 +26,11 @@ describe('Driver Schedule Service', function (): void {
         $service = app(DriverScheduleService::class);
 
         $schedule = $service->create($this->actor, $this->company, $this->driver, $this->scheduleData);
-        expect($schedule->start_time)->toBe('08:00:00');
-        expect($schedule->id)->toBeUuid();
+        expect($schedule->start_time)->toBe('08:00:00')
+            ->and($schedule->id)->toBeUuid();
         $updated = $service->update($this->actor, $this->company, $this->driver, $schedule, ['end_time' => '13:30']);
-        expect($updated->id)->toBe($schedule->id);
-        expect($updated->end_time)->toBe('13:30:00');
+        expect($updated->id)->toBe($schedule->id)
+            ->and($updated->end_time)->toBe('13:30:00');
         $service->delete($this->actor, $this->company, $this->driver, $updated);
 
         $this->assertModelMissing($schedule);
@@ -51,13 +51,13 @@ describe('Driver Schedule Service', function (): void {
             'delete' => $service->delete($this->actor, $this->company, $this->driver, $schedule),
         };
 
-        expect($operation)->toThrow(AuthorizationException::class);
-        expect(getPermissionsTeamId())->toBe($previous->id);
-        expect($this->actor->relationLoaded('roles'))->toBeFalse();
+        expect($operation)->toThrow(AuthorizationException::class)
+            ->and(getPermissionsTeamId())->toBe($previous->id)
+            ->and($this->actor->relationLoaded('roles'))->toBeFalse();
         grantShield($this->actor, [$permission], $this->company);
         $operation();
-        expect(getPermissionsTeamId())->toBe($previous->id);
-        expect($this->actor->relationLoaded('permissions'))->toBeFalse();
+        expect(getPermissionsTeamId())->toBe($previous->id)
+            ->and($this->actor->relationLoaded('permissions'))->toBeFalse();
     })->with([['create', 'Create:DriverSchedule'], ['update', 'Update:DriverSchedule'], ['delete', 'Delete:DriverSchedule']]);
 
     test('rejects reassignment and unknown payload fields', function (string $field): void {
@@ -67,9 +67,9 @@ describe('Driver Schedule Service', function (): void {
         $data = [$field => null];
         $service = app(DriverScheduleService::class);
 
-        expect(fn () => $service->create($this->actor, $this->company, $this->driver, array_replace($this->scheduleData, $data)))->toThrow(ValidationException::class);
-        expect(fn () => $service->update($this->actor, $this->company, $this->driver, $schedule, $data))->toThrow(ValidationException::class);
-        expect($schedule->fresh()->getRawOriginal())->toBe($before);
+        expect(fn () => $service->create($this->actor, $this->company, $this->driver, array_replace($this->scheduleData, $data)))->toThrow(ValidationException::class)
+            ->and(fn () => $service->update($this->actor, $this->company, $this->driver, $schedule, $data))->toThrow(ValidationException::class)
+            ->and($schedule->fresh()->getRawOriginal())->toBe($before);
     })->with(['id', 'driver_id', 'company_id', 'route_id', 'route_pattern_id', 'bus_id', 'created_at', 'unknown']);
 
     test('rejects foreign drivers and schedules even for global administrators', function (string $method): void {
@@ -95,9 +95,9 @@ describe('Driver Schedule Service', function (): void {
         $before = $second->fresh()->getRawOriginal();
         $service = app(DriverScheduleService::class);
 
-        expect($service->update($this->actor, $this->company, $this->driver, $first, ['end_time' => '12:00'])->id)->toBe($first->id);
-        expect(fn () => $service->update($this->actor, $this->company, $this->driver, $second, ['start_time' => '11:00']))->toThrow(ValidationException::class);
-        expect($second->fresh()->getRawOriginal())->toBe($before);
+        expect($service->update($this->actor, $this->company, $this->driver, $first, ['end_time' => '12:00'])->id)->toBe($first->id)
+            ->and(fn () => $service->update($this->actor, $this->company, $this->driver, $second, ['start_time' => '11:00']))->toThrow(ValidationException::class)
+            ->and($second->fresh()->getRawOriginal())->toBe($before);
     });
 
     test('uses the company local calendar independently of the application timezone', function (): void {
@@ -154,8 +154,8 @@ describe('Driver Schedule Service', function (): void {
         DriverSchedule::factory()->for($this->driver)->create(['valid_from' => '2026-10-26']);
         $before = $first->fresh()->getRawOriginal();
 
-        expect(fn () => app(DriverScheduleService::class)->update($this->actor, $this->company, $this->driver, $first, ['valid_until' => '2026-10-26']))->toThrow(ValidationException::class);
-        expect($first->fresh()->getRawOriginal())->toBe($before);
+        expect(fn () => app(DriverScheduleService::class)->update($this->actor, $this->company, $this->driver, $first, ['valid_until' => '2026-10-26']))->toThrow(ValidationException::class)
+            ->and($first->fresh()->getRawOriginal())->toBe($before);
     });
 
     test('rolls back observer failures and rejects observer cancellations', function (string $method, bool $cancel): void {
@@ -182,8 +182,8 @@ describe('Driver Schedule Service', function (): void {
                 'create' => $service->create($this->actor, $this->company, $this->driver, array_replace($this->scheduleData, ['day_of_week' => 2])),
                 'update' => $service->update($this->actor, $this->company, $this->driver, $schedule, ['end_time' => '17:00']),
                 'delete' => $service->delete($this->actor, $this->company, $this->driver, $schedule),
-            })->toThrow($cancel ? ValidationException::class : RuntimeException::class);
-            expect($schedule->fresh()->getRawOriginal())->toBe($before);
+            })->toThrow($cancel ? ValidationException::class : RuntimeException::class)
+                ->and($schedule->fresh()->getRawOriginal())->toBe($before);
             $this->assertDatabaseCount('driver_schedules', 1);
         } finally {
             DriverSchedule::setEventDispatcher($originalDispatcher);
@@ -210,9 +210,9 @@ describe('Driver Schedule Service', function (): void {
             'create' => $service->create($this->actor, $this->company, $this->driver, array_replace($this->scheduleData, ['day_of_week' => 2])),
             'update' => $service->update($this->actor, $this->company, $this->driver, $schedule, ['end_time' => '17:00']),
             'delete' => $service->delete($this->actor, $this->company, $this->driver, $schedule),
-        })->toThrow(ValidationException::class);
-        expect($service->observedOperation)->toBe($method);
-        expect($schedule->fresh()->getRawOriginal())->toBe($before);
+        })->toThrow(ValidationException::class)
+            ->and($service->observedOperation)->toBe($method)
+            ->and($schedule->fresh()->getRawOriginal())->toBe($before);
         $this->assertDatabaseCount('driver_schedules', 1);
     })->with(['create', 'update', 'delete']);
 });

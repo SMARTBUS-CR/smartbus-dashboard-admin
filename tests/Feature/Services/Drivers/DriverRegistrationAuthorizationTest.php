@@ -9,7 +9,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class);
+pest()->use(WithDriverRegistration::class);
 
 describe('Driver Registration Authorization', function (): void {
     test('allows a global administrator to create employment without company membership', function (): void {
@@ -47,8 +47,8 @@ describe('Driver Registration Authorization', function (): void {
         setPermissionsTeamId($foreignCompany->id);
 
         expect(fn () => app(DriverManagementService::class)->createForExistingUser($actor, $company, $target, $this->validDriverEmployment()))
-            ->toThrow(AuthorizationException::class);
-        expect(getPermissionsTeamId())->toBe($foreignCompany->id);
+            ->toThrow(AuthorizationException::class)
+            ->and(getPermissionsTeamId())->toBe($foreignCompany->id);
         $this->assertDatabaseCount('drivers', 0);
         expect(CompanyUser::withTrashed()->where('user_id', $target->id)->exists())->toBeFalse();
     })->with([
@@ -69,8 +69,8 @@ describe('Driver Registration Authorization', function (): void {
         setPermissionsTeamId($previousTeam);
 
         expect(fn () => app(DriverManagementService::class)->createForExistingUser($actor, $company, $target, $this->validDriverEmployment()))
-            ->toThrow(ValidationException::class);
-        expect(getPermissionsTeamId())->toBe($previousTeam);
+            ->toThrow(ValidationException::class)
+            ->and(getPermissionsTeamId())->toBe($previousTeam);
         $this->assertDatabaseCount('drivers', 0);
     })->with(['inactive company' => false, 'archived company' => true]);
 

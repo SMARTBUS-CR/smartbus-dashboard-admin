@@ -92,8 +92,8 @@ describe('Bus Reads', function (): void {
             } catch (ModelNotFoundException $exception) {
                 expect($outcome)->toBe('missing');
             } catch (ValidationException $exception) {
-                expect($outcome)->toBe('inactive company');
-                expect($exception->errors())->toHaveKey('company');
+                expect($outcome)->toBe('inactive company')
+                    ->and($exception->errors())->toHaveKey('company');
             }
             expect(getPermissionsTeamId())->toBe($previousCompany->getKey())
                 ->and($actor->relationLoaded('roles'))->toBeFalse()

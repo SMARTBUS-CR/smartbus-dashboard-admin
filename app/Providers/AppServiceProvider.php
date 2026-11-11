@@ -124,6 +124,9 @@ class AppServiceProvider extends ServiceProvider
             return $user->isSuperAdmin() ? true : null;
         });
 
+        // Restrict API documentation access exclusively to SuperAdmin accounts.
+        Gate::define('viewApiDocs', fn (?User $user = null): bool => $user?->isSuperAdmin() ?? false);
+
         // Configure Spatie Permission package to use custom models
         app(PermissionRegistrar::class)
             ->setPermissionClass(Permission::class)

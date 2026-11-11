@@ -23,10 +23,11 @@ class TripSeeder extends Seeder
 {
     /**
      * Development fixtures for fixed local Mondays, with explicit one-hour
-     * planned window. Reuse the first demo Monday schedule and active bus by ID,
-     * and the first eligible covered Driver. Missing or conflicting resources
-     * skip insertion. Execution examples use deterministic fixture timestamps.
-     * Never create identities, grant permissions or update existing trips.
+     * planned window. Reuse the dedicated DEMO-CITY/OUTBOUND Monday 09:00
+     * schedule, the first active demo bus by ID, and the first eligible covered
+     * Driver. Missing or conflicting resources skip insertion. Execution examples
+     * use deterministic fixture timestamps. Never create identities, grant
+     * permissions or update existing trips.
      */
     public function run(TripPlanSnapshotService $snapshots, TripDriverEligibilityService $eligibility): void
     {
@@ -60,9 +61,17 @@ class TripSeeder extends Seeder
                 if (Trip::query()->whereKey($id)->exists()) {
                     return true;
                 }
-                $schedule = RouteSchedule::query()->where('day_of_week', 1)
-                    ->whereHas('pattern.route', fn (Builder $query) => $query->where('company_id', $company->getKey()))
-                    ->orderBy('id')->first();
+                $schedule = RouteSchedule::query()
+                    ->where('day_of_week', 1)
+                    ->where('departure_time', '09:00:00')
+                    ->whereNull('valid_from')
+                    ->whereNull('valid_until')
+                    ->whereHas('pattern', fn (Builder $query): Builder => $query
+                        ->where('code', 'OUTBOUND')
+                        ->whereHas('route', fn (Builder $query): Builder => $query
+                            ->where('company_id', $company->getKey())
+                            ->where('code', 'DEMO-CITY')))
+                    ->first();
                 $bus = Bus::query()->where('company_id', $company->getKey())->where('is_active', true)
                     ->orderBy('id')->lockForUpdate()->first();
                 if (! $schedule || ! $bus) {

@@ -9,6 +9,7 @@ use App\Http\Middleware\EnsureExternalTokenIsValid;
 use App\Http\Middleware\SyncSpatieTeam;
 use App\Models\Company;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
+use Filament\Actions\Action;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -16,6 +17,7 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -41,6 +43,13 @@ class AdminPanelProvider extends PanelProvider
             )
             ->colors([
                 'primary' => Color::Indigo,
+            ])
+            ->userMenuItems([
+                Action::make('docs')
+                    ->label(fn (): string => __('API Documentation'))
+                    ->url(fn (): string => route('scramble.docs.ui'), shouldOpenInNewTab: true)
+                    ->icon(Heroicon::OutlinedCodeBracketSquare)
+                    ->visible(fn (): bool => auth()->user()?->isSuperAdmin() ?? false),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')

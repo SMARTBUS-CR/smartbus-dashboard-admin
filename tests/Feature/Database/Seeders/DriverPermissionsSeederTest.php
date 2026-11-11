@@ -15,9 +15,9 @@ describe('Driver Permissions Seeder', function (): void {
         $first = Permission::query()->whereIn('name', $expected)->orderBy('name')->pluck('id', 'name')->all();
         $this->seed(DriverPermissionsSeeder::class);
 
-        expect(array_keys($first))->toBe($expected);
-        expect(Permission::query()->whereIn('name', $expected)->orderBy('name')->pluck('id', 'name')->all())->toBe($first);
-        expect(Permission::query()->whereIn('name', $expected)->pluck('guard_name')->unique()->all())->toBe(['web']);
-        expect(DB::connection('mysql')->table('role_has_permissions')->count())->toBe(0);
+        expect(array_keys($first))->toBe($expected)
+            ->and(Permission::query()->whereIn('name', $expected)->orderBy('name')->pluck('id', 'name')->all())->toBe($first)
+            ->and(Permission::query()->whereIn('name', $expected)->pluck('guard_name')->unique()->all())->toBe(['web'])
+            ->and(DB::connection('mysql')->table('role_has_permissions')->count())->toBe(0);
     });
 });
