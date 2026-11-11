@@ -17,7 +17,7 @@ test('rejects a company transfer through the bus model', function (): void {
         $bus->update(['company_id' => $otherCompany->getKey()]);
         $this->fail('Expected a validation exception.');
     } catch (ValidationException $exception) {
-        expect($exception->errors())->toHaveKey('company_id');
-        expect($bus->fresh()->company_id)->toBe($company->getKey());
+        expect($exception->errors())->toHaveKey('company_id')
+            ->and($bus->fresh()->company_id)->toBe($company->getKey());
     }
 });

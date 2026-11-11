@@ -31,8 +31,8 @@ test('preserves real execution history against direct writes deletion and replan
             'actual_departure_at' => null, 'actual_arrival_at' => null,
             'cancelled_at' => null, 'cancellation_reason' => null,
         ]);
-        expect(fn () => $changed->{$method}())->toThrow(ValidationException::class);
-        expect($trip->fresh()->getRawOriginal())->toBe($before);
+        expect(fn () => $changed->{$method}())->toThrow(ValidationException::class)
+            ->and($trip->fresh()->getRawOriginal())->toBe($before);
     }
     foreach (['forceDelete', 'forceDeleteQuietly'] as $method) {
         expect(fn () => $trip->{$method}())->toThrow(ValidationException::class);
@@ -42,13 +42,13 @@ test('preserves real execution history against direct writes deletion and replan
         expect(Gate::forUser($actor)->allows($ability, $trip))->toBeFalse();
     }
     expect(fn () => $service->replan($actor, $trip->company, $trip->id, []))
-        ->toThrow(AuthorizationException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
-    expect(Trip::destroy($trip->id))->toBe(1);
+        ->toThrow(AuthorizationException::class)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before)
+        ->and(Trip::destroy($trip->id))->toBe(1);
     $this->assertSoftDeleted($trip);
     $archived = Trip::withTrashed()->findOrFail($trip->id);
-    expect(fn () => $archived->forceDeleteQuietly())->toThrow(ValidationException::class);
-    expect($archived->restore())->toBeTrue();
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+    expect(fn () => $archived->forceDeleteQuietly())->toThrow(ValidationException::class)
+        ->and($archived->restore())->toBeTrue()
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
     Http::assertNothingSent();
 })->with(['in_progress', 'completed', 'cancelled']);

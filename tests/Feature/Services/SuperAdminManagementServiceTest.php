@@ -11,7 +11,6 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
-use RuntimeException;
 
 describe('Global SuperAdmin Creation', function (): void {
     beforeEach(function (): void {

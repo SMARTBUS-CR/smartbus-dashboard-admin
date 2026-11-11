@@ -12,8 +12,8 @@ describe('Driver Values', function (): void {
             'salary_currency' => ' crc ',
         ])->fresh();
 
-        expect($driver->license)->toBe('CR-12345');
-        expect($driver->salary_currency)->toBe('CRC');
+        expect($driver->license)->toBe('CR-12345')
+            ->and($driver->salary_currency)->toBe('CRC');
     });
 
     test('persists valid salary boundaries as exact decimal strings', function (string|int $amount, string $expected): void {
@@ -61,8 +61,8 @@ describe('Driver Values', function (): void {
         $driver->salary_amount = '1.005';
         $driver->salary_amount;
 
-        expect(fn () => $driver->save())->toThrow(ValidationException::class);
-        expect($driver->fresh()->salary_amount)->toBe('650000.25');
+        expect(fn () => $driver->save())->toThrow(ValidationException::class)
+            ->and($driver->fresh()->salary_amount)->toBe('650000.25');
     });
 
     test('rejects invalid original dates when creating employment with a field specific validation error', function (string $field, string $value): void {
@@ -93,8 +93,8 @@ describe('Driver Values', function (): void {
         expect(fn () => $driver->update(['salary_amount' => '700000.00', $field => $value]))
             ->toThrow(function (ValidationException $exception) use ($field): void {
                 expect(array_keys($exception->errors()))->toBe([$field]);
-            });
-        expect($driver->fresh()->getRawOriginal())->toBe($stored);
+            })
+            ->and($driver->fresh()->getRawOriginal())->toBe($stored);
     })->with(['license_expires_at', 'employment_starts_on', 'employment_ends_on'])->with([
         'impossible day' => '2026-02-30',
         'impossible month' => '2026-13-01',
@@ -108,12 +108,12 @@ describe('Driver Values', function (): void {
             'employment_ends_on' => '2028-02-29',
         ])->fresh();
 
-        expect($driver->license_expires_at)->toBeInstanceOf(CarbonImmutable::class);
-        expect($driver->employment_starts_on)->toBeInstanceOf(CarbonImmutable::class);
-        expect($driver->employment_ends_on)->toBeInstanceOf(CarbonImmutable::class);
-        expect($driver->license_expires_at->toDateString())->toBe('2032-02-29');
-        expect($driver->employment_starts_on->toDateString())->toBe('2024-02-29');
-        expect($driver->employment_ends_on->toDateString())->toBe('2028-02-29');
+        expect($driver->license_expires_at)->toBeInstanceOf(CarbonImmutable::class)
+            ->and($driver->employment_starts_on)->toBeInstanceOf(CarbonImmutable::class)
+            ->and($driver->employment_ends_on)->toBeInstanceOf(CarbonImmutable::class)
+            ->and($driver->license_expires_at->toDateString())->toBe('2032-02-29')
+            ->and($driver->employment_starts_on->toDateString())->toBe('2024-02-29')
+            ->and($driver->employment_ends_on->toDateString())->toBe('2028-02-29');
     });
 
     test('allows clearing the employment end date without changing the required dates', function (): void {
@@ -121,15 +121,15 @@ describe('Driver Values', function (): void {
 
         $driver->update(['employment_ends_on' => null]);
 
-        expect($driver->fresh()->employment_ends_on)->toBeNull();
-        expect($driver->fresh()->license_expires_at->toDateString())->toBe('2030-12-31');
-        expect($driver->fresh()->employment_starts_on->toDateString())->toBe('2026-10-01');
+        expect($driver->fresh()->employment_ends_on)->toBeNull()
+            ->and($driver->fresh()->license_expires_at->toDateString())->toBe('2030-12-31')
+            ->and($driver->fresh()->employment_starts_on->toDateString())->toBe('2026-10-01');
     });
 
     test('rejects unsupported status during enum assignment and preserves the stored status', function (): void {
         $driver = Driver::factory()->create();
 
-        expect(fn () => $driver->update(['status' => 'unknown']))->toThrow(ValueError::class);
-        expect($driver->fresh()->status)->toBe(DriverStatus::ACTIVE);
+        expect(fn () => $driver->update(['status' => 'unknown']))->toThrow(ValueError::class)
+            ->and($driver->fresh()->status)->toBe(DriverStatus::ACTIVE);
     });
 });

@@ -29,11 +29,10 @@ test('cancels a scheduled trip with a trimmed reason and server UTC timestamp wh
 
     $cancelled = app(TripManagementService::class)->cancel($actor, $trip->company, $trip->id, "  Operational change.\n");
 
-    expect($cancelled->status)->toBe(TripStatus::CANCELLED);
-    expect($cancelled->cancellation_reason)->toBe('Operational change.');
-    expect($cancelled->cancelled_at->utc()->format('Y-m-d H:i:s.uP'))->toBe('2026-10-26 12:00:00.123456+00:00');
-    expect(Arr::except($cancelled->getRawOriginal(), ['status', 'cancellation_reason', 'cancelled_at', 'updated_at']))
-        ->toBe(Arr::except($before, ['status', 'cancellation_reason', 'cancelled_at', 'updated_at']));
+    expect($cancelled->status)->toBe(TripStatus::CANCELLED)
+        ->and($cancelled->cancellation_reason)->toBe('Operational change.')
+        ->and($cancelled->cancelled_at->utc()->format('Y-m-d H:i:s.uP'))->toBe('2026-10-26 12:00:00.123456+00:00')
+        ->and(Arr::except($cancelled->getRawOriginal(), ['status', 'cancellation_reason', 'cancelled_at', 'updated_at']))->toBe(Arr::except($before, ['status', 'cancellation_reason', 'cancelled_at', 'updated_at']));
     Http::assertNothingSent();
 });
 
@@ -44,8 +43,8 @@ test('rejects invalid cancellation reasons without persisting a transition', fun
     expect(fn () => app(TripManagementService::class)->cancel($actor, $trip->company, $trip->id, $reason))
         ->toThrow(function (ValidationException $exception): void {
             expect($exception->errors())->toHaveKey('cancellation_reason');
-        });
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+        })
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 })->with(['empty' => [''], 'spaces' => ['   '], 'control whitespace' => ["\t\r\n"],
     'too long' => [str_repeat('a', 501)], 'multibyte too long' => [str_repeat('ñ', 501)]]);
 
@@ -55,8 +54,8 @@ test('accepts exactly 500 multibyte characters after trimming the reason', funct
 
     $cancelled = app(TripManagementService::class)->cancel($actor, $trip->company, $trip->id, '  '.$reason."\n");
 
-    expect($cancelled->status)->toBe(TripStatus::CANCELLED);
-    expect($cancelled->cancellation_reason)->toBe($reason);
+    expect($cancelled->status)->toBe(TripStatus::CANCELLED)
+        ->and($cancelled->cancellation_reason)->toBe($reason);
 });
 
 test('preserves the first cancellation timestamp and reason when a valid retry supplies a different reason', function (): void {
@@ -76,8 +75,8 @@ test('validates the reason on an authorized cancellation retry while preserving 
     $service = app(TripManagementService::class);
     $before = $service->cancel($actor, $trip->company, $trip->id, 'Original reason')->getRawOriginal();
 
-    expect(fn () => $service->cancel($actor, $trip->company, $trip->id, '   '))->toThrow(ValidationException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+    expect(fn () => $service->cancel($actor, $trip->company, $trip->id, '   '))->toThrow(ValidationException::class)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 });
 
 test('authorizes cancellation before reason validation or retry resolution', function (UserRole $role, bool $retry): void {
@@ -92,9 +91,9 @@ test('authorizes cancellation before reason validation or retry resolution', fun
     grantShield($actor, ['Cancel:Trip'], $trip->company);
     $before = $trip->getRawOriginal();
 
-    expect(fn () => app(TripManagementService::class)->cancel($actor, $trip->company, $trip->id, ''))->toThrow(AuthorizationException::class);
-    expect(fn () => app(TripManagementService::class)->cancel($actor, $trip->company, 'invalid', ''))->toThrow(AuthorizationException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+    expect(fn () => app(TripManagementService::class)->cancel($actor, $trip->company, $trip->id, ''))->toThrow(AuthorizationException::class)
+        ->and(fn () => app(TripManagementService::class)->cancel($actor, $trip->company, 'invalid', ''))->toThrow(AuthorizationException::class)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 })->with([UserRole::Driver, UserRole::Passenger])->with([false, true]);
 
 test('rejects an administrator cancellation retry after authorization is revoked', function (): void {
@@ -107,9 +106,9 @@ test('rejects an administrator cancellation retry after authorization is revoked
     $team = createCompany()->id;
     setPermissionsTeamId($team);
 
-    expect(fn () => app(TripManagementService::class)->cancel($actor, $trip->company, $trip->id, 'New reason'))->toThrow(AuthorizationException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
-    expect(getPermissionsTeamId())->toBe($team);
+    expect(fn () => app(TripManagementService::class)->cancel($actor, $trip->company, $trip->id, 'New reason'))->toThrow(AuthorizationException::class)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before)
+        ->and(getPermissionsTeamId())->toBe($team);
 });
 
 test('rejects cancellation after execution begins or completes', function (bool $completed): void {
@@ -126,8 +125,8 @@ test('rejects cancellation after execution begins or completes', function (bool 
     expect(fn () => $service->cancel($actor, $trip->company, $trip->id, 'Too late'))
         ->toThrow(function (ValidationException $exception): void {
             expect($exception->errors())->toBe(['status' => [__('Only scheduled trips can be cancelled.')]]);
-        });
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+        })
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 })->with([false, true]);
 
 test('permits authorized cancellation in an inactive company to release a scheduled assignment', function (): void {
@@ -155,9 +154,9 @@ test('allows a replacement departure after cancellation without changing the can
 
     $replacement = $service->schedule($actor, $trip->company, $data);
 
-    expect($replacement->id)->not->toBe($cancelled->id);
-    expect($replacement->status)->toBe(TripStatus::SCHEDULED);
-    expect($cancelled->fresh()->getRawOriginal())->toBe($before);
+    expect($replacement->id)->not->toBe($cancelled->id)
+        ->and($replacement->status)->toBe(TripStatus::SCHEDULED)
+        ->and($cancelled->fresh()->getRawOriginal())->toBe($before);
     $this->assertDatabaseCount('trips', 2);
 });
 
@@ -165,8 +164,8 @@ test('scopes cancellation to the selected company even for super administrators'
     [$trip, $actor] = tripCancellationInputs();
     $before = $trip->getRawOriginal();
 
-    expect(fn () => app(TripManagementService::class)->cancel($actor, createCompany(), $trip->id, 'Wrong company'))->toThrow(ModelNotFoundException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+    expect(fn () => app(TripManagementService::class)->cancel($actor, createCompany(), $trip->id, 'Wrong company'))->toThrow(ModelNotFoundException::class)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 });
 
 test('returns bilingual errors when cancelling an executing trip', function (string $locale, string $message): void {
@@ -180,8 +179,8 @@ test('returns bilingual errors when cancelling an executing trip', function (str
     expect(fn () => $service->cancel($actor, $trip->company, $trip->id, 'Too late'))
         ->toThrow(function (ValidationException $exception) use ($message): void {
             expect($exception->errors())->toBe(['status' => [$message]]);
-        });
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+        })
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 })->with([['en', 'Only scheduled trips can be cancelled.'], ['es', 'Solo se pueden cancelar viajes programados.']]);
 
 test('localizes cancellation reason validation with its domain field label', function (string $locale, string $reason, string $message): void {
@@ -192,8 +191,8 @@ test('localizes cancellation reason validation with its domain field label', fun
     expect(fn () => app(TripManagementService::class)->cancel($actor, $trip->company, $trip->id, $reason))
         ->toThrow(function (ValidationException $exception) use ($message): void {
             expect($exception->errors())->toBe(['cancellation_reason' => [$message]]);
-        });
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+        })
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 })->with([
     ['en', '', 'The cancellation reason field is required.'],
     ['es', '', 'El campo motivo de cancelación es obligatorio.'],

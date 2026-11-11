@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\WithDriverTrips;
 
-uses(WithDriverTrips::class);
+pest()->use(WithDriverTrips::class);
 
 describe('Driver Trip Execution', function (): void {
     test('rejects the real start after current identity eligibility is revoked', function (string $revocation): void {
@@ -28,9 +28,8 @@ describe('Driver Trip Execution', function (): void {
         expect(fn () => app(TripManagementService::class)->start($actor, $trip->company, $trip->id))
             ->toThrow(function (ValidationException $exception): void {
                 expect($exception->errors())->toHaveKey('driver_id');
-            });
-
-        expect($trip->fresh()->getRawOriginal())->toBe($before);
+            })
+            ->and($trip->fresh()->getRawOriginal())->toBe($before);
     })->with(['identity', 'membership', 'role']);
 
     test('starts successfully after compatible workforce changes', function (): void {
@@ -64,9 +63,8 @@ describe('Driver Trip Execution', function (): void {
 
         expect(fn () => app(DriverScheduleService::class)->update($actor, $trip->company, $trip->driver, $schedule, [
             'start_time' => '00:00', 'end_time' => $end, 'ends_next_day' => false,
-        ]))->toThrow(ValidationException::class);
-
-        expect($schedule->fresh()->getRawOriginal())->toBe($before)
+        ]))->toThrow(ValidationException::class)
+            ->and($schedule->fresh()->getRawOriginal())->toBe($before)
             ->and($trip->fresh()->getRawOriginal())->toBe($history);
     })->with([
         'late start' => ['2026-10-26T14:30:00Z', '2026-10-26T14:30:00Z', '08:00'],
@@ -88,9 +86,8 @@ describe('Driver Trip Execution', function (): void {
         $history = $trip->getRawOriginal();
 
         expect(fn () => app(DriverManagementService::class)->updateEmployment($actor, $trip->company, $driver, [$field => '2026-10-26']))
-            ->toThrow(ValidationException::class);
-
-        expect($driver->fresh()->getRawOriginal())->toBe($before)
+            ->toThrow(ValidationException::class)
+            ->and($driver->fresh()->getRawOriginal())->toBe($before)
             ->and($trip->fresh()->getRawOriginal())->toBe($history);
     })->with(['employment_ends_on', 'license_expires_at'])->with([
         'late start on next day' => ['2026-10-27T12:45:00Z', '2026-10-27T12:45:00Z'],
@@ -127,9 +124,8 @@ describe('Driver Trip Execution', function (): void {
         expect(fn () => $operation === 'archive'
             ? app(DriverManagementService::class)->archive($actor, $trip->company, $driver)
             : app(DriverScheduleService::class)->delete($actor, $trip->company, $driver, $schedule))
-            ->toThrow(ValidationException::class);
-
-        expect($trip->fresh()->getRawOriginal())->toBe($history);
+            ->toThrow(ValidationException::class)
+            ->and($trip->fresh()->getRawOriginal())->toBe($history);
         $this->assertModelExists($driver);
         $this->assertModelExists($schedule);
     })->with(['scheduled', 'in_progress'])->with(['archive', 'delete availability']);

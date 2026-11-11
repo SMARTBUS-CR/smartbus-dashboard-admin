@@ -57,9 +57,9 @@ test('builds the exact historical projection and revision from persisted plannin
         'route_id' => $pattern->route_id, 'route_name' => 'Ruta / Río',
         'routing_leg_distances' => [1500], 'routing_points_hash' => $pattern->fresh()->routing_points_hash, 'schema_version' => 1,
     ];
-    expect($snapshot)->toBe($expected);
-    expect($revision)->toBe(hash('sha256', json_encode($expected, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR)));
-    expect($plan['departure_at']->format('H:i:sP'))->toBe('12:30:00+00:00');
+    expect($snapshot)->toBe($expected)
+        ->and($revision)->toBe(hash('sha256', json_encode($expected, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR)))
+        ->and($plan['departure_at']->format('H:i:sP'))->toBe('12:30:00+00:00');
     $this->assertDatabaseCount('trips', 0);
     Http::assertNothingSent();
 });
@@ -104,8 +104,8 @@ test('catalogue edits change the full revision without mutating previous snapsho
     $updated = $service->prepare($company, $data)['planned_route_snapshot'];
 
     expect($updated['routing_points_hash'])->toBe($original['routing_points_hash'])
-        ->and($updated['revision_hash'])->not->toBe($original['revision_hash']);
-    expect(json_encode($original, JSON_THROW_ON_ERROR))->toBe($before);
+        ->and($updated['revision_hash'])->not->toBe($original['revision_hash'])
+        ->and(json_encode($original, JSON_THROW_ON_ERROR))->toBe($before);
     $this->assertDatabaseCount('trips', 0);
 })->with(['pattern name', 'route name', 'stop name', 'timing estimate', 'metrics']);
 
@@ -122,12 +122,12 @@ test('keeps repeated stops distinct and preserves nullable historical values', f
 
     $snapshot = app(TripPlanSnapshotService::class)->prepare($company, $data)['planned_route_snapshot'];
 
-    expect($snapshot['headsign'])->toBe('Centro')->and($snapshot['routing_leg_distances'])->toBeNull();
-    expect(array_column($snapshot['occurrences'], 'stop_sequence'))->toBe([1, 2, 3]);
-    expect(array_column($snapshot['occurrences'], 'minutes_from_start'))->toBe([null, 15, null]);
-    expect(array_column($snapshot['occurrences'], 'occurrence_id'))->toHaveCount(3);
-    expect($snapshot['occurrences'][0]['stop_id'])->toBe($snapshot['occurrences'][2]['stop_id']);
-    expect($snapshot['occurrences'][0]['occurrence_id'])->not->toBe($snapshot['occurrences'][2]['occurrence_id']);
+    expect($snapshot['headsign'])->toBe('Centro')->and($snapshot['routing_leg_distances'])->toBeNull()
+        ->and(array_column($snapshot['occurrences'], 'stop_sequence'))->toBe([1, 2, 3])
+        ->and(array_column($snapshot['occurrences'], 'minutes_from_start'))->toBe([null, 15, null])
+        ->and(array_column($snapshot['occurrences'], 'occurrence_id'))->toHaveCount(3)
+        ->and($snapshot['occurrences'][0]['stop_id'])->toBe($snapshot['occurrences'][2]['stop_id'])
+        ->and($snapshot['occurrences'][0]['occurrence_id'])->not->toBe($snapshot['occurrences'][2]['occurrence_id']);
 });
 
 test('rejects forged snapshots geometry and revisions before constructing history', function (string $field): void {

@@ -6,7 +6,7 @@ use App\Services\DriverManagementService;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class);
+pest()->use(WithDriverRegistration::class);
 
 describe('Driver Existing User Registration', function (): void {
     test('links an existing identity with active membership and only the target company driver role without Filament', function (): void {
@@ -20,12 +20,12 @@ describe('Driver Existing User Registration', function (): void {
         $driver = app(DriverManagementService::class)->createForExistingUser($actor, $company, $user, $this->validDriverEmployment());
 
         $this->assertModelExists($driver);
-        expect($driver->company_id)->toBe($company->id);
-        expect($driver->user_id)->toBe($user->id);
-        expect($driver->salary_amount)->toBe('650000.25');
-        expect($user->fresh()->getRawOriginal('password'))->toBe($originalPassword);
-        expect(getPermissionsTeamId())->toBe($previousTeam);
-        expect(CompanyUser::query()->where('company_id', $company->id)->where('user_id', $user->id)->exists())->toBeTrue();
+        expect($driver->company_id)->toBe($company->id)
+            ->and($driver->user_id)->toBe($user->id)
+            ->and($driver->salary_amount)->toBe('650000.25')
+            ->and($user->fresh()->getRawOriginal('password'))->toBe($originalPassword)
+            ->and(getPermissionsTeamId())->toBe($previousTeam)
+            ->and(CompanyUser::query()->where('company_id', $company->id)->where('user_id', $user->id)->exists())->toBeTrue();
         $assignment = DB::connection('mysql')->table('model_has_roles as assignments')
             ->join('roles', 'roles.id', '=', 'assignments.role_id')
             ->where('assignments.model_uuid', $user->id)
