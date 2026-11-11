@@ -7,6 +7,7 @@ use App\Models\RoutePatternStop;
 use App\Models\RouteSchedule;
 use App\Models\Stop;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Fluent;
 
@@ -54,30 +55,40 @@ class DirectJourneySearchService
         $boardingPatternStops = RoutePatternStop::query()
             ->with(['stop', 'pattern.route.company', 'pattern.route.fares'])
             ->whereIn('stop_id', $originStopIds)
+            ->whereHas('pattern', fn (Builder $pattern): Builder => $pattern->inPublicCatalogue())
             ->get();
 
         $alightingPatternStops = RoutePatternStop::query()
             ->with(['stop'])
             ->whereIn('stop_id', $destStopIds)
+            ->whereHas('pattern', fn (Builder $pattern): Builder => $pattern->inPublicCatalogue())
             ->get()
             ->groupBy('route_pattern_id');
 
         $patternIds = $boardingPatternStops->pluck('route_pattern_id')->unique()->all();
 
-        // Sample company timezone or default to UTC
-        $companyTimezone = $boardingPatternStops->first()?->pattern?->route?->company?->timezone ?? 'UTC';
-        $departureInCompanyTz = $departureAtUtc->setTimezone($companyTimezone);
+        $datesByTimezone = [];
+        $serviceDates = [];
+        foreach ($boardingPatternStops as $boarding) {
+            $timezone = $boarding->pattern?->route?->company?->timezone ?? 'UTC';
+            if (isset($datesByTimezone[$timezone])) {
+                continue;
+            }
 
-        // Consider service dates around query time to support midnight crossings
-        $datesToCheck = collect([
-            $departureInCompanyTz->subDay()->startOfDay(),
-            $departureInCompanyTz->startOfDay(),
-            $departureInCompanyTz->addDay()->startOfDay(),
-        ]);
+            $localDeparture = $departureAtUtc->setTimezone($timezone);
+            $datesByTimezone[$timezone] = [
+                $localDeparture->subDay()->startOfDay(),
+                $localDeparture->startOfDay(),
+                $localDeparture->addDay()->startOfDay(),
+            ];
+            foreach ($datesByTimezone[$timezone] as $date) {
+                $serviceDates[$date->toDateString()] = $date;
+            }
+        }
 
         // Bulk load schedules for candidate patterns across target dates avoiding N+1
         $schedulesByPatternAndDate = [];
-        foreach ($datesToCheck as $date) {
+        foreach ($serviceDates as $date) {
             $dateStr = $date->format('Y-m-d');
             $schedules = RouteSchedule::query()
                 ->whereIn('route_pattern_id', $patternIds)
@@ -123,9 +134,8 @@ class DirectJourneySearchService
 
                 $alightingMinutes = $alighting->minutes_from_start;
 
-                foreach ($datesToCheck as $date) {
-                    $dateInTz = $date->setTimezone($companyTimezone);
-                    $dateStr = $dateInTz->format('Y-m-d');
+                foreach ($datesByTimezone[$companyTimezone] as $date) {
+                    $dateStr = $date->format('Y-m-d');
 
                     $schedules = $schedulesByPatternAndDate[$pattern->id][$dateStr] ?? [];
 
@@ -139,25 +149,17 @@ class DirectJourneySearchService
                         ->first();
 
                     foreach ($schedules as $schedule) {
-                        $originDepartureAt = $dateInTz->copy()
+                        $originDepartureAt = $date
                             ->setTimeFromTimeString($schedule->departure_time);
 
                         $scheduledBoardingAt = $boardingMinutes !== null
                             ? $originDepartureAt->addMinutes($boardingMinutes)
                             : null;
 
-                        // Only return departures on or after the requested departure time
-                        if ($scheduledBoardingAt !== null) {
-                            if ($scheduledBoardingAt->lessThan($departureInCompanyTz)) {
-                                continue;
-                            }
-                            if ($scheduledBoardingAt->greaterThan($departureInCompanyTz->addHours(24))) {
-                                continue;
-                            }
-                        } else {
-                            if ($originDepartureAt->lessThan($departureInCompanyTz->subHours(2))) {
-                                continue;
-                            }
+                        if ($scheduledBoardingAt === null
+                            || $scheduledBoardingAt->lessThan($departureInCompanyTz)
+                            || $scheduledBoardingAt->greaterThan($departureInCompanyTz->addHours(24))) {
+                            continue;
                         }
 
                         $estimatedArrivalAt = $alightingMinutes !== null
@@ -199,9 +201,8 @@ class DirectJourneySearchService
         }
 
         return $journeys
-            ->sortBy('scheduled_departure_at')
-            ->values()
-            ->take(20);
+            ->sortBy(fn (Fluent $journey): int => CarbonImmutable::parse($journey->scheduled_departure_at)->getTimestamp())
+            ->values();
     }
 
     /**
@@ -214,6 +215,7 @@ class DirectJourneySearchService
         $lngDelta = $radiusM / (111320 * $cosLat);
 
         $candidates = Stop::query()
+            ->inPublicCatalogue()
             ->whereBetween('latitude', [$lat - $latDelta, $lat + $latDelta])
             ->whereBetween('longitude', [$lng - $lngDelta, $lng + $lngDelta])
             ->get(['id', 'latitude', 'longitude']);

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\CompanyStatus;
 use App\Models\Route;
 use App\Models\RouteFare;
 use App\Models\RoutePattern;
@@ -324,5 +325,68 @@ describe('Direct Journey Search API', function (): void {
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['per_page']);
+    });
+
+    it('excludes journeys of inactive companies and archived routes', function (): void {
+        $company = createCompany(['timezone' => 'UTC']);
+        $route = Route::factory()->for($company)->create();
+        $pattern = RoutePattern::factory()->for($route)->create();
+        $origin = Stop::factory()->for($company)->create(['latitude' => 9.9, 'longitude' => -84.1]);
+        $destination = Stop::factory()->for($company)->create(['latitude' => 10.1, 'longitude' => -84.2]);
+        RoutePatternStop::factory()->create(['route_pattern_id' => $pattern->id, 'stop_id' => $origin->id, 'stop_sequence' => 1, 'minutes_from_start' => 0]);
+        RoutePatternStop::factory()->create(['route_pattern_id' => $pattern->id, 'stop_id' => $destination->id, 'stop_sequence' => 2, 'minutes_from_start' => 30]);
+        RouteSchedule::factory()->create(['route_pattern_id' => $pattern->id, 'day_of_week' => 1, 'departure_time' => '10:00:00']);
+        $url = '/api/v1/operations/journeys?'.http_build_query(['origin_lat' => 9.9, 'origin_lng' => -84.1, 'destination_lat' => 10.1, 'destination_lng' => -84.2, 'departure_at' => '2026-11-09T09:00:00Z']);
+
+        $this->getJson($url)->assertOk()->assertJsonCount(1, 'data');
+        $company->update(['status' => CompanyStatus::INACTIVE]);
+        $this->getJson($url)->assertOk()->assertJsonCount(0, 'data');
+        $company->update(['status' => CompanyStatus::ACTIVE]);
+        $route->delete();
+        $this->getJson($url)->assertOk()->assertJsonCount(0, 'data');
+    });
+
+    it('uses each company local date for journeys near the date line', function (): void {
+        $origin = Stop::factory()->create(['company_id' => null, 'latitude' => 9.9, 'longitude' => -84.1]);
+        $destination = Stop::factory()->create(['company_id' => null, 'latitude' => 10.1, 'longitude' => -84.2]);
+        foreach (['Pacific/Pago_Pago', 'Pacific/Kiritimati'] as $timezone) {
+            $company = createCompany(['timezone' => $timezone]);
+            $route = Route::factory()->for($company)->create();
+            $pattern = RoutePattern::factory()->for($route)->create();
+            RoutePatternStop::factory()->create(['route_pattern_id' => $pattern->id, 'stop_id' => $origin->id, 'stop_sequence' => 1, 'minutes_from_start' => 0]);
+            RoutePatternStop::factory()->create(['route_pattern_id' => $pattern->id, 'stop_id' => $destination->id, 'stop_sequence' => 2, 'minutes_from_start' => 30]);
+            RouteSchedule::factory()->create(['route_pattern_id' => $pattern->id, 'day_of_week' => $timezone === 'Pacific/Pago_Pago' ? 0 : 2, 'departure_time' => $timezone === 'Pacific/Pago_Pago' ? '23:30:00' : '01:00:00']);
+        }
+
+        $response = $this->getJson('/api/v1/operations/journeys?'.http_build_query(['origin_lat' => 9.9, 'origin_lng' => -84.1, 'destination_lat' => 10.1, 'destination_lng' => -84.2, 'departure_at' => '2026-11-09T10:00:00Z']));
+        $response->assertOk()->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.attributes.scheduled_departure_at', '2026-11-08T23:30:00-11:00')
+            ->assertJsonPath('data.1.attributes.scheduled_departure_at', '2026-11-10T01:00:00+14:00');
+    });
+
+    it('paginates all matching journeys beyond the first twenty', function (): void {
+        $company = createCompany(['timezone' => 'UTC']);
+        $pattern = RoutePattern::factory()->for(Route::factory()->for($company))->create();
+        $origin = Stop::factory()->for($company)->create(['latitude' => 9.9, 'longitude' => -84.1]);
+        $destination = Stop::factory()->for($company)->create(['latitude' => 10.1, 'longitude' => -84.2]);
+        RoutePatternStop::factory()->create(['route_pattern_id' => $pattern->id, 'stop_id' => $origin->id, 'stop_sequence' => 1, 'minutes_from_start' => 0]);
+        RoutePatternStop::factory()->create(['route_pattern_id' => $pattern->id, 'stop_id' => $destination->id, 'stop_sequence' => 2, 'minutes_from_start' => 30]);
+        for ($hour = 0; $hour < 24; $hour++) {
+            RouteSchedule::factory()->create(['route_pattern_id' => $pattern->id, 'day_of_week' => 1, 'departure_time' => sprintf('%02d:00:00', $hour)]);
+        }
+        $url = '/api/v1/operations/journeys?'.http_build_query(['origin_lat' => 9.9, 'origin_lng' => -84.1, 'destination_lat' => 10.1, 'destination_lng' => -84.2, 'departure_at' => '2026-11-09T00:00:00Z', 'page' => ['size' => 20, 'number' => 2]]);
+        $this->getJson($url)->assertOk()->assertJsonCount(4, 'data')->assertJsonPath('meta.total', 24);
+    });
+
+    it('omits an intermediate boarding stop with no known departure time', function (): void {
+        $company = createCompany(['timezone' => 'UTC']);
+        $pattern = RoutePattern::factory()->for(Route::factory()->for($company))->create();
+        $origin = Stop::factory()->for($company)->create(['latitude' => 9.9, 'longitude' => -84.1]);
+        $destination = Stop::factory()->for($company)->create(['latitude' => 10.1, 'longitude' => -84.2]);
+        RoutePatternStop::factory()->create(['route_pattern_id' => $pattern->id, 'stop_id' => $origin->id, 'stop_sequence' => 2, 'minutes_from_start' => null]);
+        RoutePatternStop::factory()->create(['route_pattern_id' => $pattern->id, 'stop_id' => $destination->id, 'stop_sequence' => 3, 'minutes_from_start' => 30]);
+        RouteSchedule::factory()->create(['route_pattern_id' => $pattern->id, 'day_of_week' => 1, 'departure_time' => '10:00:00']);
+        $url = '/api/v1/operations/journeys?'.http_build_query(['origin_lat' => 9.9, 'origin_lng' => -84.1, 'destination_lat' => 10.1, 'destination_lng' => -84.2, 'departure_at' => '2026-11-09T09:00:00Z']);
+        $this->getJson($url)->assertOk()->assertJsonCount(0, 'data');
     });
 });

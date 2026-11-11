@@ -7,6 +7,7 @@ use App\Models\RoutePatternStop;
 use App\Models\RouteSchedule;
 use App\Models\Stop;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Fluent;
 
@@ -24,6 +25,7 @@ class StopDepartureService
         $patternStops = RoutePatternStop::query()
             ->with(['pattern.route.company', 'pattern.route.fares'])
             ->where('stop_id', $stop->id)
+            ->whereHas('pattern', fn (Builder $pattern): Builder => $pattern->inPublicCatalogue())
             ->get();
 
         if ($patternStops->isEmpty()) {
@@ -32,24 +34,30 @@ class StopDepartureService
 
         $patternIds = $patternStops->pluck('route_pattern_id')->unique()->all();
 
-        // Sample company timezone from patterns or default to UTC
-        $companyTimezone = $patternStops->first()->pattern?->route?->company?->timezone ?? 'UTC';
-        $departureInCompanyTz = $departureAtUtc->setTimezone($companyTimezone);
-        $windowEnd = $departureInCompanyTz->addMinutes($windowMinutes);
+        $datesByTimezone = [];
+        $serviceDates = [];
+        foreach ($patternStops as $patternStop) {
+            $timezone = $patternStop->pattern?->route?->company?->timezone ?? 'UTC';
+            if (isset($datesByTimezone[$timezone])) {
+                continue;
+            }
 
-        // Service dates to query: yesterday, today, and tomorrow (if window reaches next day)
-        $datesToCheck = collect([
-            $departureInCompanyTz->subDay()->startOfDay(),
-            $departureInCompanyTz->startOfDay(),
-        ]);
-
-        if ($windowEnd->toDateString() > $departureInCompanyTz->toDateString()) {
-            $datesToCheck->push($departureInCompanyTz->addDay()->startOfDay());
+            $localDeparture = $departureAtUtc->setTimezone($timezone);
+            $datesByTimezone[$timezone] = [
+                $localDeparture->subDay()->startOfDay(),
+                $localDeparture->startOfDay(),
+            ];
+            if ($localDeparture->addMinutes($windowMinutes)->toDateString() > $localDeparture->toDateString()) {
+                $datesByTimezone[$timezone][] = $localDeparture->addDay()->startOfDay();
+            }
+            foreach ($datesByTimezone[$timezone] as $date) {
+                $serviceDates[$date->toDateString()] = $date;
+            }
         }
 
         // Bulk-load schedules by pattern and service date avoiding N+1 queries
         $schedulesByPatternAndDate = [];
-        foreach ($datesToCheck as $date) {
+        foreach ($serviceDates as $date) {
             $dateStr = $date->format('Y-m-d');
             $schedules = RouteSchedule::query()
                 ->whereIn('route_pattern_id', $patternIds)
@@ -70,6 +78,9 @@ class StopDepartureService
             }
 
             $route = $pattern->route;
+            $companyTimezone = $route->company?->timezone ?? 'UTC';
+            $departureInCompanyTz = $departureAtUtc->setTimezone($companyTimezone);
+            $windowEnd = $departureInCompanyTz->addMinutes($windowMinutes);
 
             // Unknown intermediate stop departure time cannot be placed in a scheduled window
             if ($patternStop->stop_sequence > 1 && $patternStop->minutes_from_start === null) {
@@ -80,9 +91,8 @@ class StopDepartureService
                 ? ($patternStop->minutes_from_start ?? 0)
                 : (int) $patternStop->minutes_from_start;
 
-            foreach ($datesToCheck as $date) {
-                $dateInTz = $date->setTimezone($companyTimezone);
-                $dateStr = $dateInTz->format('Y-m-d');
+            foreach ($datesByTimezone[$companyTimezone] as $date) {
+                $dateStr = $date->format('Y-m-d');
 
                 $schedules = $schedulesByPatternAndDate[$pattern->id][$dateStr] ?? [];
 
@@ -96,7 +106,7 @@ class StopDepartureService
                     ->first();
 
                 foreach ($schedules as $schedule) {
-                    $stopDepartureAt = $dateInTz->copy()
+                    $stopDepartureAt = $date
                         ->setTimeFromTimeString($schedule->departure_time)
                         ->addMinutes($minutesFromStart);
 
@@ -123,7 +133,7 @@ class StopDepartureService
         }
 
         return $departures
-            ->sortBy('scheduled_stop_departure_at')
+            ->sortBy(fn (Fluent $departure): int => CarbonImmutable::parse($departure->scheduled_stop_departure_at)->getTimestamp())
             ->values();
     }
 }

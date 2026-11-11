@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\CompanyStatus;
 use App\Models\Route;
 use App\Models\RouteFare;
 use App\Models\RoutePattern;
@@ -222,5 +223,35 @@ describe('Planned Stop Departures API', function (): void {
         $this->getJson("/api/v1/operations/stops/{$stop->id}/departures?per_page=-1")->assertStatus(422);
         $this->getJson("/api/v1/operations/stops/{$stop->id}/departures?per_page=0")->assertStatus(422);
         $this->getJson("/api/v1/operations/stops/{$stop->id}/departures?per_page=500")->assertStatus(422);
+    });
+
+    it('hides departures of inactive companies at shared stops', function (): void {
+        $company = createCompany(['timezone' => 'UTC']);
+        $pattern = RoutePattern::factory()->for(Route::factory()->for($company))->create();
+        $stop = Stop::factory()->create(['company_id' => null]);
+        $companyStop = Stop::factory()->for($company)->create();
+        RoutePatternStop::factory()->create(['route_pattern_id' => $pattern->id, 'stop_id' => $stop->id, 'stop_sequence' => 1, 'minutes_from_start' => 0]);
+        RouteSchedule::factory()->create(['route_pattern_id' => $pattern->id, 'day_of_week' => 1, 'departure_time' => '10:00:00']);
+        $url = "/api/v1/operations/stops/{$stop->id}/departures?departure_at=2026-11-09T09:00:00Z";
+
+        $this->getJson($url)->assertOk()->assertJsonCount(1, 'data');
+        $company->update(['status' => CompanyStatus::INACTIVE]);
+        $this->getJson($url)->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson("/api/v1/operations/stops/{$companyStop->id}/departures")->assertNotFound();
+    });
+
+    it('uses each route local date for departures near the date line', function (): void {
+        $stop = Stop::factory()->create(['company_id' => null]);
+        foreach (['Pacific/Pago_Pago', 'Pacific/Kiritimati'] as $timezone) {
+            $company = createCompany(['timezone' => $timezone]);
+            $pattern = RoutePattern::factory()->for(Route::factory()->for($company))->create();
+            RoutePatternStop::factory()->create(['route_pattern_id' => $pattern->id, 'stop_id' => $stop->id, 'stop_sequence' => 1, 'minutes_from_start' => 0]);
+            RouteSchedule::factory()->create(['route_pattern_id' => $pattern->id, 'day_of_week' => $timezone === 'Pacific/Pago_Pago' ? 0 : 2, 'departure_time' => $timezone === 'Pacific/Pago_Pago' ? '23:30:00' : '01:00:00']);
+        }
+
+        $response = $this->getJson("/api/v1/operations/stops/{$stop->id}/departures?".http_build_query(['departure_at' => '2026-11-09T10:00:00Z', 'window_minutes' => 120]));
+        $response->assertOk()->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.attributes.scheduled_stop_departure_at', '2026-11-08T23:30:00-11:00')
+            ->assertJsonPath('data.1.attributes.scheduled_stop_departure_at', '2026-11-10T01:00:00+14:00');
     });
 });

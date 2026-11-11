@@ -19,7 +19,7 @@ class StopDepartureController extends Controller
      */
     public function index(string $id, StopDepartureRequest $request, StopDepartureService $departureService): AnonymousResourceCollection
     {
-        $stop = Stop::query()->whereNull('deleted_at')->find($id);
+        $stop = Stop::query()->inPublicCatalogue()->find($id);
 
         if (! $stop) {
             abort(404, __('The requested stop does not exist or has been archived.'));
