@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\Operations\DriverProfileController;
 use App\Http\Controllers\Api\V1\Operations\DriverTripController;
 use App\Http\Controllers\Api\V1\Operations\JourneyController;
+use App\Http\Controllers\Api\V1\Operations\PublicTripController;
 use App\Http\Controllers\Api\V1\Operations\RouteController;
 use App\Http\Controllers\Api\V1\Operations\RouteFareController;
 use App\Http\Controllers\Api\V1\Operations\RoutePatternController;
@@ -32,6 +33,8 @@ Route::prefix('v1/operations')->group(function (): void {
     // Route Patterns & Schedules
     Route::get('route-patterns/{id}', [RoutePatternController::class, 'show'])->whereUuid('id')->name('operations.route-patterns.show');
     Route::get('route-patterns/{id}/schedules', [RoutePatternController::class, 'schedules'])->whereUuid('id')->name('operations.route-patterns.schedules');
+    Route::get('route-patterns/{id}/trips', [PublicTripController::class, 'index'])->whereUuid('id')->name('operations.route-patterns.trips');
+    Route::get('public/trips/{id}', [PublicTripController::class, 'show'])->whereUuid('id')->name('operations.public.trips.show');
 
     // Stops Catalogue
     Route::get('stops', [StopController::class, 'index'])->name('operations.stops.index');

@@ -33,7 +33,7 @@ class TripExecutionController extends Controller
         $previousTeam = getPermissionsTeamId();
         try {
             setPermissionsTeamId($trip->company_id);
-            Gate::forUser($user)->authorize('view', [Trip::class, $trip]);
+            Gate::forUser($user)->authorize('view', [Trip::class, $trip->company, $trip]);
         } finally {
             setPermissionsTeamId($previousTeam);
         }
