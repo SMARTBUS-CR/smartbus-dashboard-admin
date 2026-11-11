@@ -36,10 +36,9 @@ test('completes a running trip with a server UTC arrival while preserving its pl
 
     $completed = app(TripManagementService::class)->complete($actor, $trip->company, $trip->id);
 
-    expect($completed->status)->toBe(TripStatus::COMPLETED);
-    expect($completed->actual_arrival_at->utc()->format('Y-m-d H:i:s.uP'))->toBe('2026-10-26 13:45:00.654321+00:00');
-    expect(Arr::except($completed->getRawOriginal(), ['status', 'actual_arrival_at', 'updated_at']))
-        ->toBe(Arr::except($before, ['status', 'actual_arrival_at', 'updated_at']));
+    expect($completed->status)->toBe(TripStatus::COMPLETED)
+        ->and($completed->actual_arrival_at->utc()->format('Y-m-d H:i:s.uP'))->toBe('2026-10-26 13:45:00.654321+00:00')
+        ->and(Arr::except($completed->getRawOriginal(), ['status', 'actual_arrival_at', 'updated_at']))->toBe(Arr::except($before, ['status', 'actual_arrival_at', 'updated_at']));
     Http::assertNothingSent();
 });
 
@@ -53,10 +52,10 @@ test('allows completion by the assigned driver without administrative permission
 
     $completed = app(TripManagementService::class)->complete($actor, $trip->company, $trip->id);
 
-    expect($completed->status)->toBe(TripStatus::COMPLETED);
-    expect(getPermissionsTeamId())->toBe($team);
-    expect($actor->relationLoaded('roles'))->toBeFalse();
-    expect($actor->relationLoaded('permissions'))->toBeFalse();
+    expect($completed->status)->toBe(TripStatus::COMPLETED)
+        ->and(getPermissionsTeamId())->toBe($team)
+        ->and($actor->relationLoaded('roles'))->toBeFalse()
+        ->and($actor->relationLoaded('permissions'))->toBeFalse();
 });
 
 test('permits closing history after company and operational resources become unavailable', function (): void {
@@ -71,8 +70,8 @@ test('permits closing history after company and operational resources become una
 
     $completed = app(TripManagementService::class)->complete($actor, $trip->company, $trip->id);
 
-    expect($completed->status)->toBe(TripStatus::COMPLETED);
-    expect($completed->actual_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-10-26 13:45:00');
+    expect($completed->status)->toBe(TripStatus::COMPLETED)
+        ->and($completed->actual_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-10-26 13:45:00');
 });
 
 test('requires actual arrival to be at or after actual departure without clamping server time', function (string $instant, bool $allowed): void {
@@ -82,14 +81,14 @@ test('requires actual arrival to be at or after actual departure without clampin
 
     if ($allowed) {
         $completed = app(TripManagementService::class)->complete($actor, $trip->company, $trip->id);
-        expect($completed->actual_arrival_at->equalTo($completed->actual_departure_at))->toBeTrue();
-        expect($completed->status)->toBe(TripStatus::COMPLETED);
+        expect($completed->actual_arrival_at->equalTo($completed->actual_departure_at))->toBeTrue()
+            ->and($completed->status)->toBe(TripStatus::COMPLETED);
     } else {
         expect(fn () => app(TripManagementService::class)->complete($actor, $trip->company, $trip->id))
             ->toThrow(function (ValidationException $exception): void {
                 expect($exception->errors())->toHaveKey('actual_arrival_at');
-            });
-        expect($trip->fresh()->getRawOriginal())->toBe($before);
+            })
+            ->and($trip->fresh()->getRawOriginal())->toBe($before);
     }
 })->with([['2026-10-26T12:45:00.123456Z', true], ['2026-10-26T12:45:00.123455Z', false]]);
 
@@ -120,9 +119,9 @@ test('authorizes before validating identifiers and resolving a completion retry'
 
     expect(fn () => app(TripManagementService::class)->complete($other, $trip->company, $trip->id))->toThrow(AuthorizationException::class);
     $passenger = createUserWithRole(UserRole::Passenger, $trip->company);
-    expect(fn () => app(TripManagementService::class)->complete($passenger, $trip->company, 'invalid'))->toThrow(AuthorizationException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
-    expect(getPermissionsTeamId())->toBe($team);
+    expect(fn () => app(TripManagementService::class)->complete($passenger, $trip->company, 'invalid'))->toThrow(AuthorizationException::class)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before)
+        ->and(getPermissionsTeamId())->toBe($team);
 })->with([false, true]);
 
 test('rejects completion retries after current authorization is revoked', function (string $revoked): void {
@@ -142,8 +141,8 @@ test('rejects completion retries after current authorization is revoked', functi
         $actor->getConnection()->table('model_has_roles')->where('model_uuid', $actor->id)->where('company_id', $trip->company_id)->delete();
     }
 
-    expect(fn () => app(TripManagementService::class)->complete($actor, $trip->company, $trip->id))->toThrow(AuthorizationException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+    expect(fn () => app(TripManagementService::class)->complete($actor, $trip->company, $trip->id))->toThrow(AuthorizationException::class)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 })->with(['membership', 'role', 'identity', 'permission']);
 
 test('rejects completion from incompatible states without changing history', function (bool $cancelled): void {
@@ -159,16 +158,16 @@ test('rejects completion from incompatible states without changing history', fun
     expect(fn () => app(TripManagementService::class)->complete($actor, $trip->company, $trip->id))
         ->toThrow(function (ValidationException $exception): void {
             expect($exception->errors())->toBe(['status' => [__('Only in-progress trips can be completed.')]]);
-        });
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+        })
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 })->with([false, true]);
 
 test('scopes completion to the selected company even for super administrators', function (): void {
     [$trip, $actor] = tripCompletionInputs();
     $before = $trip->getRawOriginal();
 
-    expect(fn () => app(TripManagementService::class)->complete($actor, createCompany(), $trip->id))->toThrow(ModelNotFoundException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+    expect(fn () => app(TripManagementService::class)->complete($actor, createCompany(), $trip->id))->toThrow(ModelNotFoundException::class)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 });
 
 test('allows an authorized company administrator to complete after the company becomes inactive', function (): void {
@@ -194,9 +193,9 @@ test('releases an overdue bus for another start only after the running trip is c
     $completed = $service->complete($actor, $trip->company, $trip->id);
     $started = $service->start($actor, $trip->company, $next->id);
 
-    expect($completed->status)->toBe(TripStatus::COMPLETED);
-    expect($started->status)->toBe(TripStatus::IN_PROGRESS);
-    expect($completed->actual_arrival_at->equalTo($started->actual_departure_at))->toBeTrue();
+    expect($completed->status)->toBe(TripStatus::COMPLETED)
+        ->and($started->status)->toBe(TripStatus::IN_PROGRESS)
+        ->and($completed->actual_arrival_at->equalTo($started->actual_departure_at))->toBeTrue();
 });
 
 test('returns bilingual completion state and chronology errors', function (string $locale, string $scenario, string $field, string $message): void {
@@ -215,8 +214,8 @@ test('returns bilingual completion state and chronology errors', function (strin
     expect(fn () => $service->complete($actor, $trip->company, $trip->id))
         ->toThrow(function (ValidationException $exception) use ($field, $message): void {
             expect($exception->errors())->toBe([$field => [$message]]);
-        });
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+        })
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
 })->with([
     ['en', 'state', 'status', 'Only in-progress trips can be completed.'],
     ['es', 'state', 'status', 'Solo se pueden completar viajes en curso.'],

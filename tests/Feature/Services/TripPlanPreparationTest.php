@@ -107,8 +107,8 @@ test('accepts saved detours and nullable leg distances without recalculation', f
 
     $plan = app(TripPlanPreparationService::class)->prepare($company, $data);
 
-    expect($plan['pattern']->route_geometry['coordinates'])->toHaveCount(3);
-    expect($pattern->fresh()->getRawOriginal())->toBe($before);
+    expect($plan['pattern']->route_geometry['coordinates'])->toHaveCount(3)
+        ->and($pattern->fresh()->getRawOriginal())->toBe($before);
     Http::assertNothingSent();
 })->with([false, true]);
 
@@ -160,9 +160,9 @@ test('preserves repeated occurrences and null timing estimates in prepared data'
 
     $plan = app(TripPlanPreparationService::class)->prepare($company, $data);
 
-    expect($plan['occurrences']->pluck('stop_id')->all())->toBe([$original[0]->stop_id, $original[1]->stop_id, $original[0]->stop_id]);
-    expect($plan['occurrences']->pluck('id')->unique())->toHaveCount(3);
-    expect($plan['occurrences']->pluck('minutes_from_start')->all())->toBe([null, null, null]);
+    expect($plan['occurrences']->pluck('stop_id')->all())->toBe([$original[0]->stop_id, $original[1]->stop_id, $original[0]->stop_id])
+        ->and($plan['occurrences']->pluck('id')->unique())->toHaveCount(3)
+        ->and($plan['occurrences']->pluck('minutes_from_start')->all())->toBe([null, null, null]);
 });
 
 test('includes schedule validity endpoints and preserves explicit fractional arrival instants', function (): void {
@@ -191,8 +191,8 @@ test('validates the saved points hash and legs including routing adjustments', f
 
     $plan = app(TripPlanPreparationService::class)->prepare($company, $data);
 
-    expect($plan['occurrences'])->toHaveCount(2);
-    expect($plan['pattern']->routing_leg_distances)->toBe([750, 750]);
+    expect($plan['occurrences'])->toHaveCount(2)
+        ->and($plan['pattern']->routing_leg_distances)->toBe([750, 750]);
     Http::assertNothingSent();
 });
 
@@ -239,8 +239,8 @@ test('returns localized preparation errors without partial writes', function (st
         app(TripPlanPreparationService::class)->prepare($company, $data);
         $this->fail('Expected a validation exception.');
     } catch (ValidationException $exception) {
-        expect($exception->errors())->toBe($problem === 'arrival' ? ['arrival_at' => [$arrivalMessage]] : ['route_pattern_id' => [$planMessage]]);
-        expect($pattern->fresh()->getRawOriginal())->toBe($before);
+        expect($exception->errors())->toBe($problem === 'arrival' ? ['arrival_at' => [$arrivalMessage]] : ['route_pattern_id' => [$planMessage]])
+            ->and($pattern->fresh()->getRawOriginal())->toBe($before);
         $this->assertDatabaseCount('trips', 0);
     }
 })->with(['arrival', 'plan'])->with([

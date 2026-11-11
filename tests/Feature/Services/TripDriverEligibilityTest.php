@@ -35,8 +35,8 @@ test('accepts inclusive employment and license boundaries without changing permi
 
     $result = app(TripDriverEligibilityService::class)->validate($company, $driver->getKey(), ['2026-10-26', '2026-10-27']);
 
-    expect($result->is($driver))->toBeTrue();
-    expect(getPermissionsTeamId())->toBe($other->getKey());
+    expect($result->is($driver))->toBeTrue()
+        ->and(getPermissionsTeamId())->toBe($other->getKey());
     $this->assertDatabaseCount('trips', 0);
     Http::assertNothingSent();
 });
@@ -84,8 +84,8 @@ test('rejects unavailable or ineligible real driver records privately', function
         app(TripDriverEligibilityService::class)->validate($company, $id, ['2026-10-26', '2026-10-27']);
         $this->fail('Expected a validation exception.');
     } catch (ValidationException $exception) {
-        expect($exception->errors())->toBe(['driver_id' => [__('The selected driver is unavailable or ineligible for the planned dates.')]]);
-        expect(getPermissionsTeamId())->toBe($originalTeam);
+        expect($exception->errors())->toBe(['driver_id' => [__('The selected driver is unavailable or ineligible for the planned dates.')]])
+            ->and(getPermissionsTeamId())->toBe($originalTeam);
         $this->assertDatabaseCount('trips', 0);
     }
 })->with([
