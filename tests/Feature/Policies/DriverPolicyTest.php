@@ -79,3 +79,62 @@ describe('Driver Policy', function (): void {
             ->and(Gate::forUser($actor)->allows('forceDeleteAny', [Driver::class, $company]))->toBeFalse();
     });
 });
+
+describe('Driver Record Authorization Contracts', function (): void {
+    test('resolves the active tenant for native collection authorization', function (): void {
+        $company = createCompany();
+        $actor = User::factory()->create();
+        CompanyUser::create(['company_id' => $company->getKey(), 'user_id' => $actor->getKey()]);
+        grantShield($actor, ['ViewAny:Driver'], $company);
+        actingAsInCompany($actor, $company);
+
+        $allowed = Gate::forUser($actor)->allows('viewAny', Driver::class);
+
+        expect($allowed)->toBeTrue();
+    });
+
+    test('supports native model and explicit company authorization', function (
+        string $ability,
+        string $permission,
+        bool $archived,
+    ): void {
+        $company = createCompany();
+        $actor = User::factory()->create();
+        CompanyUser::create(['company_id' => $company->getKey(), 'user_id' => $actor->getKey()]);
+        grantShield($actor, [$permission], $company);
+        $driver = Driver::factory()->for($company)->create();
+        if ($archived) {
+            $driver->delete();
+        }
+        actingAsInCompany($actor, $company);
+
+        $nativeAuthorization = Gate::forUser($actor)->allows($ability, $driver);
+        $explicitAuthorization = Gate::forUser($actor)->allows(
+            $ability,
+            [Driver::class, $company, $driver],
+        );
+
+        expect($nativeAuthorization)->toBeTrue()
+            ->and($explicitAuthorization)->toBeTrue();
+    })->with([
+        'viewing' => ['view', 'View:Driver', false],
+        'updating' => ['update', 'Update:Driver', false],
+        'archiving' => ['delete', 'Delete:Driver', false],
+        'restoring' => ['restore', 'Restore:Driver', true],
+        'viewing salary' => ['viewSalary', 'ViewSalary:Driver', false],
+        'viewing attendance' => ['viewAttendance', 'ViewAttendance:Driver', false],
+    ]);
+
+    test('denies native model authorization outside the actor company', function (): void {
+        [$company, $otherCompany] = createTenantPair();
+        $actor = User::factory()->create();
+        CompanyUser::create(['company_id' => $company->getKey(), 'user_id' => $actor->getKey()]);
+        grantShield($actor, ['Update:Driver'], $company);
+        $foreignDriver = Driver::factory()->for($otherCompany)->create();
+        actingAsInCompany($actor, $company);
+
+        $allowed = Gate::forUser($actor)->allows('update', $foreignDriver);
+
+        expect($allowed)->toBeFalse();
+    });
+});

@@ -7,6 +7,7 @@ use App\Filament\Resources\Drivers\Pages\ListDrivers;
 use App\Filament\Resources\Drivers\Pages\ViewDriver;
 use App\Models\CompanyUser;
 use App\Models\Driver;
+use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
 
 describe('Driver Resource Access', function (): void {
@@ -135,5 +136,20 @@ describe('Driver Resource Access', function (): void {
 
         Livewire::test(ViewDriver::class, ['record' => $driver->getKey()])
             ->assertDontSee('987654.32');
+    });
+
+    test('renders native record actions for an authorized workforce administrator', function (): void {
+        $company = createCompany();
+        $driver = Driver::factory()->for($company)->create();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+        CompanyUser::create([
+            'company_id' => $company->getKey(),
+            'user_id' => $actor->getKey(),
+        ]);
+        grantShield($actor, ['ViewAny:Driver', 'View:Driver', 'Update:Driver'], $company);
+        actingAsInCompany($actor, $company);
+
+        Livewire::test(ListDrivers::class)
+            ->assertActionVisible(TestAction::make('edit')->table($driver));
     });
 });
