@@ -88,3 +88,13 @@ test('fails closed when the service secret is not configured with 503', function
     $this->get($uri, trackingServiceHeaders($uri))->assertServiceUnavailable();
     Http::assertNothingSent();
 })->with([null, '', '   ']);
+
+test('keeps the GPS contract on the operations path even with the ETA selector', function (): void {
+    $trip = Trip::factory()->withDriverAvailability()->create()->refresh();
+    $uri = '/api/v1/operations/trips/'.$trip->id.'/tracking-context?projection=eta-v1';
+
+    $this->get($uri, trackingServiceHeaders($uri))->assertOk()
+        ->assertHeader('Content-Type', 'application/vnd.api+json')
+        ->assertJsonPath('data.id', $trip->id)
+        ->assertJsonMissingPath('contract_version');
+});

@@ -605,6 +605,8 @@
     "The actual arrival cannot be before the actual departure.": "La llegada real no puede ser anterior a la salida real.",
     "Only scheduled trips can be cancelled.": "Solo se pueden cancelar viajes programados.",
     "A valid GPS service signature is required.": "Se requiere una firma válida del servicio GPS.",
+    "A valid ETA service token is required.": "Se requiere un token válido del servicio de ETA.",
+    "The saved trip plan cannot be projected for ETA.": "El plan de viaje guardado no se puede proyectar para ETA.",
     "Tracking service authentication is not configured.": "La autenticación del servicio de seguimiento no está configurada.",
     "The bounding box must be ordered west, south, east, north and span at most one degree per axis.": "El área debe indicarse en orden oeste, sur, este, norte y abarcar como máximo un grado por eje.",
     "Fleet": "Flota",

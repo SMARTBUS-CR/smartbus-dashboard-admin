@@ -565,6 +565,8 @@
     "The actual arrival cannot be before the actual departure.": "The actual arrival cannot be before the actual departure.",
     "Only scheduled trips can be cancelled.": "Only scheduled trips can be cancelled.",
     "A valid GPS service signature is required.": "A valid GPS service signature is required.",
+    "A valid ETA service token is required.": "A valid ETA service token is required.",
+    "The saved trip plan cannot be projected for ETA.": "The saved trip plan cannot be projected for ETA.",
     "Tracking service authentication is not configured.": "Tracking service authentication is not configured.",
     "The bounding box must be ordered west, south, east, north and span at most one degree per axis.": "The bounding box must be ordered west, south, east, north and span at most one degree per axis.",
     "Fleet": "Fleet",
