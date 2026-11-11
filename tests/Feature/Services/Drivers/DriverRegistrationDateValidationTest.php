@@ -5,7 +5,7 @@ use Illuminate\Contracts\Validation\UncompromisedVerifier;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class);
+pest()->use(WithDriverRegistration::class);
 
 describe('Driver Registration Date Validation', function (): void {
     test('rejects invalid raw employment dates before Eloquent can normalize them', function (string $field, string $date): void {

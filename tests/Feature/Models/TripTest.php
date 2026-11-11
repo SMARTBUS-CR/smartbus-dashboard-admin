@@ -77,8 +77,8 @@ test('protects stored trip planning and execution fields against direct writes',
         $trip->save();
         $this->fail('Expected a validation exception.');
     } catch (ValidationException $exception) {
-        expect($exception->errors())->toHaveKey($field);
-        expect(Trip::query()->findOrFail($before['id'])->getRawOriginal())->toBe($before);
+        expect($exception->errors())->toHaveKey($field)
+            ->and(Trip::query()->findOrFail($before['id'])->getRawOriginal())->toBe($before);
     }
 })->with([
     'identity' => ['id', '00000000-0000-4000-8000-000000000001'],
@@ -104,9 +104,8 @@ test('soft deletes trips and restores them without changing their history', func
 
     expect($trip->{$method}())->toBeTrue();
     $this->assertSoftDeleted($trip);
-    expect(Trip::query()->find($trip->getKey()))->toBeNull();
-
-    expect($trip->{$restore}())->toBeTrue();
+    expect(Trip::query()->find($trip->getKey()))->toBeNull()
+        ->and($trip->{$restore}())->toBeTrue();
     $restored = Trip::query()->findOrFail($trip->getKey());
     expect($restored->getRawOriginal('planned_route_snapshot'))->toBe($before['planned_route_snapshot']);
 })->with(['delete', 'deleteQuietly'])->with(['restore', 'restoreQuietly']);
@@ -151,8 +150,8 @@ test('rejects database-valid changes to terminal history when events are suppres
 
     expect(fn () => $method === 'saveQuietly'
         ? $trip->saveQuietly()
-        : Trip::withoutEvents(fn () => $trip->save()))->toThrow(ValidationException::class);
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+        : Trip::withoutEvents(fn () => $trip->save()))->toThrow(ValidationException::class)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
     Http::assertNothingSent();
 })->with(['completed', 'cancelled'])->with(['saveQuietly', 'withoutEvents']);
 
@@ -166,9 +165,8 @@ test('rejects permanent deletion of visible and soft deleted trip history', func
 
     expect(fn () => $method === 'forceDestroy'
         ? Trip::forceDestroy($trip->id)
-        : $trip->{$method}())->toThrow(ValidationException::class);
-
-    expect(Trip::withTrashed()->findOrFail($trip->id)->getRawOriginal())->toBe($before);
+        : $trip->{$method}())->toThrow(ValidationException::class)
+        ->and(Trip::withTrashed()->findOrFail($trip->id)->getRawOriginal())->toBe($before);
     Http::assertNothingSent();
 })->with(['forceDelete', 'forceDeleteQuietly', 'forceDestroy'])->with([false, true]);
 
@@ -180,9 +178,8 @@ test('rejects history changes hidden inside a restoration', function (string $me
     $before = $trip->getRawOriginal();
     $trip->actual_arrival_at = $trip->actual_arrival_at->addMinute();
 
-    expect(fn () => $trip->{$method}())->toThrow(ValidationException::class);
-
-    expect(Trip::withTrashed()->findOrFail($trip->id)->getRawOriginal())->toBe($before);
+    expect(fn () => $trip->{$method}())->toThrow(ValidationException::class)
+        ->and(Trip::withTrashed()->findOrFail($trip->id)->getRawOriginal())->toBe($before);
     Http::assertNothingSent();
 })->with(['restore', 'restoreQuietly']);
 

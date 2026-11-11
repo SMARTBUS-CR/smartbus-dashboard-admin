@@ -13,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class);
+pest()->use(WithDriverRegistration::class);
 
 beforeEach(function (): void {
     $this->company = createCompany();
@@ -28,8 +28,8 @@ describe('Driver Employment Lifecycle', function (): void {
         $service = app(DriverManagementService::class);
         foreach ([false, false, true, true] as $active) {
             $result = $service->setActive($this->actor, $this->company, $this->driver, $active);
-            expect($result->fresh()->status)->toBe($active ? DriverStatus::ACTIVE : DriverStatus::INACTIVE);
-            expect($result->only(['id', 'company_id', 'user_id']))->toBe($before);
+            expect($result->fresh()->status)->toBe($active ? DriverStatus::ACTIVE : DriverStatus::INACTIVE)
+                ->and($result->only(['id', 'company_id', 'user_id']))->toBe($before);
         }
     });
 
@@ -41,17 +41,17 @@ describe('Driver Employment Lifecycle', function (): void {
 
         $service->archive($this->actor, $this->company, $this->driver);
         $this->assertSoftDeleted($this->driver);
-        expect($schedule->fresh()->driver->id)->toBe($this->driver->id);
-        expect(app(DriverReadService::class)->findArchivedFor($this->actor, $this->company, $this->driver->id)['id'])->toBe($this->driver->id);
+        expect($schedule->fresh()->driver->id)->toBe($this->driver->id)
+            ->and(app(DriverReadService::class)->findArchivedFor($this->actor, $this->company, $this->driver->id)['id'])->toBe($this->driver->id);
         $service->archive($this->actor, $this->company, $this->driver);
         $restored = $service->restore($this->actor, $this->company, $this->driver);
 
-        expect($restored->id)->toBe($before['id']);
-        expect($restored->status)->toBe(DriverStatus::INACTIVE);
-        expect($restored->salary_amount)->toBe('650000.00');
-        expect($restored->trashed())->toBeFalse();
-        expect($schedule->fresh()->driver->id)->toBe($restored->id);
-        expect($service->restore($this->actor, $this->company, $this->driver)->id)->toBe($restored->id);
+        expect($restored->id)->toBe($before['id'])
+            ->and($restored->status)->toBe(DriverStatus::INACTIVE)
+            ->and($restored->salary_amount)->toBe('650000.00')
+            ->and($restored->trashed())->toBeFalse()
+            ->and($schedule->fresh()->driver->id)->toBe($restored->id)
+            ->and($service->restore($this->actor, $this->company, $this->driver)->id)->toBe($restored->id);
         $this->assertDatabaseCount('drivers', 1);
     });
 
@@ -73,10 +73,10 @@ describe('Driver Employment Lifecycle', function (): void {
         $service->archive($this->actor, $this->company, $this->driver);
         $service->restore($this->actor, $this->company, $this->driver);
 
-        expect(DB::connection('mysql')->table('users')->orderBy('id')->get()->toJson())->toBe($identityBefore);
-        expect(DB::connection('mysql')->table('model_has_roles')->orderBy('role_id')->get()->toJson())->toBe($rolesBefore);
-        expect(DB::table('company_users')->orderBy('id')->get()->toJson())->toBe($membershipsBefore);
-        expect($unrelated->fresh()->getRawOriginal())->toBe($employmentBefore);
+        expect(DB::connection('mysql')->table('users')->orderBy('id')->get()->toJson())->toBe($identityBefore)
+            ->and(DB::connection('mysql')->table('model_has_roles')->orderBy('role_id')->get()->toJson())->toBe($rolesBefore)
+            ->and(DB::table('company_users')->orderBy('id')->get()->toJson())->toBe($membershipsBefore)
+            ->and($unrelated->fresh()->getRawOriginal())->toBe($employmentBefore);
     });
 
     test('does not restore archived identities or memberships when restoring employment', function (): void {
@@ -101,8 +101,8 @@ describe('Driver Employment Lifecycle', function (): void {
         expect(fn () => app(DriverManagementService::class)->{$method}($this->actor, $this->company, $this->driver, $argument))
             ->toThrow(function (ValidationException $exception): void {
                 expect($exception->errors())->toHaveKey('driver');
-            });
-        expect(Driver::withTrashed()->findOrFail($this->driver->id)->getRawOriginal())->toBe($before);
+            })
+            ->and(Driver::withTrashed()->findOrFail($this->driver->id)->getRawOriginal())->toBe($before);
     })->with(['updateEmployment', 'setActive']);
 
     test('rejects physical deletion including the quiet model path', function (bool $quiet): void {
@@ -125,8 +125,8 @@ describe('Driver Employment Lifecycle', function (): void {
         try {
             $argument = $method === 'setActive' ? false : ['license' => 'TRANSIENT'];
             expect(fn () => app(DriverManagementService::class)->{$method}($this->actor, $this->company, $this->driver, $argument))
-                ->toThrow(RuntimeException::class, 'Injected lifecycle persistence failure');
-            expect(Driver::withTrashed()->findOrFail($this->driver->id)->getRawOriginal())->toBe($before);
+                ->toThrow(RuntimeException::class, 'Injected lifecycle persistence failure')
+                ->and(Driver::withTrashed()->findOrFail($this->driver->id)->getRawOriginal())->toBe($before);
         } finally {
             Driver::setEventDispatcher($originalDispatcher);
         }
@@ -149,8 +149,8 @@ describe('Driver Employment Lifecycle', function (): void {
             expect(fn () => app(DriverManagementService::class)->{$method}($this->actor, $this->company, $this->driver, $argument))
                 ->toThrow(function (ValidationException $exception): void {
                     expect($exception->errors())->toBe(['driver' => [__('The employment operation was cancelled.')]]);
-                });
-            expect(Driver::withTrashed()->findOrFail($this->driver->id)->getRawOriginal())->toBe($before);
+                })
+                ->and(Driver::withTrashed()->findOrFail($this->driver->id)->getRawOriginal())->toBe($before);
         } finally {
             Driver::setEventDispatcher($originalDispatcher);
         }
@@ -176,8 +176,8 @@ describe('Driver Employment Lifecycle', function (): void {
         $before = Driver::withTrashed()->findOrFail($this->driver->id)->getRawOriginal();
         $argument = $method === 'setActive' ? false : ['license' => 'GUARDED'];
 
-        expect(fn () => $service->{$method}($this->actor, $this->company, $this->driver, $argument))->toThrow(ValidationException::class);
-        expect($service->observedOperation)->toBe($method);
-        expect(Driver::withTrashed()->findOrFail($this->driver->id)->getRawOriginal())->toBe($before);
+        expect(fn () => $service->{$method}($this->actor, $this->company, $this->driver, $argument))->toThrow(ValidationException::class)
+            ->and($service->observedOperation)->toBe($method)
+            ->and(Driver::withTrashed()->findOrFail($this->driver->id)->getRawOriginal())->toBe($before);
     })->with(['updateEmployment', 'setActive', 'archive', 'restore']);
 });

@@ -64,10 +64,10 @@ test('rejects bus unavailability while scheduled or ongoing trips remain', funct
         }
         $this->fail('Expected a validation exception.');
     } catch (ValidationException $exception) {
-        expect($exception->errors())->toBe(['bus' => [$message]]);
-        expect($bus->fresh()->getAttributes())->toBe($before);
-        expect((array) DB::table('trips')->where('id', $tripId)->sole())->toBe($tripBefore);
-        expect(getPermissionsTeamId())->toBe($previousTeam);
+        expect($exception->errors())->toBe(['bus' => [$message]])
+            ->and($bus->fresh()->getAttributes())->toBe($before)
+            ->and((array) DB::table('trips')->where('id', $tripId)->sole())->toBe($tripBefore)
+            ->and(getPermissionsTeamId())->toBe($previousTeam);
     }
 })->with(['scheduled', 'in_progress'])->with(['archive', 'deactivate'])->with([
     'English' => ['en', 'Buses with scheduled or in-progress trips cannot be deactivated or archived.'],
@@ -93,8 +93,8 @@ test('preserves completed and cancelled trip history through bus lifecycle chang
     }
 
     expect($result->getKey())->toBe($bus->getKey())
-        ->and($result->company_id)->toBe($bus->company_id);
-    expect((array) DB::table('trips')->where('id', $tripId)->sole())->toBe($tripBefore);
+        ->and($result->company_id)->toBe($bus->company_id)
+        ->and((array) DB::table('trips')->where('id', $tripId)->sole())->toBe($tripBefore);
 })->with(['completed', 'cancelled'])->with(['archive', 'deactivate']);
 
 test('does not block reactivation when the bus has active trips', function (string $status): void {
