@@ -1,0 +1,41 @@
+# Dependencies
+/vendor
+/node_modules
+
+# Environment & credentials
+.env
+.env.*
+!.env.example
+/auth.json
+
+# Git
+.git
+.gitignore
+
+# Laravel local caches and logs
+/bootstrap/cache/*.php
+!/bootstrap/cache/.gitignore
+/storage/*.key
+/storage/logs/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+!/storage/framework/cache/.gitignore
+!/storage/framework/sessions/.gitignore
+!/storage/framework/views/.gitignore
+
+# Testing & code coverage
+.phpunit.cache
+.phpunit.result.cache
+
+# IDE, OS & editor files
+.idea
+.vscode
+.cursor
+.zed
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
