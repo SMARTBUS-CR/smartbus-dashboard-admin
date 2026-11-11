@@ -71,6 +71,24 @@ describe('Bus Read Permissions', function (): void {
 });
 
 describe('Bus Record Authorization Contracts', function (): void {
+    test('resolves the active tenant for native collection authorization', function (
+        string $ability,
+        string $permission,
+    ): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+        CompanyUser::create(['company_id' => $company->getKey(), 'user_id' => $actor->getKey()]);
+        grantShield($actor, [$permission], $company);
+        actingAsInCompany($actor, $company);
+
+        $allowed = Gate::forUser($actor)->allows($ability, Bus::class);
+
+        expect($allowed)->toBeTrue();
+    })->with([
+        'listing' => ['viewAny', 'ViewAny:Bus'],
+        'creating' => ['create', 'Create:Bus'],
+    ]);
+
     test('supports native model and explicit company authorization', function (
         string $ability,
         string $permission,

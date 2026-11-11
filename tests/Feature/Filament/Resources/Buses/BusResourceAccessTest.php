@@ -91,4 +91,18 @@ describe('Bus Resource Access', function (): void {
         Livewire::test(ListBuses::class)
             ->assertActionVisible(TestAction::make('edit')->table($bus));
     });
+
+    test('renders the native create action for an authorized fleet administrator', function (): void {
+        $company = createCompany();
+        $actor = createUserWithRole(UserRole::Admin, $company);
+        CompanyUser::create([
+            'company_id' => $company->getKey(),
+            'user_id' => $actor->getKey(),
+        ]);
+        grantShield($actor, ['ViewAny:Bus', 'Create:Bus'], $company);
+        actingAsInCompany($actor, $company);
+
+        Livewire::test(ListBuses::class)
+            ->assertActionVisible('create');
+    });
 });
