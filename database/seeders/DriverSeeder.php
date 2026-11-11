@@ -12,8 +12,6 @@ use App\Services\DriverManagementService;
 use App\Services\DriverScheduleService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
-use Throwable;
 
 class DriverSeeder extends Seeder
 {
@@ -41,51 +39,35 @@ class DriverSeeder extends Seeder
 
         $this->call(WorkforcePermissionsSeeder::class);
 
-        foreach (['001', '002', '003'] as $number) {
-            $id = 'd3000000-0000-4000-8000-000000000'.$number;
-            $email = 'demo.driver.'.$number.'@example.invalid';
-            $license = 'DEMO-DRIVER-'.$number;
-            $user = User::withTrashed()->find($id);
+        $user = User::query()->where('email', 'user@driver.com')->first();
+        if ($user === null) {
+            $this->command?->warn('DriverSeeder skipped: run the authentication seeders to create user@driver.com first.');
 
-            if (($user !== null && ($user->trashed() || $user->email !== $email))
-                || User::withTrashed()->where('email', $email)->whereKeyNot($id)->exists()
-                || Driver::withTrashed()->where('company_id', $company->id)->where('user_id', $id)->exists()
-                || Driver::withTrashed()->where('company_id', $company->id)->where('license', $license)->exists()
-                || CompanyUser::onlyTrashed()->where('company_id', $company->id)->where('user_id', $id)->exists()) {
-                $this->command?->warn('DriverSeeder skipped DEMO '.$number.': its identity or employment is already reserved.');
-
-                continue;
-            }
-
-            $createdIdentity = $user === null;
-            $user ??= User::factory()->create([
-                'id' => $id, 'name' => 'DEMO Driver '.$number, 'email' => $email,
-                'password' => Str::password(32), 'remember_token' => null,
-            ]);
-
-            try {
-                $driver = $drivers->createForExistingUser($actor, $company, $user, [
-                    'license' => $license, 'license_expires_at' => '2030-12-31',
-                    'employment_starts_on' => '2026-10-01', 'employment_ends_on' => null,
-                    'salary_amount' => '650000.00', 'salary_currency' => 'CRC', 'salary_period' => 'monthly',
-                ]);
-            } catch (Throwable $failure) {
-                if ($createdIdentity && ! Driver::withTrashed()->where('user_id', $id)->exists()) {
-                    $user->forceDelete();
-                }
-
-                throw $failure;
-            }
-
-            DB::connection('pgsql')->transaction(function () use ($actor, $company, $driver, $schedules): void {
-                foreach (range(1, 5) as $day) {
-                    $schedules->create($actor, $company, $driver, [
-                        'day_of_week' => $day, 'start_time' => '08:00:00', 'end_time' => '16:00:00',
-                        'ends_next_day' => false, 'valid_from' => null, 'valid_until' => null,
-                    ]);
-                }
-            });
+            return;
         }
+
+        if (Driver::withTrashed()->where('company_id', $company->id)->where('user_id', $user->id)->exists()
+            || Driver::withTrashed()->where('company_id', $company->id)->where('license', 'AUTH-DRIVER-USER')->exists()
+            || CompanyUser::onlyTrashed()->where('company_id', $company->id)->where('user_id', $user->id)->exists()) {
+            $this->command?->warn('DriverSeeder skipped Driver User: its employment, license or membership is already reserved.');
+
+            return;
+        }
+
+        $driver = $drivers->createForExistingUser($actor, $company, $user, [
+            'license' => 'AUTH-DRIVER-USER', 'license_expires_at' => '2030-12-31',
+            'employment_starts_on' => '2026-10-01', 'employment_ends_on' => null,
+            'salary_amount' => '650000.00', 'salary_currency' => 'CRC', 'salary_period' => 'monthly',
+        ]);
+
+        DB::connection('pgsql')->transaction(function () use ($actor, $company, $driver, $schedules): void {
+            foreach (range(1, 5) as $day) {
+                $schedules->create($actor, $company, $driver, [
+                    'day_of_week' => $day, 'start_time' => '08:00:00', 'end_time' => '16:00:00',
+                    'ends_next_day' => false, 'valid_from' => null, 'valid_until' => null,
+                ]);
+            }
+        });
     }
 
     private function administrator(Company $company): ?User

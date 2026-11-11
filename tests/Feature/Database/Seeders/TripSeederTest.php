@@ -22,6 +22,7 @@ function demoTripResources(): array
     Http::preventStrayRequests();
     $company = createCompany(['slug' => 'smartbus-demo', 'timezone' => 'America/Costa_Rica']);
     $fixture = Trip::factory()->for($company)->withDriverAvailability()->make(['service_date' => '2026-11-02']);
+    $fixture->driver->user->update(['name' => 'Driver User', 'email' => 'user@driver.com']);
     $fixture->pattern->route->update(['code' => 'DEMO-CITY']);
     $fixture->pattern->update(['code' => 'OUTBOUND']);
     $fixture->schedule->update(['departure_time' => '09:00:00']);
@@ -89,6 +90,7 @@ test('preserves replanned and terminal demo history when seeded again', function
 test('skips unavailable demo planning dependencies without partial writes', function (string $scenario): void {
     [$company, $fixture] = demoTripResources();
     match ($scenario) {
+        'missing auth driver' => $fixture->driver->user->update(['email' => 'other@example.com']),
         'inactive company' => $company->update(['status' => CompanyStatus::INACTIVE]),
         'archived company' => $company->delete(),
         'inactive bus' => $fixture->bus->forceFill(['is_active' => false])->save(),
@@ -104,7 +106,7 @@ test('skips unavailable demo planning dependencies without partial writes', func
 
     $this->assertDatabaseCount('trips', 0);
     Http::assertNothingSent();
-})->with(['inactive company', 'archived company', 'inactive bus', 'archived bus', 'inactive driver', 'expired license', 'no availability', 'unavailable plan', 'wrong calendar']);
+})->with(['missing auth driver', 'inactive company', 'archived company', 'inactive bus', 'archived bus', 'inactive driver', 'expired license', 'no availability', 'unavailable plan', 'wrong calendar']);
 
 test('skips missing demo resources with an explanation', function (): void {
     Http::preventStrayRequests();
@@ -144,6 +146,7 @@ test('never inserts demo trips in production', function (): void {
 
 test('database setup creates repeatable trip fixtures with all demo dependencies', function (): void {
     User::factory()->create(['email' => 'admin@company.com']);
+    User::factory()->create(['name' => 'Driver User', 'email' => 'user@driver.com']);
 
     $this->seed(DatabaseSeeder::class);
 
@@ -168,14 +171,15 @@ test('never reassigns a demo UUID already owned by another company', function ()
     Http::assertNothingSent();
 });
 
-test('uses the first eligible covered employment rather than an ineligible earlier profile', function (): void {
+test('does not assign trips to another eligible driver when the authentication driver is ineligible', function (): void {
     [$company, $fixture] = demoTripResources();
     $fixture->driver->update(['license_expires_at' => '2026-11-01']);
     $eligible = Trip::factory()->for($company)->withDriverAvailability()->make(['service_date' => '2026-11-02']);
 
     $this->seed(TripSeeder::class);
 
-    expect(Trip::query()->sole()->driver_id)->toBe($eligible->driver_id);
+    $this->assertDatabaseCount('trips', 0);
+    $this->assertDatabaseMissing('trips', ['driver_id' => $eligible->driver_id]);
     Http::assertNothingSent();
 });
 
