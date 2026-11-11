@@ -1,8 +1,9 @@
 ﻿# Simplified Trip Reservation Concurrency Contract — HU #38
 
-Status: implemented in the planning and workforce services, with real-process
-race coverage. Cross-module agreement with B and Isaac and complete-suite
-verification remain part of HU #36/#38 integration before operational enablement.
+Status: implemented in the planning, bus lifecycle and workforce services, with
+real-process race coverage. The shared protocol is confirmed by B and Isaac,
+as reported by Melanie. Complete-suite regression verification is required when
+integrating these services before operational enablement.
 
 ## Reuse the Existing Schema
 
@@ -103,8 +104,9 @@ Keep transactions short, batch key computation and avoid redundant queries.
 Do not claim cloud performance gains without measuring query count and
 transaction duration. No global lock or exclusive company-wide planning lock.
 
-Coordination pending: B and Isaac confirm the shared person key/order before
-shared participants are considered integrated. Snapshot agreement is separate.
+Coordination confirmed: B and Isaac agreed on the shared person key, resource
+order and transaction boundaries, as reported by Melanie. Snapshot and trip
+history response agreements are separate contracts.
 
 References: [PostgreSQL locking](https://www.postgresql.org/docs/16/explicit-locking.html)
 and [constraints](https://www.postgresql.org/docs/16/ddl-constraints.html).
