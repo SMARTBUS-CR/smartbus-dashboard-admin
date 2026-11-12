@@ -7,7 +7,6 @@ use App\Models\Bus;
 use App\Models\Company;
 use App\Models\User;
 use App\Services\BusManagementService;
-use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
@@ -20,13 +19,6 @@ class EditBus extends EditRecord
     protected ?bool $hasDatabaseTransactions = false;
 
     protected ?bool $hasUnsavedDataChangesAlert = true;
-
-    protected function getHeaderActions(): array
-    {
-        return [
-            ViewAction::make(),
-        ];
-    }
 
     /**
      * @param  array<string, mixed>  $data

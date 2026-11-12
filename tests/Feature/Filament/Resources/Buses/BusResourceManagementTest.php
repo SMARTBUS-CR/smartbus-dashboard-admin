@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Filament\Resources\Buses\BusResource;
 use App\Filament\Resources\Buses\Pages\CreateBus;
 use App\Filament\Resources\Buses\Pages\EditBus;
 use App\Filament\Resources\Buses\Pages\ListBuses;
@@ -159,6 +160,25 @@ describe('Bus Resource Management', function (): void {
             ->assertCanNotSeeTableRecords([$different, $foreign]);
 
         expect($list->instance()->getTable()->getFilter('brand')->getOptions())->toBe(['Volvo' => 'Volvo']);
+    });
+
+    test('opens fleet details in a read-only modal for a viewer', function (): void {
+        $bus = Bus::factory()->for($this->company)->create();
+        $viewer = createUserWithRole(UserRole::Admin, $this->company);
+        CompanyUser::factory()->for($this->company)->for($viewer, 'user')->create();
+        grantShield($viewer, ['ViewAny:Bus', 'View:Bus'], $this->company);
+        actingAsInCompany($viewer, $this->company);
+
+        expect(BusResource::hasPage('view'))->toBeFalse();
+
+        $list = Livewire::test(ListBuses::class)
+            ->assertActionHidden(TestAction::make('edit')->table($bus))
+            ->mountAction(TestAction::make('view')->table($bus))
+            ->assertActionMounted(TestAction::make('view')->table($bus));
+
+        $component = $list->instance();
+        $schema = $component->getSchema($component->getMountedActionSchemaName());
+        expect($schema->getComponents()[0]->getHeading())->toBe(__('Fleet Identification'));
     });
 
     test('archives and restores a bus without physical deletion', function (): void {

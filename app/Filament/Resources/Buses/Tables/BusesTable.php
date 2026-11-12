@@ -9,12 +9,14 @@ use App\Models\User;
 use App\Services\BusManagementService;
 use Closure;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontFamily;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
@@ -68,64 +70,67 @@ class BusesTable
             ])
             ->recordActions([
                 ViewAction::make()
-                    ->visible(fn (Bus $record): bool => ! $record->trashed() && ! BusResource::canEdit($record)),
+                    ->schema(fn (Schema $schema): Schema => BusResource::infolist($schema))
+                    ->visible(fn (Bus $record): bool => BusResource::canView($record) && ! BusResource::canEdit($record)),
 
                 EditAction::make()
-                    ->visible(fn (Bus $record): bool => ! $record->trashed() && BusResource::canEdit($record)),
+                    ->visible(fn (Bus $record): bool => BusResource::canEdit($record)),
 
-                Action::make('deactivate')
-                    ->label(__('Deactivate'))
-                    ->icon(Heroicon::OutlinedNoSymbol)
-                    ->color('warning')
-                    ->requiresConfirmation()
-                    ->authorize(fn (Bus $record): bool => BusResource::canEdit($record))
-                    ->visible(fn (Bus $record): bool => ! $record->trashed() && $record->is_active)
-                    ->action(fn (Bus $record, Action $action): bool => static::run(
-                        $action,
-                        fn (User $actor, Company $company): Bus => app(BusManagementService::class)
-                            ->setActive($actor, $company, $record->getKey(), false),
-                        __('Bus Deactivated'),
-                    )),
+                ActionGroup::make([
+                    Action::make('deactivate')
+                        ->label(__('Deactivate'))
+                        ->icon(Heroicon::OutlinedNoSymbol)
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->authorize(fn (Bus $record): bool => BusResource::canEdit($record))
+                        ->visible(fn (Bus $record): bool => ! $record->trashed() && $record->is_active)
+                        ->action(fn (Bus $record, Action $action): bool => static::run(
+                            $action,
+                            fn (User $actor, Company $company): Bus => app(BusManagementService::class)
+                                ->setActive($actor, $company, $record->getKey(), false),
+                            __('Bus Deactivated'),
+                        )),
 
-                Action::make('activate')
-                    ->label(__('Activate'))
-                    ->icon(Heroicon::OutlinedCheckCircle)
-                    ->color('success')
-                    ->requiresConfirmation()
-                    ->authorize(fn (Bus $record): bool => BusResource::canEdit($record))
-                    ->visible(fn (Bus $record): bool => ! $record->trashed() && ! $record->is_active)
-                    ->action(fn (Bus $record, Action $action): bool => static::run(
-                        $action,
-                        fn (User $actor, Company $company): Bus => app(BusManagementService::class)
-                            ->setActive($actor, $company, $record->getKey(), true),
-                        __('Bus Activated'),
-                    )),
+                    Action::make('activate')
+                        ->label(__('Activate'))
+                        ->icon(Heroicon::OutlinedCheckCircle)
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->authorize(fn (Bus $record): bool => BusResource::canEdit($record))
+                        ->visible(fn (Bus $record): bool => ! $record->trashed() && ! $record->is_active)
+                        ->action(fn (Bus $record, Action $action): bool => static::run(
+                            $action,
+                            fn (User $actor, Company $company): Bus => app(BusManagementService::class)
+                                ->setActive($actor, $company, $record->getKey(), true),
+                            __('Bus Activated'),
+                        )),
 
-                DeleteAction::make()
-                    ->label(__('Archive'))
-                    ->icon(Heroicon::OutlinedArchiveBox)
-                    ->modalHeading(__('Archive Bus'))
-                    ->modalDescription(__('The bus will be archived without deleting its operational history.'))
-                    ->modalSubmitActionLabel(__('Archive'))
-                    ->successNotificationTitle(__('Bus Archived'))
-                    ->using(fn (Bus $record, DeleteAction $action): bool => static::run(
-                        $action,
-                        fn (User $actor, Company $company): Bus => app(BusManagementService::class)
-                            ->archive($actor, $company, $record->getKey()),
-                    )),
+                    DeleteAction::make()
+                        ->label(__('Archive'))
+                        ->icon(Heroicon::OutlinedArchiveBox)
+                        ->modalHeading(__('Archive Bus'))
+                        ->modalDescription(__('The bus will be archived without deleting its operational history.'))
+                        ->modalSubmitActionLabel(__('Archive'))
+                        ->successNotificationTitle(__('Bus Archived'))
+                        ->using(fn (Bus $record, DeleteAction $action): bool => static::run(
+                            $action,
+                            fn (User $actor, Company $company): Bus => app(BusManagementService::class)
+                                ->archive($actor, $company, $record->getKey()),
+                        )),
 
-                RestoreAction::make()
-                    ->label(__('Restore'))
-                    ->icon(Heroicon::OutlinedArrowUturnLeft)
-                    ->modalHeading(__('Restore Bus'))
-                    ->modalDescription(__('The bus will become available in the company fleet again.'))
-                    ->modalSubmitActionLabel(__('Restore'))
-                    ->successNotificationTitle(__('Bus Restored'))
-                    ->using(fn (Bus $record, RestoreAction $action): bool => static::run(
-                        $action,
-                        fn (User $actor, Company $company): Bus => app(BusManagementService::class)
-                            ->restore($actor, $company, $record->getKey()),
-                    )),
+                    RestoreAction::make()
+                        ->label(__('Restore'))
+                        ->icon(Heroicon::OutlinedArrowUturnLeft)
+                        ->modalHeading(__('Restore Bus'))
+                        ->modalDescription(__('The bus will become available in the company fleet again.'))
+                        ->modalSubmitActionLabel(__('Restore'))
+                        ->successNotificationTitle(__('Bus Restored'))
+                        ->using(fn (Bus $record, RestoreAction $action): bool => static::run(
+                            $action,
+                            fn (User $actor, Company $company): Bus => app(BusManagementService::class)
+                                ->restore($actor, $company, $record->getKey()),
+                        )),
+                ])->label(__('More Actions'))->icon(Heroicon::OutlinedEllipsisVertical)->color('gray'),
             ])
             ->toolbarActions([])
             ->emptyStateHeading(__('No Buses Available'))
