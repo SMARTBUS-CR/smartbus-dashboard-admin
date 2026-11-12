@@ -42,7 +42,11 @@ class EditTripAssignment extends EditRecord
         } catch (ValidationException $exception) {
             $path = $this->form->getStatePath();
             throw ValidationException::withMessages(collect($exception->errors())->mapWithKeys(
-                fn (array $messages, string $field): array => [filled($path) ? "{$path}.{$field}" : $field => $messages],
+                function (array $messages, string $field) use ($path): array {
+                    $field = $field === 'availability' ? 'driver_id' : $field;
+
+                    return [filled($path) ? "{$path}.{$field}" : $field => $messages];
+                },
             )->all());
         }
     }
