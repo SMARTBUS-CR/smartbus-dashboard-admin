@@ -53,6 +53,7 @@ trait WithDriverConcurrency
         $patterns = $database->table('route_patterns')->whereIn('route_id', $routes)->pluck('id');
         $schedules = $database->table('route_schedules')->whereIn('route_pattern_id', $patterns)->pluck('id');
         $database->table('trips')->whereIn('company_id', $this->concurrentCompanyIds)->delete();
+        $database->table('trip_assignments')->whereIn('company_id', $this->concurrentCompanyIds)->delete();
         $database->table('route_schedule_exceptions')->whereIn('route_schedule_id', $schedules)->delete();
         $database->table('route_schedules')->whereIn('id', $schedules)->delete();
         $database->table('route_pattern_stops')->whereIn('route_pattern_id', $patterns)->delete();
