@@ -13,6 +13,7 @@
     "Assignment Change Rejected": "Cambio de asignación rechazado",
     "Day :day": "Día :day",
     "Daily Trips": "Viajes diarios",
+    "Planned Duration (Minutes)": "Duración planificada (minutos)",
     "Permanent recurring assignment deletion is disabled. Archive the assignment instead.": "La eliminación permanente de asignaciones recurrentes está deshabilitada. Archive la asignación en su lugar.",
     "This field cannot be changed through recurring assignment operations.": "Este campo no se puede cambiar mediante operaciones de asignación recurrente.",
     "Restore the archived recurring assignment before changing it.": "Restaure la asignación recurrente archivada antes de modificarla.",

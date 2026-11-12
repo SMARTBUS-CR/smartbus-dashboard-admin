@@ -13,6 +13,7 @@
     "Assignment Change Rejected": "Assignment Change Rejected",
     "Day :day": "Day :day",
     "Daily Trips": "Daily Trips",
+    "Planned Duration (Minutes)": "Planned Duration (Minutes)",
     "Permanent recurring assignment deletion is disabled. Archive the assignment instead.": "Permanent recurring assignment deletion is disabled. Archive the assignment instead.",
     "This field cannot be changed through recurring assignment operations.": "This field cannot be changed through recurring assignment operations.",
     "Restore the archived recurring assignment before changing it.": "Restore the archived recurring assignment before changing it.",
