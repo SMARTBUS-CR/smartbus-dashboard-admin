@@ -43,17 +43,34 @@ class TripAssignmentManagementService
      */
     public function createMany(User $actor, Company $company, array $routeScheduleIds, array $data): Collection
     {
-        Validator::make(['route_schedule_ids' => $routeScheduleIds], [
+        $durationMinutes = $data['planned_duration_minutes'] ?? null;
+        Validator::make([
+            'route_schedule_ids' => $routeScheduleIds,
+            'planned_duration_minutes' => $durationMinutes,
+        ], [
             'route_schedule_ids' => ['required', 'array', 'min:1'],
             'route_schedule_ids.*' => ['required', 'uuid', 'distinct'],
+            'planned_duration_minutes' => ['required', 'integer', 'between:1,1440'],
         ])->validate();
+        unset($data['planned_duration_minutes']);
 
         return DB::connection('pgsql')->transaction(fn (): Collection => collect($routeScheduleIds)
-            ->map(fn (string $scheduleId): TripAssignment => $this->create(
-                $actor,
-                $company,
-                array_replace($data, ['route_schedule_id' => $scheduleId]),
-            )));
+            ->map(function (string $scheduleId) use ($actor, $company, $data, $durationMinutes): TripAssignment {
+                $schedule = RouteSchedule::query()->whereKey($scheduleId)
+                    ->whereHas('pattern.route', fn (Builder $query): Builder => $query->where('company_id', $company->getKey()))
+                    ->first();
+                if ($schedule === null) {
+                    $this->reject('route_schedule_ids', 'The selected recurring departure is unavailable for this company.');
+                }
+                $departureSeconds = $this->seconds($schedule->departure_time);
+                $arrivalSeconds = $departureSeconds + ((int) $durationMinutes * 60);
+
+                return $this->create($actor, $company, array_replace($data, [
+                    'route_schedule_id' => $scheduleId,
+                    'planned_arrival_time' => gmdate('H:i:s', $arrivalSeconds % 86400),
+                    'ends_next_day' => $arrivalSeconds >= 86400,
+                ]));
+            }));
     }
 
     /** @param array<string, mixed> $data */
