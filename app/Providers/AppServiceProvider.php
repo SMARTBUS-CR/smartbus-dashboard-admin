@@ -14,6 +14,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Route;
 use App\Models\Trip;
+use App\Models\TripAssignment;
 use App\Models\User;
 use App\Services\AuthService;
 use BezhanSalleh\LanguageSwitch\Enums\TriggerStyle;
@@ -93,6 +94,7 @@ class AppServiceProvider extends ServiceProvider
             // Workforce policies validate company boundaries before checking
             // permissions through this same Gate, including global access.
             if ($record instanceof Driver || $record === Driver::class
+                || $record instanceof TripAssignment || $record === TripAssignment::class
                 || $record instanceof DriverSchedule || $record === DriverSchedule::class) {
                 return null;
             }
