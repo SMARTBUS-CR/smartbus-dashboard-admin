@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\BusManagementService;
 use App\Services\DriverManagementService;
 use App\Services\DriverScheduleService;
+use App\Services\TripAssignmentManagementService;
 use App\Services\TripManagementService;
 use App\Services\UserManagementService;
 use Carbon\CarbonImmutable;
@@ -197,6 +198,14 @@ try {
                 'cancelled_at' => $trip->cancelled_at?->utc()->format('Y-m-d H:i:s.uP'),
                 'cancellation_reason' => $trip->cancellation_reason,
             ];
+        } elseif ($input['operation'] === 'trip_assignment_batch') {
+            $assignments = app(TripAssignmentManagementService::class)->createMany(
+                $actor,
+                $company,
+                $input['route_schedule_ids'],
+                $input['assignment'],
+            );
+            $result = ['assignment_ids' => $assignments->pluck('id')->all()];
         } elseif ($input['operation'] === 'trip_schedule' || $input['operation'] === 'trip_replan') {
             $service = app(TripManagementService::class);
             $trip = $input['operation'] === 'trip_schedule'
