@@ -6,6 +6,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 
 class BusForm
 {
@@ -13,6 +14,7 @@ class BusForm
     {
         return $schema->components([
             Section::make(__('Fleet Identification'))
+                ->icon(Heroicon::OutlinedIdentification)
                 ->description(__('Identifiers used to distinguish the unit within its company and country.'))
                 ->schema([
                     Select::make('country_code')
@@ -33,18 +35,21 @@ class BusForm
 
                     TextInput::make('plate_number')
                         ->label(__('Plate Number'))
+                        ->placeholder('SJB-5421')
                         ->required()
                         ->maxLength(30),
 
                     TextInput::make('unit_number')
                         ->label(__('Unit Number'))
+                        ->placeholder('BUS-04')
                         ->required()
                         ->maxLength(50),
                 ])
-                ->columns(3)
+                ->columns(['md' => 2, 'xl' => 3])
                 ->columnSpanFull(),
 
             Section::make(__('Vehicle Details'))
+                ->icon(Heroicon::OutlinedTruck)
                 ->schema([
                     TextInput::make('brand')
                         ->label(__('Brand'))
@@ -62,12 +67,13 @@ class BusForm
 
                     TextInput::make('capacity')
                         ->label(__('Passenger Capacity'))
+                        ->placeholder('50')
                         ->integer()
                         ->minValue(1)
                         ->maxValue(32767)
                         ->required(),
                 ])
-                ->columns(2)
+                ->columns(['md' => 2])
                 ->columnSpanFull(),
         ]);
     }
