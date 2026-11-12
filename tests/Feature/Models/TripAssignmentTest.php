@@ -9,6 +9,7 @@ use App\Models\TripAssignment;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 describe('Trip Assignment', function (): void {
     test('persists a recurring assignment with typed values and relationships', function (): void {
@@ -106,4 +107,13 @@ describe('Trip Assignment', function (): void {
                 ->and($exception->errorInfo[2])->toContain("trip_assignments_{$field}_company_foreign");
         });
     })->with(['driver_id', 'bus_id']);
+
+    test('prevents permanent deletion while preserving the recurring assignment', function (): void {
+        $assignment = TripAssignment::factory()->create();
+
+        expect(fn () => $assignment->forceDelete())->toThrow(function (ValidationException $exception): void {
+            expect($exception->errors())->toHaveKey('assignment');
+        });
+        $this->assertModelExists($assignment);
+    });
 });
