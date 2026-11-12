@@ -33,3 +33,30 @@ test('shows the scheduled hours in the saved timezone and marks an overnight arr
         ->assertSee('11:30 PM → 01:00 AM (+1 day)')
         ->assertDontSee('Scheduled Arrival');
 });
+
+test('shows the saved route and both identifiers for archived trip assignments', function (): void {
+    $company = createCompany();
+    $actor = createUserWithRole(UserRole::Admin, $company);
+    CompanyUser::factory()->for($company)->for($actor, 'user')->create();
+    grantShield($actor, ['ViewAny:Trip', 'View:Trip'], $company);
+
+    $trip = Trip::factory()->for($company)->withEligibleDriver()->completed()->create();
+    $snapshot = $trip->planned_route_snapshot;
+    $bus = $trip->bus;
+    $driver = $trip->driver;
+    $driverName = $driver->user->name;
+    $trip->pattern->update(['name' => 'Renamed live pattern']);
+    $bus->delete();
+    $driver->delete();
+    actingAsInCompany($actor, $company);
+    app()->setLocale('en');
+
+    Livewire::test(ListTrips::class)
+        ->assertTableColumnStateSet('planned_route_snapshot.pattern_code', $snapshot['pattern_code'], $trip)
+        ->assertSee($snapshot['pattern_name'])
+        ->assertDontSee('Renamed live pattern')
+        ->assertTableColumnStateSet('bus.unit_number', $bus->unit_number, $trip)
+        ->assertSee($bus->plate_number)
+        ->assertTableColumnStateSet('driver_name', $driverName, $trip)
+        ->assertSee('Lic. '.$driver->license);
+});
