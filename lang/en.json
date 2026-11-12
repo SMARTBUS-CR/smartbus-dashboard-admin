@@ -738,11 +738,8 @@
     "Minutes From Start": "Minutes From Start",
     "From Date": "From Date",
     "Until Date": "Until Date",
-    "Date Range": "Date Range",
-    "Today": "Today",
     "Last 7 Days": "Last 7 Days",
     "Last 30 Days": "Last 30 Days",
-    "Custom": "Custom",
     "Trip Operations": "Trip Operations",
     "Persisted Trip statuses for the selected local service dates.": "Persisted Trip statuses for the selected local service dates."
 }
