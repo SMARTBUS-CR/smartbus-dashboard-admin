@@ -3,6 +3,7 @@
 use App\Enums\UserRole;
 use App\Filament\Resources\TripAssignments\Pages\CreateTripAssignment;
 use App\Filament\Resources\TripAssignments\Pages\ListTripAssignments;
+use App\Filament\Resources\TripAssignments\TripAssignmentResource;
 use App\Models\CompanyUser;
 use App\Models\DriverSchedule;
 use App\Models\RouteSchedule;
@@ -19,12 +20,15 @@ describe('Trip Assignment Resource', function (): void {
             'ViewAny:TripAssignment', 'View:TripAssignment', 'Create:TripAssignment',
             'Update:TripAssignment', 'Delete:TripAssignment', 'Restore:TripAssignment',
         ], $this->company);
-        actingAsInCompany($this->actor, $this->company);
     });
 
     test('lists only recurring assignments from the selected company', function (): void {
         $own = TripAssignment::factory()->for($this->company)->create();
-        $foreign = TripAssignment::factory()->create();
+        $foreign = TripAssignment::factory()->create(['company_id' => createCompany()->id]);
+        actingAsInCompany($this->actor, $this->company);
+
+        expect($foreign->company_id)->not->toBe($this->company->id)
+            ->and(TripAssignmentResource::getEloquentQuery()->pluck('id')->all())->toBe([$own->id]);
 
         Livewire::test(ListTripAssignments::class)
             ->assertCanSeeTableRecords([$own])
@@ -43,8 +47,13 @@ describe('Trip Assignment Resource', function (): void {
             'day_of_week' => 2,
             'departure_time' => '06:30:00',
         ]);
-        DriverSchedule::factory()->for($first->driver)->fullDay()->create(['day_of_week' => 2]);
+        DriverSchedule::factory()->for($first->driver)->fullDay()->create([
+            'day_of_week' => 2,
+            'start_time' => '00:00:00',
+            'end_time' => '00:00:00',
+        ]);
         $before = TripAssignment::query()->count();
+        actingAsInCompany($this->actor, $this->company);
 
         Livewire::test(CreateTripAssignment::class)
             ->fillForm([
@@ -53,8 +62,24 @@ describe('Trip Assignment Resource', function (): void {
                 'bus_id' => $first->bus_id,
                 'planned_arrival_time' => '07:30:00',
                 'ends_next_day' => false,
-            ])->call('create')->assertHasFormErrors(['route_schedule_ids']);
+            ])->call('create')->assertHasFormErrors();
 
         expect(TripAssignment::query()->count())->toBe($before);
+    });
+
+    test('shows service date validation on its form field', function (): void {
+        $planned = Trip::factory()->for($this->company)->withDriverAvailability()->make();
+        actingAsInCompany($this->actor, $this->company);
+
+        Livewire::test(CreateTripAssignment::class)
+            ->fillForm([
+                'route_schedule_ids' => [$planned->route_schedule_id],
+                'driver_id' => $planned->driver_id,
+                'bus_id' => $planned->bus_id,
+                'planned_arrival_time' => '07:30:00',
+                'ends_next_day' => false,
+                'valid_from' => '2026-12-01',
+                'valid_until' => '2026-11-01',
+            ])->call('create')->assertHasFormErrors(['valid_until']);
     });
 });
