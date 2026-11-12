@@ -47,23 +47,35 @@ class TripAssignmentManagementService
         Validator::make([
             'route_schedule_ids' => $routeScheduleIds,
             'planned_duration_minutes' => $durationMinutes,
+            'driver_id' => $data['driver_id'] ?? null,
+            'bus_id' => $data['bus_id'] ?? null,
         ], [
             'route_schedule_ids' => ['required', 'array', 'min:1'],
             'route_schedule_ids.*' => ['required', 'uuid', 'distinct'],
             'planned_duration_minutes' => ['required', 'integer', 'between:1,1440'],
+            'driver_id' => ['required', 'uuid'],
+            'bus_id' => ['required', 'uuid'],
         ])->validate();
         unset($data['planned_duration_minutes']);
 
-        return DB::connection('pgsql')->transaction(fn (): Collection => collect($routeScheduleIds)
-            ->sort(SORT_STRING)
-            ->values()
-            ->map(function (string $scheduleId) use ($actor, $company, $data, $durationMinutes): TripAssignment {
-                $schedule = RouteSchedule::query()->whereKey($scheduleId)
-                    ->whereHas('pattern.route', fn (Builder $query): Builder => $query->where('company_id', $company->getKey()))
-                    ->first();
-                if ($schedule === null) {
-                    $this->reject('route_schedule_ids', 'The selected recurring departure is unavailable for this company.');
-                }
+        $routeScheduleIds = collect($routeScheduleIds)->sort(SORT_STRING)->values()->all();
+
+        return DB::connection('pgsql')->transaction(function () use ($actor, $company, $routeScheduleIds, $data, $durationMinutes): Collection {
+            $company = Company::query()->whereKey($company->getKey())->where('status', CompanyStatus::ACTIVE)
+                ->sharedLock()->firstOrFail();
+            $identities = Driver::withTrashed()->whereKey($data['driver_id'])->get(['id', 'user_id']);
+            $this->reservations->lockPeople($identities->pluck('user_id')->all());
+            Bus::withTrashed()->whereKey($data['bus_id'])->lockForUpdate()->get();
+            Driver::withTrashed()->whereKey($data['driver_id'])->lockForUpdate()->get();
+            $schedules = RouteSchedule::query()->whereIn('id', $routeScheduleIds)
+                ->whereHas('pattern.route', fn (Builder $query): Builder => $query->where('company_id', $company->getKey()))
+                ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            if ($schedules->count() !== count($routeScheduleIds)) {
+                $this->reject('route_schedule_ids', 'The selected recurring departure is unavailable for this company.');
+            }
+
+            return collect($routeScheduleIds)->map(function (string $scheduleId) use ($actor, $company, $data, $durationMinutes, $schedules): TripAssignment {
+                $schedule = $schedules->get($scheduleId);
                 $departureSeconds = $this->seconds($schedule->departure_time);
                 $arrivalSeconds = $departureSeconds + ((int) $durationMinutes * 60);
 
@@ -72,7 +84,8 @@ class TripAssignmentManagementService
                     'planned_arrival_time' => gmdate('H:i:s', $arrivalSeconds % 86400),
                     'ends_next_day' => $arrivalSeconds >= 86400,
                 ]));
-            }));
+            });
+        });
     }
 
     /** @param array<string, mixed> $data */
