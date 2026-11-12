@@ -22,6 +22,13 @@ class ViewDriver extends ViewRecord
     {
         return [
             EditAction::make(),
+            Action::make('viewActivity')
+                ->label(__('View Activity'))
+                ->icon(Heroicon::OutlinedClipboardDocumentList)
+                ->authorize(fn (): bool => DriverResource::canViewAttendance($this->getRecord()))
+                ->url(fn (): string => DriverResource::getUrl('activity', [
+                    'record' => $this->getRecord(),
+                ])),
             Action::make('viewSalary')
                 ->label(__('View Salary'))
                 ->icon(Heroicon::OutlinedBanknotes)

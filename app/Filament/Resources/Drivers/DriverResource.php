@@ -4,9 +4,11 @@ namespace App\Filament\Resources\Drivers;
 
 use App\Enums\NavigationGroup;
 use App\Filament\Resources\Drivers\Pages\CreateDriver;
+use App\Filament\Resources\Drivers\Pages\DriverActivity;
 use App\Filament\Resources\Drivers\Pages\EditDriver;
 use App\Filament\Resources\Drivers\Pages\ListDrivers;
 use App\Filament\Resources\Drivers\Pages\ViewDriver;
+use App\Filament\Resources\Drivers\RelationManagers\SchedulesRelationManager;
 use App\Filament\Resources\Drivers\Schemas\DriverForm;
 use App\Filament\Resources\Drivers\Schemas\DriverInfolist;
 use App\Filament\Resources\Drivers\Tables\DriversTable;
@@ -54,7 +56,9 @@ class DriverResource extends Resource
 
     public static function getRelations(): array
     {
-        return [];
+        return [
+            'schedules' => SchedulesRelationManager::class,
+        ];
     }
 
     public static function getPages(): array
@@ -64,6 +68,7 @@ class DriverResource extends Resource
             'create' => CreateDriver::route('/create'),
             'view' => ViewDriver::route('/{record}'),
             'edit' => EditDriver::route('/{record}/edit'),
+            'activity' => DriverActivity::route('/{record}/activity'),
         ];
     }
 
@@ -105,6 +110,11 @@ class DriverResource extends Resource
     public static function canViewSalary(Model $record): bool
     {
         return $record instanceof Driver && static::allows('viewSalary', $record);
+    }
+
+    public static function canViewAttendance(Model $record): bool
+    {
+        return $record instanceof Driver && static::allows('viewAttendance', $record);
     }
 
     public static function canDelete(Model $record): bool
