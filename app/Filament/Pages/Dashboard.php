@@ -2,13 +2,13 @@
 
 namespace App\Filament\Pages;
 
-use App\Models\Company;
+use App\Filament\Widgets\TripStatusOverview;
 use BackedEnum;
-use Carbon\CarbonImmutable;
-use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Pages\Dashboard\Concerns\HasFiltersForm;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -16,23 +16,61 @@ use Illuminate\Contracts\Support\Htmlable;
 
 class Dashboard extends BaseDashboard
 {
-    use HasFiltersForm;
+    use HasFiltersForm {
+        updatedFilters as protected persistFilters;
+    }
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHome;
 
     protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::Home;
 
+    public function content(Schema $schema): Schema
+    {
+        $widgets = collect($this->getWidgets());
+        [$operations, $welcome] = $widgets->partition(fn ($widget): bool => $this->normalizeWidgetClass($widget) === TripStatusOverview::class);
+
+        return $schema->components([
+            Grid::make($this->getColumns())
+                ->schema(fn (): array => $this->getWidgetsSchemaComponents($welcome->all())),
+            $this->getFiltersFormContentComponent()->visible(fn (): bool => TripStatusOverview::canView()),
+            Grid::make($this->getColumns())
+                ->schema(fn (): array => $this->getWidgetsSchemaComponents($operations->all()))
+                ->visible(fn (): bool => TripStatusOverview::canView()),
+        ]);
+    }
+
     public function filtersForm(Schema $schema): Schema
     {
         return $schema->components([
+            Select::make('period')
+                ->label(__('Date Range'))
+                ->options([
+                    'today' => __('Today'),
+                    'last_7_days' => __('Last 7 Days'),
+                    'last_30_days' => __('Last 30 Days'),
+                    'custom' => __('Custom'),
+                ])
+                ->default('today')
+                ->selectablePlaceholder(false),
             DatePicker::make('from_date')
                 ->label(__('From Date'))
-                ->default(fn (): ?string => $this->tenantToday()),
+                ->visible(fn (Get $get): bool => $get('period') === 'custom')
+                ->rule('date_format:Y-m-d')
+                ->maxDate(fn (Get $get): ?string => $get('until_date')),
             DatePicker::make('until_date')
                 ->label(__('Until Date'))
-                ->default(fn (): ?string => $this->tenantToday())
+                ->visible(fn (Get $get): bool => $get('period') === 'custom')
+                ->rule('date_format:Y-m-d')
+                ->afterOrEqual(fn (Get $get): string => filled($get('from_date')) ? 'from_date' : '')
                 ->minDate(fn (Get $get): ?string => $get('from_date')),
         ]);
+    }
+
+    public function updatedFilters(): void
+    {
+        $this->resetValidation(['filters.from_date', 'filters.until_date']);
+        $this->getFiltersForm()->validate();
+        $this->persistFilters();
     }
 
     public function getTitle(): string|Htmlable
@@ -43,14 +81,5 @@ class Dashboard extends BaseDashboard
     public static function getNavigationLabel(): string
     {
         return __('Home');
-    }
-
-    private function tenantToday(): ?string
-    {
-        $company = Filament::getTenant();
-
-        return $company instanceof Company
-            ? CarbonImmutable::now($company->timezone)->toDateString()
-            : null;
     }
 }
