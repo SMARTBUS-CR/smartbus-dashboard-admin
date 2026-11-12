@@ -696,5 +696,17 @@
     "Day :day at :time": ":day a las :time",
     "Replan": "Replanificar",
     "No Trips Planned": "No hay viajes planificados",
-    "Scheduled company trips will appear here.": "Los viajes programados de la empresa aparecerán aquí."
+    "Scheduled company trips will appear here.": "Los viajes programados de la empresa aparecerán aquí.",
+    "Start Trip": "Iniciar viaje",
+    "The actual departure time will be recorded by the server.": "La hora real de salida será registrada por el servidor.",
+    "Trip Started": "Viaje iniciado",
+    "Complete Trip": "Completar viaje",
+    "The actual arrival time will be recorded by the server.": "La hora real de llegada será registrada por el servidor.",
+    "Trip Completed": "Viaje completado",
+    "Cancel Trip": "Cancelar viaje",
+    "The Trip will remain available as historical operational data.": "El viaje permanecerá disponible como información operativa histórica.",
+    "Cancellation Reason": "Motivo de cancelación",
+    "Trip Cancelled": "Viaje cancelado",
+    "Create Replacement": "Crear reemplazo",
+    "Trip Change Rejected": "Cambio de viaje rechazado"
 }
