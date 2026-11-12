@@ -680,5 +680,21 @@
     "Confidential Salary": "Salario confidencial",
     "Salary information is restricted to explicitly authorized company administrators.": "La información salarial está restringida a administradores de empresa autorizados explícitamente.",
     "Salary Updated": "Salario actualizado",
-    "Period": "Periodo"
+    "Period": "Periodo",
+    "Trip Planning": "Planificación de viajes",
+    "Trip": "Viaje",
+    "Trips": "Viajes",
+    "Trip Plan": "Plan del viaje",
+    "Select a company route departure and the resources required for the complete planned interval.": "Selecciona una salida de ruta de la empresa y los recursos requeridos para todo el intervalo planificado.",
+    "Route Pattern": "Patrón de ruta",
+    "Route Schedule": "Horario de ruta",
+    "Service Date": "Fecha de servicio",
+    "Departure UTC Offset": "Desplazamiento UTC de salida",
+    "Required only when the local departure time is ambiguous because of a daylight-saving transition.": "Se requiere solo cuando la hora local de salida es ambigua debido a una transición de horario de verano.",
+    "Scheduled Departure": "Salida programada",
+    "Scheduled Arrival": "Llegada programada",
+    "Day :day at :time": ":day a las :time",
+    "Replan": "Replanificar",
+    "No Trips Planned": "No hay viajes planificados",
+    "Scheduled company trips will appear here.": "Los viajes programados de la empresa aparecerán aquí."
 }
