@@ -9,6 +9,7 @@ use Carbon\CarbonImmutable;
 use Livewire\Livewire;
 
 test('shows the scheduled hours in the saved timezone and marks an overnight arrival', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-10-26T12:30:00Z'));
     $company = createCompany(['timezone' => 'America/Costa_Rica']);
     $actor = createUserWithRole(UserRole::Admin, $company);
     CompanyUser::factory()->for($company)->for($actor, 'user')->create();
@@ -35,7 +36,8 @@ test('shows the scheduled hours in the saved timezone and marks an overnight arr
 });
 
 test('shows the saved route and both identifiers for archived trip assignments', function (): void {
-    $company = createCompany();
+    $this->travelTo(CarbonImmutable::parse('2026-10-26T12:30:00Z'));
+    $company = createCompany(['timezone' => 'America/Costa_Rica']);
     $actor = createUserWithRole(UserRole::Admin, $company);
     CompanyUser::factory()->for($company)->for($actor, 'user')->create();
     grantShield($actor, ['ViewAny:Trip', 'View:Trip'], $company);
