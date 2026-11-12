@@ -4,6 +4,7 @@ use App\Models\Company;
 use App\Services\TripAssignmentMaterializationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
 
 use function Pest\Laravel\mock;
@@ -36,6 +37,7 @@ describe('Materialize Recurring Trips Command', function (): void {
 
     test('supports explicit company date and recovery window with safe aggregate output', function (): void {
         $company = createCompany();
+        Log::spy();
         mock(TripAssignmentMaterializationService::class)
             ->shouldReceive('materialize')->times(3)->andReturn([
                 'created' => [['assignment_id' => fake()->uuid(), 'trip_id' => fake()->uuid()]],
@@ -46,6 +48,15 @@ describe('Materialize Recurring Trips Command', function (): void {
         $this->artisan('trips:materialize-recurring', [
             '--company' => $company->id, '--date' => '2026-11-12', '--days' => 3,
         ])->expectsOutputToContain('Created')->doesntExpectOutputToContain($company->id)->assertSuccessful();
+
+        Log::shouldHaveReceived('info')->once()->with('Recurring Trip materialization completed.', [
+            'created' => 3,
+            'existing' => 3,
+            'suspended' => 0,
+            'ineligible' => 0,
+            'conflicting' => 0,
+            'failed' => 0,
+        ]);
     });
 
     test('rejects invalid options with a meaningful exit code', function (array $options): void {
@@ -55,6 +66,8 @@ describe('Materialize Recurring Trips Command', function (): void {
         'invalid days' => [['--days' => 0]],
         'malformed company uuid' => [['--company' => 'missing-company']],
         'unknown company uuid' => [['--company' => '019aa8e7-7c83-7145-83e5-c27f643df098']],
+        'company option without value' => [['--company' => null]],
+        'date option without value' => [['--date' => null]],
     ]);
 
     test('continues after assignment failures and returns failure', function (): void {
