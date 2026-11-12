@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Services\TripAssignmentMaterializationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
+use Illuminate\Support\Str;
 use Throwable;
 
 class MaterializeRecurringTrips extends Command
@@ -36,6 +37,12 @@ class MaterializeRecurringTrips extends Command
 
         $query = Company::query()->where('status', CompanyStatus::ACTIVE)->orderBy('id');
         if (($companyId = $this->option('company')) !== null) {
+            if (! is_string($companyId) || ! Str::isUuid($companyId)) {
+                $this->components->error('The --company option must be a valid Company UUID.');
+
+                return self::INVALID;
+            }
+
             $query->whereKey($companyId);
             if (! (clone $query)->exists()) {
                 $this->components->error('The requested active Company was not found.');

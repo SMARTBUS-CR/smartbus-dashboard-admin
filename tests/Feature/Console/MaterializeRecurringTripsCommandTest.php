@@ -53,7 +53,8 @@ describe('Materialize Recurring Trips Command', function (): void {
     })->with([
         'invalid date' => [['--date' => '2026-02-30']],
         'invalid days' => [['--days' => 0]],
-        'missing company' => [['--company' => 'missing-company']],
+        'malformed company uuid' => [['--company' => 'missing-company']],
+        'unknown company uuid' => [['--company' => '019aa8e7-7c83-7145-83e5-c27f643df098']],
     ]);
 
     test('continues after assignment failures and returns failure', function (): void {
