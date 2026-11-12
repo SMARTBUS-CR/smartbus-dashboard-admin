@@ -16,9 +16,10 @@ use Filament\Actions\RestoreAction;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
+use Filament\Support\Enums\FontFamily;
+use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Validation\ValidationException;
@@ -31,42 +32,26 @@ class DriversTable
             ->columns([
                 TextColumn::make('user.name')
                     ->label(__('Driver'))
-                    ->placeholder(__('Unavailable Identity')),
-
-                TextColumn::make('user.email')
-                    ->label(__('Email'))
+                    ->weight(FontWeight::Bold)
+                    ->description(fn (Driver $record): ?string => $record->user?->email)
                     ->placeholder(__('Unavailable Identity')),
 
                 TextColumn::make('license')
                     ->label(__('License'))
+                    ->badge()->fontFamily(FontFamily::Mono)
+                    ->description(fn (Driver $record): ?string => $record->license_expires_at === null
+                        ? null
+                        : __('Expires: :date', ['date' => $record->license_expires_at->format('d/m/Y')]))
                     ->searchable()
                     ->sortable(),
 
-                TextColumn::make('license_expires_at')
-                    ->label(__('License Expiration'))
-                    ->date()
-                    ->sortable(),
-
                 TextColumn::make('employment_starts_on')
-                    ->label(__('Employment Start'))
+                    ->label(__('Start Date'))
                     ->date()
-                    ->sortable(),
-
-                TextColumn::make('status')
-                    ->label(__('Status'))
-                    ->badge()
-                    ->formatStateUsing(fn (DriverStatus $state): string => __(ucfirst($state->value)))
-                    ->color(fn (DriverStatus $state): string => $state === DriverStatus::ACTIVE ? 'success' : 'gray'),
+                    ->sortable()->toggleable(),
             ])
             ->defaultSort('license')
             ->filters([
-                SelectFilter::make('status')
-                    ->label(__('Status'))
-                    ->options([
-                        DriverStatus::ACTIVE->value => __('Active'),
-                        DriverStatus::INACTIVE->value => __('Inactive'),
-                    ]),
-
                 TrashedFilter::make()
                     ->label(__('Archive Status'))
                     ->placeholder(__('Not Archived'))
