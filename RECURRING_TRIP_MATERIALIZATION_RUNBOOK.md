@@ -49,8 +49,11 @@ Render free web services can sleep while idle, and a sleeping process cannot exe
 Example start-command prefix:
 
 ```bash
-php artisan trips:materialize-recurring --days=7 && <existing-web-start-command>
+php artisan trips:materialize-recurring --days=7 || echo "Recurring Trip materialization reported operational issues; continuing startup"
+exec <existing-web-start-command>
 ```
+
+The web start command is deliberately unconditional. Exit code `1` reports ineligible assignments, conflicts, or isolated failures that require attention, but it must not prevent the Dashboard from starting. The command output and application log retain the aggregate result for diagnosis.
 
 This does not send keepalive traffic, expose a public trigger endpoint, require an artificial system User, or depend on external HTTP requests. A scheduled GitHub Actions request is intentionally not included because it would require either a public mutation endpoint or remote shell credentials.
 
@@ -61,4 +64,6 @@ This does not send keepalive traffic, expose a public trigger endpoint, require 
 - `2`: invalid command options or Company selection.
 
 Output contains aggregate counts only: created, existing, suspended, ineligible, conflicting, and failed. It excludes identity credentials, salary, licenses, and assignment details.
+
+The same aggregate counts are written to the application log after every completed run, including hourly Scheduler executions whose console table is otherwise discarded.
 
