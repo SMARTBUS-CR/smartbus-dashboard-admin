@@ -11,14 +11,20 @@ use App\Models\RouteSchedule;
 use App\Models\Trip;
 use App\Models\User;
 use App\Services\TripManagementService;
+use Carbon\CarbonImmutable;
 use Closure;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Support\Enums\FontFamily;
+use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -38,27 +44,34 @@ class TripsTable
                     ->date()
                     ->sortable(),
 
-                TextColumn::make('planned_route_snapshot.pattern_name')
+                TextColumn::make('planned_route_snapshot.pattern_code')
                     ->label(__('Route Pattern'))
-                    ->formatStateUsing(fn (string $state, Trip $record): string => "{$record->planned_route_snapshot['pattern_code']} — {$state}"),
+                    ->badge()
+                    ->color('primary')
+                    ->fontFamily(FontFamily::Mono)
+                    ->description(fn (Trip $record): ?string => $record->planned_route_snapshot['pattern_name'] ?? null),
 
                 TextColumn::make('scheduled_departure_at')
-                    ->label(__('Scheduled Departure'))
-                    ->dateTime()
-                    ->timezone(fn (Trip $record): string => $record->company->timezone)
-                    ->sortable(),
-
-                TextColumn::make('scheduled_arrival_at')
-                    ->label(__('Scheduled Arrival'))
-                    ->dateTime()
-                    ->timezone(fn (Trip $record): string => $record->company->timezone)
+                    ->label(__('Scheduled Time'))
+                    ->state(fn (Trip $record): string => static::scheduledTime($record))
                     ->sortable(),
 
                 TextColumn::make('bus.unit_number')
-                    ->label(__('Bus')),
+                    ->label(__('Bus'))
+                    ->badge()
+                    ->color('info')
+                    ->fontFamily(FontFamily::Mono)
+                    ->description(fn (Trip $record): ?string => $record->bus?->plate_number)
+                    ->toggleable(),
 
-                TextColumn::make('driver.license')
-                    ->label(__('Driver')),
+                TextColumn::make('driver_name')
+                    ->label(__('Driver'))
+                    ->state(fn (Trip $record): string => $record->driver?->user?->name ?? __('Unavailable Identity'))
+                    ->weight(FontWeight::Bold)
+                    ->description(fn (Trip $record): ?string => $record->driver === null
+                        ? null
+                        : __('Lic. :license', ['license' => $record->driver->license]))
+                    ->toggleable(),
 
                 TextColumn::make('status')
                     ->label(__('Status'))
@@ -69,14 +82,26 @@ class TripsTable
                 Filter::make('service_date')
                     ->label(__('Service Date'))
                     ->schema([
-                        DatePicker::make('from_date')->label(__('From Date')),
-                        DatePicker::make('until_date')->label(__('Until Date')),
+                        Select::make('period')
+                            ->label(__('Date Range'))
+                            ->options(static::serviceDatePeriods())
+                            ->default('today')
+                            ->required()
+                            ->live(),
+                        DatePicker::make('from_date')
+                            ->label(__('From Date'))
+                            ->visible(fn (Get $get): bool => $get('period') === 'custom')
+                            ->requiredWithout('until_date')
+                            ->rule('date_format:Y-m-d'),
+                        DatePicker::make('until_date')
+                            ->label(__('Until Date'))
+                            ->visible(fn (Get $get): bool => $get('period') === 'custom')
+                            ->rule('date_format:Y-m-d')
+                            ->afterOrEqual(fn (Get $get): string => filled($get('from_date')) ? 'from_date' : ''),
                     ])
+                    ->resetState(['period' => 'today'])
+                    ->indicateUsing(fn (array $data): ?string => static::serviceDatePeriods()[$data['period'] ?? 'today'] ?? null)
                     ->query(fn (Builder $query, array $data): Builder => static::applyServiceDateFilter($query, $data)),
-
-                SelectFilter::make('status')
-                    ->label(__('Status'))
-                    ->options(TripStatus::class),
 
                 SelectFilter::make('driver_id')
                     ->label(__('Driver'))
@@ -91,15 +116,9 @@ class TripsTable
                     ->options(fn (): array => static::routeScheduleOptions()),
             ])
             ->recordActions([
-                ViewAction::make(),
-
-                EditAction::make()
-                    ->label(__('Replan'))
-                    ->visible(fn (Trip $record): bool => $record->status === TripStatus::SCHEDULED
-                        && TripResource::canEdit($record)),
-
                 Action::make('start')
                     ->label(__('Start Trip'))
+                    ->button()
                     ->icon(Heroicon::OutlinedPlay)
                     ->color('success')
                     ->requiresConfirmation()
@@ -116,6 +135,7 @@ class TripsTable
 
                 Action::make('complete')
                     ->label(__('Complete Trip'))
+                    ->button()
                     ->icon(Heroicon::OutlinedCheckCircle)
                     ->color('success')
                     ->requiresConfirmation()
@@ -130,41 +150,94 @@ class TripsTable
                         __('Trip Completed'),
                     )),
 
-                Action::make('cancel')
-                    ->label(__('Cancel Trip'))
-                    ->icon(Heroicon::OutlinedXCircle)
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->modalHeading(__('Cancel Trip'))
-                    ->modalDescription(__('The Trip will remain available as historical operational data.'))
-                    ->schema([
-                        Textarea::make('cancellation_reason')
-                            ->label(__('Cancellation Reason'))
-                            ->required()
-                            ->maxLength(500),
-                    ])
-                    ->authorize(fn (Trip $record): bool => TripResource::canCancel($record))
-                    ->visible(fn (Trip $record): bool => $record->status === TripStatus::SCHEDULED)
-                    ->action(fn (Trip $record, array $data, Action $action): bool => static::run(
-                        $action,
-                        fn (User $actor, Company $company): Trip => app(TripManagementService::class)
-                            ->cancel($actor, $company, $record->getKey(), $data['cancellation_reason']),
-                        __('Trip Cancelled'),
-                    )),
+                ActionGroup::make([
+                    EditAction::make()
+                        ->label(__('Replan'))
+                        ->visible(fn (Trip $record): bool => $record->status === TripStatus::SCHEDULED
+                            && TripResource::canEdit($record)),
 
-                Action::make('replace')
-                    ->label(__('Create Replacement'))
-                    ->icon(Heroicon::OutlinedDocumentDuplicate)
-                    ->color('info')
-                    ->authorize(fn (): bool => TripResource::canCreate())
-                    ->visible(fn (Trip $record): bool => $record->status === TripStatus::CANCELLED)
-                    ->url(fn (Trip $record): string => TripResource::getUrl('create', [
-                        'replacement' => $record->getKey(),
-                    ], tenant: Filament::getTenant())),
+                    Action::make('cancel')
+                        ->label(__('Cancel Trip'))
+                        ->icon(Heroicon::OutlinedXCircle)
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->modalHeading(__('Cancel Trip'))
+                        ->modalDescription(__('The Trip will remain available as historical operational data.'))
+                        ->schema([
+                            Textarea::make('cancellation_reason')
+                                ->label(__('Cancellation Reason'))
+                                ->required()
+                                ->maxLength(500),
+                        ])
+                        ->authorize(fn (Trip $record): bool => TripResource::canCancel($record))
+                        ->visible(fn (Trip $record): bool => $record->status === TripStatus::SCHEDULED)
+                        ->action(fn (Trip $record, array $data, Action $action): bool => static::run(
+                            $action,
+                            fn (User $actor, Company $company): Trip => app(TripManagementService::class)
+                                ->cancel($actor, $company, $record->getKey(), $data['cancellation_reason']),
+                            __('Trip Cancelled'),
+                        )),
+
+                    Action::make('replace')
+                        ->label(__('Create Replacement'))
+                        ->icon(Heroicon::OutlinedDocumentDuplicate)
+                        ->color('info')
+                        ->authorize(fn (): bool => TripResource::canCreate())
+                        ->visible(fn (Trip $record): bool => $record->status === TripStatus::CANCELLED)
+                        ->url(fn (Trip $record): string => TripResource::getUrl('create', [
+                            'replacement' => $record->getKey(),
+                        ], tenant: Filament::getTenant())),
+
+                    ViewAction::make()->label(__('View Trip History')),
+                ])
+                    ->label(__('More Actions'))
+                    ->icon(Heroicon::OutlinedEllipsisVertical)
+                    ->color('gray'),
             ])
+            ->recordUrl(function (Trip $record): ?string {
+                $parameters = ['record' => $record];
+
+                if (TripResource::canEdit($record)) {
+                    return TripResource::getUrl('edit', $parameters, tenant: Filament::getTenant());
+                }
+
+                if (TripResource::canView($record)) {
+                    return TripResource::getUrl('view', $parameters, tenant: Filament::getTenant());
+                }
+
+                return null;
+            })
             ->toolbarActions([])
             ->emptyStateHeading(__('No Trips Planned'))
             ->emptyStateDescription(__('Scheduled company trips will appear here.'));
+    }
+
+    private static function scheduledTime(Trip $trip): string
+    {
+        $timezone = $trip->planned_route_snapshot['company_timezone'] ?? $trip->company->timezone;
+        $departure = $trip->scheduled_departure_at->setTimezone($timezone);
+        $arrival = $trip->scheduled_arrival_at->setTimezone($timezone);
+        $departureDate = CarbonImmutable::parse($departure->toDateString(), 'UTC');
+        $arrivalDate = CarbonImmutable::parse($arrival->toDateString(), 'UTC');
+        $days = (int) $departureDate->diffInDays($arrivalDate);
+        $time = $departure->format('h:i A').' → '.$arrival->format('h:i A');
+
+        if ($days > 0) {
+            $time .= ' ('.trans_choice('+1 day|+:count days', $days).')';
+        }
+
+        return $time;
+    }
+
+    /** @return array<string, string> */
+    private static function serviceDatePeriods(): array
+    {
+        return [
+            'today' => __('Today'),
+            'this_week' => __('This Week'),
+            'custom' => __('Custom'),
+            'all' => __('All Dates'),
+        ];
     }
 
     /**
@@ -174,11 +247,44 @@ class TripsTable
      */
     private static function applyServiceDateFilter(Builder $query, array $data): Builder
     {
+        $period = $data['period'] ?? 'today';
+        if ($period === 'all') {
+            return $query;
+        }
+
+        if ($period === 'custom') {
+            return static::applyCustomServiceDateFilter($query, $data);
+        }
+
+        $company = Filament::getTenant();
+        if (! $company instanceof Company) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $today = CarbonImmutable::today($company->timezone);
+
+        return match ($period) {
+            'today' => $query->where('service_date', $today->toDateString()),
+            'this_week' => $query->whereBetween('service_date', [
+                $today->startOfWeek(CarbonImmutable::MONDAY)->toDateString(),
+                $today->endOfWeek(CarbonImmutable::SUNDAY)->toDateString(),
+            ]),
+            default => $query->whereRaw('1 = 0'),
+        };
+    }
+
+    /**
+     * @param  Builder<Trip>  $query
+     * @param  array<string, mixed>  $data
+     * @return Builder<Trip>
+     */
+    private static function applyCustomServiceDateFilter(Builder $query, array $data): Builder
+    {
         $fromDate = $data['from_date'] ?? null;
         $untilDate = $data['until_date'] ?? null;
 
         if (blank($fromDate) && blank($untilDate)) {
-            return $query;
+            return $query->whereRaw('1 = 0');
         }
 
         if ((filled($fromDate) && ! static::isValidDate($fromDate))
