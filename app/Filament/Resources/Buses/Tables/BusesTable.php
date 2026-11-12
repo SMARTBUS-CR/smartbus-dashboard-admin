@@ -15,9 +15,11 @@ use Filament\Actions\RestoreAction;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
+use Filament\Support\Enums\FontFamily;
+use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Validation\ValidationException;
@@ -30,37 +32,34 @@ class BusesTable
             ->columns([
                 TextColumn::make('unit_number')
                     ->label(__('Unit Number'))
+                    ->badge()->color('primary')->fontFamily(FontFamily::Mono)
                     ->searchable()
                     ->sortable(),
 
                 TextColumn::make('plate_number')
                     ->label(__('Plate Number'))
-                    ->formatStateUsing(fn (string $state, Bus $record): string => "{$record->country_code} - {$state}")
                     ->searchable()
                     ->sortable(),
 
-                TextColumn::make('vehicle')
-                    ->label(__('Vehicle'))
-                    ->state(fn (Bus $record): string => trim("{$record->brand} {$record->model}"))
-                    ->placeholder(__('Not Specified')),
+                TextColumn::make('country_code')
+                    ->label(__('Country'))->badge()->color('info')->toggleable(),
 
-                TextColumn::make('year')
-                    ->label(__('Year'))
+                TextColumn::make('brand')
+                    ->label(__('Vehicle'))->weight(FontWeight::Bold)
                     ->placeholder(__('Not Specified'))
-                    ->sortable(),
+                    ->description(fn (Bus $record): string => collect([$record->model, $record->year])->filter()->implode(' · '))
+                    ->toggleable(),
 
                 TextColumn::make('capacity')
-                    ->label(__('Passenger Capacity'))
-                    ->numeric()
-                    ->sortable(),
-
-                IconColumn::make('is_active')
-                    ->label(__('Active'))
-                    ->boolean()
-                    ->sortable(),
+                    ->label(__('Capacity'))
+                    ->formatStateUsing(fn (int $state): string => static::capacityLabel($state))
+                    ->sortable()->toggleable(),
             ])
             ->defaultSort('unit_number')
             ->filters([
+                SelectFilter::make('brand')->label(__('Brand'))->options(fn (): array => static::vehicleOptions('brand')),
+                SelectFilter::make('model')->label(__('Model'))->options(fn (): array => static::vehicleOptions('model')),
+                SelectFilter::make('capacity')->label(__('Capacity'))->options(fn (): array => static::vehicleOptions('capacity')),
                 TrashedFilter::make()
                     ->label(__('Archive Status'))
                     ->placeholder(__('Not Archived'))
@@ -131,6 +130,21 @@ class BusesTable
             ->toolbarActions([])
             ->emptyStateHeading(__('No Buses Available'))
             ->emptyStateDescription(__('Company fleet units will appear here.'));
+    }
+
+    /** @return array<int|string, string> */
+    private static function vehicleOptions(string $column): array
+    {
+        return BusResource::getEloquentQuery()->withTrashed()->whereNotNull($column)
+            ->distinct()->orderBy($column)->pluck($column)
+            ->reject(fn ($value): bool => blank($value))
+            ->mapWithKeys(fn ($value): array => [$value => $column === 'capacity' ? static::capacityLabel((int) $value) : $value])
+            ->all();
+    }
+
+    private static function capacityLabel(int $capacity): string
+    {
+        return $capacity === 0 ? __('Not Applicable') : trans_choice(':count passenger|:count passengers', $capacity);
     }
 
     /** @param Closure(User, Company): Bus $operation */
