@@ -35,7 +35,7 @@ class TripAssignmentMaterializationService
      *     service_date: string,
      *     created: list<array{assignment_id: string, trip_id: string}>,
      *     skipped: list<array{assignment_id: string, reason: string}>,
-     *     failed: list<array{assignment_id: string, errors: array<string, list<string>>}>
+     *     failed: list<array{assignment_id: string, reason: 'ineligible'|'conflicting'|'failed', errors: array<string, list<string>>}>
      * }
      */
     public function materialize(Company $company, CarbonImmutable $serviceDate, int $chunkSize = 100): array
@@ -68,11 +68,13 @@ class TripAssignmentMaterializationService
                     } catch (ValidationException $exception) {
                         $result['failed'][] = [
                             'assignment_id' => $assignment->getKey(),
+                            'reason' => $this->validationFailureReason($exception),
                             'errors' => $exception->errors(),
                         ];
                     } catch (ModelNotFoundException) {
                         $result['failed'][] = [
                             'assignment_id' => $assignment->getKey(),
+                            'reason' => 'failed',
                             'errors' => ['assignment' => [__('The recurring assignment became unavailable during materialization.')]],
                         ];
                     } catch (QueryException $exception) {
@@ -195,5 +197,14 @@ class TripAssignmentMaterializationService
     {
         return ($exception->errorInfo[0] ?? null) === '23505'
             && str_contains($exception->errorInfo[2] ?? '', 'trips_schedule_service_date_unique');
+    }
+
+    private function validationFailureReason(ValidationException $exception): string
+    {
+        $conflictMessage = __('The selected departure or resource conflicts with an existing trip.');
+
+        return collect($exception->errors())->flatten()->contains($conflictMessage)
+            ? 'conflicting'
+            : 'ineligible';
     }
 }
