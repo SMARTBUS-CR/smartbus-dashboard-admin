@@ -640,5 +640,21 @@
     "Confidential Salary": "Confidential Salary",
     "Salary information is restricted to explicitly authorized company administrators.": "Salary information is restricted to explicitly authorized company administrators.",
     "Salary Updated": "Salary Updated",
-    "Period": "Period"
+    "Period": "Period",
+    "Trip Planning": "Trip Planning",
+    "Trip": "Trip",
+    "Trips": "Trips",
+    "Trip Plan": "Trip Plan",
+    "Select a company route departure and the resources required for the complete planned interval.": "Select a company route departure and the resources required for the complete planned interval.",
+    "Route Pattern": "Route Pattern",
+    "Route Schedule": "Route Schedule",
+    "Service Date": "Service Date",
+    "Departure UTC Offset": "Departure UTC Offset",
+    "Required only when the local departure time is ambiguous because of a daylight-saving transition.": "Required only when the local departure time is ambiguous because of a daylight-saving transition.",
+    "Scheduled Departure": "Scheduled Departure",
+    "Scheduled Arrival": "Scheduled Arrival",
+    "Day :day at :time": "Day :day at :time",
+    "Replan": "Replan",
+    "No Trips Planned": "No Trips Planned",
+    "Scheduled company trips will appear here.": "Scheduled company trips will appear here."
 }

@@ -9,16 +9,29 @@ use App\Models\CompanyUser;
 use App\Models\Driver;
 use App\Models\Trip;
 use App\Models\User;
+use Filament\Facades\Filament;
 
 class TripPolicy
 {
-    public function viewAny(User $user, Company $company): bool
+    public function viewAny(User $user, ?Company $company = null): bool
     {
+        $company ??= Filament::getTenant();
+
+        if (! $company instanceof Company) {
+            return false;
+        }
+
         return $this->allowsReading($user, $company, null, 'ViewAny:Trip');
     }
 
-    public function view(User $user, Company $company, ?Trip $trip = null): bool
+    public function view(User $user, Company|Trip $target, ?Trip $extra = null): bool
     {
+        [$company, $trip] = $this->resolveTripContext($target, $extra);
+
+        if (! $company instanceof Company) {
+            return false;
+        }
+
         return $this->allowsReading($user, $company, $trip, 'View:Trip');
     }
 
@@ -51,19 +64,40 @@ class TripPolicy
             && $user->can($permission);
     }
 
-    public function create(User $user, Company $company): bool
+    public function create(User $user, ?Company $company = null): bool
     {
+        $company ??= Filament::getTenant();
+
+        if (! $company instanceof Company) {
+            return false;
+        }
+
         return $user->canAccessTenant($company) && $user->can('Create:Trip');
     }
 
-    public function update(User $user, Company $company, ?Trip $trip = null): bool
+    public function update(User $user, Company|Trip $target, ?Trip $extra = null): bool
     {
+        [$company, $trip] = $this->resolveTripContext($target, $extra);
+
+        if (! $company instanceof Company) {
+            return false;
+        }
+
         return $user->canAccessTenant($company)
             && $user->can('Update:Trip')
             && ($trip === null || (
                 (string) $trip->company_id === (string) $company->getKey()
                 && $trip->status === TripStatus::SCHEDULED
             ));
+    }
+
+    /** @return array{Company|null, Trip|null} */
+    private function resolveTripContext(Company|Trip $target, ?Trip $extra): array
+    {
+        $trip = $target instanceof Trip ? $target : $extra;
+        $company = $target instanceof Company ? $target : $trip?->company;
+
+        return [$company, $trip];
     }
 
     public function delete(User $user): bool
