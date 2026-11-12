@@ -43,15 +43,8 @@ class TripsTable
                     ->formatStateUsing(fn (string $state, Trip $record): string => "{$record->planned_route_snapshot['pattern_code']} — {$state}"),
 
                 TextColumn::make('scheduled_departure_at')
-                    ->label(__('Scheduled Departure'))
-                    ->dateTime()
-                    ->timezone(fn (Trip $record): string => $record->company->timezone)
-                    ->sortable(),
-
-                TextColumn::make('scheduled_arrival_at')
-                    ->label(__('Scheduled Arrival'))
-                    ->dateTime()
-                    ->timezone(fn (Trip $record): string => $record->company->timezone)
+                    ->label(__('Scheduled Time'))
+                    ->state(fn (Trip $record): string => static::scheduledTime($record))
                     ->sortable(),
 
                 TextColumn::make('bus.unit_number')
@@ -165,6 +158,21 @@ class TripsTable
             ->toolbarActions([])
             ->emptyStateHeading(__('No Trips Planned'))
             ->emptyStateDescription(__('Scheduled company trips will appear here.'));
+    }
+
+    private static function scheduledTime(Trip $trip): string
+    {
+        $timezone = $trip->planned_route_snapshot['company_timezone'] ?? $trip->company->timezone;
+        $departure = $trip->scheduled_departure_at->setTimezone($timezone);
+        $arrival = $trip->scheduled_arrival_at->setTimezone($timezone);
+        $days = (int) $departure->startOfDay()->diffInDays($arrival->startOfDay());
+        $time = $departure->format('h:i A').' → '.$arrival->format('h:i A');
+
+        if ($days > 0) {
+            $time .= ' ('.trans_choice('+1 day|+:count days', $days).')';
+        }
+
+        return $time;
     }
 
     /**
