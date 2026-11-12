@@ -164,4 +164,10 @@ class Driver extends Model
     {
         return $this->hasMany(DriverSchedule::class);
     }
+
+    /** @return HasMany<TripAssignment, $this> */
+    public function tripAssignments(): HasMany
+    {
+        return $this->hasMany(TripAssignment::class);
+    }
 }

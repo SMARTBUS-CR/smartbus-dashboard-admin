@@ -257,15 +257,20 @@ test('accepts optional GPS accuracy and rejects negative measurements', function
 
 test('rolls back and recreates the new operational tables without removing the route catalogue', function (): void {
     $company = createCompany();
+    $paths = [
+        ...glob(database_path('migrations/2026_10_13_2132*_create_*_table.php')),
+        database_path('migrations/2026_11_12_050112_create_trip_assignments_table.php'),
+    ];
+    sort($paths);
     $migrations = array_map(
         static fn (string $path) => require $path,
-        glob(database_path('migrations/2026_10_13_2132*_create_*_table.php')),
+        $paths,
     );
 
     foreach (array_reverse($migrations) as $migration) {
         $migration->down();
     }
-    foreach (['buses', 'drivers', 'driver_schedules', 'trips', 'gps_locations'] as $table) {
+    foreach (['buses', 'drivers', 'driver_schedules', 'trips', 'gps_locations', 'trip_assignments'] as $table) {
         expect(Schema::hasTable($table))->toBeFalse();
     }
     $this->assertModelExists($company);

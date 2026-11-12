@@ -140,4 +140,12 @@ class RouteSchedule extends Model
     {
         return $this->hasMany(RouteScheduleException::class);
     }
+
+    /**
+     * @return HasMany<TripAssignment, $this>
+     */
+    public function tripAssignments(): HasMany
+    {
+        return $this->hasMany(TripAssignment::class);
+    }
 }
