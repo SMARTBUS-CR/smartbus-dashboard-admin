@@ -103,26 +103,44 @@ class DriverForm
 
             Section::make(__('Initial Monthly Salary'))
                 ->description(__('Salary is required to create employment and remains confidential after registration.'))
-                ->schema([
-                    TextInput::make('salary_amount')
-                        ->label(__('Amount'))
-                        ->inputMode('decimal')
-                        ->required()
-                        ->rule('decimal:0,2')
-                        ->minValue(0)
-                        ->rule('max:9999999999.99'),
-
-                    Select::make('salary_currency')
-                        ->label(__('Currency'))
-                        ->options(array_combine(Driver::SUPPORTED_CURRENCIES, Driver::SUPPORTED_CURRENCIES))
-                        ->required(),
-
-                    Hidden::make('salary_period')->default('monthly'),
-                ])
+                ->schema(static::salaryFields())
                 ->columns(2)
                 ->columnSpanFull()
                 ->visible(fn (string $operation): bool => $operation === 'create'),
         ]);
+    }
+
+    /** @return array<int, Hidden|Select|TextInput> */
+    public static function salaryFields(bool $readOnly = false): array
+    {
+        $amount = TextInput::make('salary_amount')
+            ->label(__('Amount'))
+            ->inputMode('decimal');
+
+        $currency = Select::make('salary_currency')
+            ->label(__('Currency'))
+            ->options(array_combine(Driver::SUPPORTED_CURRENCIES, Driver::SUPPORTED_CURRENCIES));
+
+        if ($readOnly) {
+            return [
+                $amount->disabled()->dehydrated(false),
+                $currency->disabled()->dehydrated(false),
+                TextInput::make('salary_period')
+                    ->label(__('Period'))
+                    ->disabled()
+                    ->dehydrated(false),
+            ];
+        }
+
+        return [
+            $amount
+                ->required()
+                ->rule('decimal:0,2')
+                ->minValue(0)
+                ->rule('max:9999999999.99'),
+            $currency->required(),
+            Hidden::make('salary_period')->default('monthly'),
+        ];
     }
 
     /** @return array<string, string> */

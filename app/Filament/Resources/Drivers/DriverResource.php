@@ -102,6 +102,11 @@ class DriverResource extends Resource
         return $record instanceof Driver && ! $record->trashed() && static::allows('update', $record);
     }
 
+    public static function canViewSalary(Model $record): bool
+    {
+        return $record instanceof Driver && static::allows('viewSalary', $record);
+    }
+
     public static function canDelete(Model $record): bool
     {
         return $record instanceof Driver && ! $record->trashed() && static::allows('delete', $record);

@@ -674,5 +674,11 @@
     "Driver Employment Restored": "Empleo del conductor restaurado",
     "No Driver Employment Available": "No hay empleos de conductores disponibles",
     "Driver employment profiles for the selected company will appear here.": "Los perfiles de empleo de los conductores de la empresa seleccionada aparecerán aquí.",
-    "Employment Change Rejected": "Cambio de empleo rechazado"
+    "Employment Change Rejected": "Cambio de empleo rechazado",
+    "View Salary": "Ver salario",
+    "Manage Salary": "Gestionar salario",
+    "Confidential Salary": "Salario confidencial",
+    "Salary information is restricted to explicitly authorized company administrators.": "La información salarial está restringida a administradores de empresa autorizados explícitamente.",
+    "Salary Updated": "Salario actualizado",
+    "Period": "Periodo"
 }
