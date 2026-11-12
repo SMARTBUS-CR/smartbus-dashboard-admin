@@ -69,8 +69,9 @@ Route::prefix('v1/operations')->group(function (): void {
 });
 
 // Internal Service Routes (GPS & ETA microservices)
-Route::prefix('internal/v1')->middleware('auth.gps')->group(function (): void {
-    Route::get('trips/{id}/tracking-context', [TrackingContextController::class, 'show'])
+Route::prefix('internal/v1')->group(function (): void {
+    Route::get('trips/{id}/tracking-context', [TrackingContextController::class, 'showInternal'])
+        ->middleware('auth.gps:eta-v1')
         ->whereUuid('id')
         ->name('internal.trips.tracking-context');
 });
