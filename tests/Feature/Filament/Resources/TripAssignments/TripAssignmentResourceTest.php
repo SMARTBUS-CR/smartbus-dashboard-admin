@@ -3,6 +3,7 @@
 use App\Enums\UserRole;
 use App\Filament\Resources\TripAssignments\Pages\CreateTripAssignment;
 use App\Filament\Resources\TripAssignments\Pages\ListTripAssignments;
+use App\Filament\Resources\TripAssignments\Schemas\TripAssignmentForm;
 use App\Filament\Resources\TripAssignments\TripAssignmentResource;
 use App\Models\CompanyUser;
 use App\Models\DriverSchedule;
@@ -60,11 +61,41 @@ describe('Trip Assignment Resource', function (): void {
                 'route_schedule_ids' => [$secondSchedule->id, $first->route_schedule_id],
                 'driver_id' => $first->driver_id,
                 'bus_id' => $first->bus_id,
-                'planned_arrival_time' => '07:30:00',
-                'ends_next_day' => false,
+                'planned_duration_minutes' => 60,
             ])->call('create')->assertHasFormErrors();
 
         expect(TripAssignment::query()->count())->toBe($before);
+    });
+
+    test('creates different departures from one duration and shows descriptive labels', function (): void {
+        $planned = Trip::factory()->for($this->company)->withDriverAvailability()->make();
+        $planned->schedule->pattern->route->update(['code' => 'PV-RF']);
+        $planned->schedule->pattern->update(['headsign' => 'Towards Rio Frio']);
+        $later = RouteSchedule::factory()->create([
+            'route_pattern_id' => $planned->route_pattern_id,
+            'day_of_week' => 1,
+            'departure_time' => '08:00:00',
+        ]);
+        DriverSchedule::query()->where('driver_id', $planned->driver_id)->delete();
+        DriverSchedule::factory()->for($planned->driver)->fullDay()->unbounded()->create([
+            'day_of_week' => 1,
+            'start_time' => '00:00:00',
+            'end_time' => '00:00:00',
+        ]);
+        actingAsInCompany($this->actor, $this->company);
+
+        expect(TripAssignmentForm::scheduleOptions()[$planned->route_schedule_id])
+            ->toBe('Monday · 06:30 · PV-RF · Towards Rio Frio');
+
+        Livewire::test(CreateTripAssignment::class)->fillForm([
+            'route_schedule_ids' => [$planned->route_schedule_id, $later->id],
+            'driver_id' => $planned->driver_id,
+            'bus_id' => $planned->bus_id,
+            'planned_duration_minutes' => 60,
+        ])->call('create')->assertHasNoFormErrors();
+
+        expect(TripAssignment::query()->orderBy('planned_arrival_time')->pluck('planned_arrival_time')->all())
+            ->toBe(['07:30:00', '09:00:00']);
     });
 
     test('shows service date validation on its form field', function (): void {
@@ -76,8 +107,7 @@ describe('Trip Assignment Resource', function (): void {
                 'route_schedule_ids' => [$planned->route_schedule_id],
                 'driver_id' => $planned->driver_id,
                 'bus_id' => $planned->bus_id,
-                'planned_arrival_time' => '07:30:00',
-                'ends_next_day' => false,
+                'planned_duration_minutes' => 60,
                 'valid_from' => '2026-12-01',
                 'valid_until' => '2026-11-01',
             ])->call('create')->assertHasFormErrors(['valid_until']);
