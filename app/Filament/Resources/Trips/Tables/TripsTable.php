@@ -217,7 +217,9 @@ class TripsTable
         $timezone = $trip->planned_route_snapshot['company_timezone'] ?? $trip->company->timezone;
         $departure = $trip->scheduled_departure_at->setTimezone($timezone);
         $arrival = $trip->scheduled_arrival_at->setTimezone($timezone);
-        $days = (int) $departure->startOfDay()->diffInDays($arrival->startOfDay());
+        $departureDate = CarbonImmutable::parse($departure->toDateString(), 'UTC');
+        $arrivalDate = CarbonImmutable::parse($arrival->toDateString(), 'UTC');
+        $days = (int) $departureDate->diffInDays($arrivalDate);
         $time = $departure->format('h:i A').' → '.$arrival->format('h:i A');
 
         if ($days > 0) {
