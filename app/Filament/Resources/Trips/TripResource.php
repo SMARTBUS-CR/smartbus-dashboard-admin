@@ -164,8 +164,9 @@ class TripResource extends Resource
             ->where('company_id', $company->getKey())
             ->with([
                 'company:id,timezone',
-                'bus:id,unit_number,deleted_at',
-                'driver:id,license,deleted_at',
+                'bus:id,unit_number,plate_number,deleted_at',
+                'driver:id,user_id,license,deleted_at',
+                'driver.user:id,name',
             ]);
     }
 

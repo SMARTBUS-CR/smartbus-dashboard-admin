@@ -19,6 +19,8 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
+use Filament\Support\Enums\FontFamily;
+use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -38,27 +40,34 @@ class TripsTable
                     ->date()
                     ->sortable(),
 
-                TextColumn::make('planned_route_snapshot.pattern_name')
+                TextColumn::make('planned_route_snapshot.pattern_code')
                     ->label(__('Route Pattern'))
-                    ->formatStateUsing(fn (string $state, Trip $record): string => "{$record->planned_route_snapshot['pattern_code']} — {$state}"),
+                    ->badge()
+                    ->color('primary')
+                    ->fontFamily(FontFamily::Mono)
+                    ->description(fn (Trip $record): ?string => $record->planned_route_snapshot['pattern_name'] ?? null),
 
                 TextColumn::make('scheduled_departure_at')
-                    ->label(__('Scheduled Departure'))
-                    ->dateTime()
-                    ->timezone(fn (Trip $record): string => $record->company->timezone)
-                    ->sortable(),
-
-                TextColumn::make('scheduled_arrival_at')
-                    ->label(__('Scheduled Arrival'))
-                    ->dateTime()
-                    ->timezone(fn (Trip $record): string => $record->company->timezone)
+                    ->label(__('Scheduled Time'))
+                    ->state(fn (Trip $record): string => static::scheduledTime($record))
                     ->sortable(),
 
                 TextColumn::make('bus.unit_number')
-                    ->label(__('Bus')),
+                    ->label(__('Bus'))
+                    ->badge()
+                    ->color('info')
+                    ->fontFamily(FontFamily::Mono)
+                    ->description(fn (Trip $record): ?string => $record->bus?->plate_number)
+                    ->toggleable(),
 
-                TextColumn::make('driver.license')
-                    ->label(__('Driver')),
+                TextColumn::make('driver_name')
+                    ->label(__('Driver'))
+                    ->state(fn (Trip $record): string => $record->driver?->user?->name ?? __('Unavailable Identity'))
+                    ->weight(FontWeight::Bold)
+                    ->description(fn (Trip $record): ?string => $record->driver === null
+                        ? null
+                        : __('Lic. :license', ['license' => $record->driver->license]))
+                    ->toggleable(),
 
                 TextColumn::make('status')
                     ->label(__('Status'))
@@ -165,6 +174,21 @@ class TripsTable
             ->toolbarActions([])
             ->emptyStateHeading(__('No Trips Planned'))
             ->emptyStateDescription(__('Scheduled company trips will appear here.'));
+    }
+
+    private static function scheduledTime(Trip $trip): string
+    {
+        $timezone = $trip->planned_route_snapshot['company_timezone'] ?? $trip->company->timezone;
+        $departure = $trip->scheduled_departure_at->setTimezone($timezone);
+        $arrival = $trip->scheduled_arrival_at->setTimezone($timezone);
+        $days = (int) $departure->startOfDay()->diffInDays($arrival->startOfDay());
+        $time = $departure->format('h:i A').' → '.$arrival->format('h:i A');
+
+        if ($days > 0) {
+            $time .= ' ('.trans_choice('+1 day|+:count days', $days).')';
+        }
+
+        return $time;
     }
 
     /**
