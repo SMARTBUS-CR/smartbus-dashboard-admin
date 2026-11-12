@@ -1,4 +1,12 @@
 {
+    "Permanent recurring assignment deletion is disabled. Archive the assignment instead.": "Permanent recurring assignment deletion is disabled. Archive the assignment instead.",
+    "This field cannot be changed through recurring assignment operations.": "This field cannot be changed through recurring assignment operations.",
+    "Restore the archived recurring assignment before changing it.": "Restore the archived recurring assignment before changing it.",
+    "The selected recurring departure is unavailable for this company.": "The selected recurring departure is unavailable for this company.",
+    "The planned interval does not match its overnight flag.": "The planned interval does not match its overnight flag.",
+    "The assignment validity does not include an active recurring departure.": "The assignment validity does not include an active recurring departure.",
+    "The selected driver does not cover the complete recurring interval.": "The selected driver does not cover the complete recurring interval.",
+    "This recurring assignment conflicts with an existing active assignment.": "This recurring assignment conflicts with an existing active assignment.",
     "The selected route is unavailable or does not belong to an active company.": "The selected route is unavailable or does not belong to an active company.",
     "This route is already in your favorites.": "This route is already in your favorites.",
     "Favorite route not found.": "Favorite route not found.",
