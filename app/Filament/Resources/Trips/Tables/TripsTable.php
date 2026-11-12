@@ -186,6 +186,19 @@ class TripsTable
                         'replacement' => $record->getKey(),
                     ], tenant: Filament::getTenant())),
             ])
+            ->recordUrl(function (Trip $record): ?string {
+                $parameters = ['record' => $record];
+
+                if (TripResource::canEdit($record)) {
+                    return TripResource::getUrl('edit', $parameters, tenant: Filament::getTenant());
+                }
+
+                if (TripResource::canView($record)) {
+                    return TripResource::getUrl('view', $parameters, tenant: Filament::getTenant());
+                }
+
+                return null;
+            })
             ->toolbarActions([])
             ->emptyStateHeading(__('No Trips Planned'))
             ->emptyStateDescription(__('Scheduled company trips will appear here.'));
