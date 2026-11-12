@@ -19,7 +19,11 @@ class TripPermissionsSeeder extends Seeder
 
         try {
             DB::connection('mysql')->transaction(function (): void {
-                foreach (['Create:Trip', 'Update:Trip', 'Start:Trip', 'Complete:Trip', 'Cancel:Trip', 'ViewAny:Trip', 'View:Trip'] as $name) {
+                foreach ([
+                    'Create:Trip', 'Update:Trip', 'Start:Trip', 'Complete:Trip', 'Cancel:Trip', 'ViewAny:Trip', 'View:Trip',
+                    'ViewAny:TripAssignment', 'View:TripAssignment', 'Create:TripAssignment',
+                    'Update:TripAssignment', 'Delete:TripAssignment', 'Restore:TripAssignment',
+                ] as $name) {
                     Permission::findOrCreate($name, 'web');
                 }
             });

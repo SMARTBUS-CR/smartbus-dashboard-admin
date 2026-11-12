@@ -18,10 +18,16 @@ test('creates the web permissions needed for trip planning execution and history
         ['name' => 'Cancel:Trip', 'guard_name' => 'web'],
         ['name' => 'Complete:Trip', 'guard_name' => 'web'],
         ['name' => 'Create:Trip', 'guard_name' => 'web'],
+        ['name' => 'Create:TripAssignment', 'guard_name' => 'web'],
+        ['name' => 'Delete:TripAssignment', 'guard_name' => 'web'],
+        ['name' => 'Restore:TripAssignment', 'guard_name' => 'web'],
         ['name' => 'Start:Trip', 'guard_name' => 'web'],
         ['name' => 'Update:Trip', 'guard_name' => 'web'],
+        ['name' => 'Update:TripAssignment', 'guard_name' => 'web'],
         ['name' => 'View:Trip', 'guard_name' => 'web'],
+        ['name' => 'View:TripAssignment', 'guard_name' => 'web'],
         ['name' => 'ViewAny:Trip', 'guard_name' => 'web'],
+        ['name' => 'ViewAny:TripAssignment', 'guard_name' => 'web'],
     ]);
     $this->assertDatabaseCount('trips', 0);
 });

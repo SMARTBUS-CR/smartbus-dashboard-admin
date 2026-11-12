@@ -1,4 +1,12 @@
 {
+    "Permanent recurring assignment deletion is disabled. Archive the assignment instead.": "La eliminación permanente de asignaciones recurrentes está deshabilitada. Archive la asignación en su lugar.",
+    "This field cannot be changed through recurring assignment operations.": "Este campo no se puede cambiar mediante operaciones de asignación recurrente.",
+    "Restore the archived recurring assignment before changing it.": "Restaure la asignación recurrente archivada antes de modificarla.",
+    "The selected recurring departure is unavailable for this company.": "La salida recurrente seleccionada no está disponible para esta empresa.",
+    "The planned interval does not match its overnight flag.": "El intervalo planificado no coincide con su indicador nocturno.",
+    "The assignment validity does not include an active recurring departure.": "La vigencia de la asignación no incluye una salida recurrente activa.",
+    "The selected driver does not cover the complete recurring interval.": "El conductor seleccionado no cubre el intervalo recurrente completo.",
+    "This recurring assignment conflicts with an existing active assignment.": "Esta asignación recurrente entra en conflicto con una asignación activa existente.",
     "The selected route is unavailable or does not belong to an active company.": "La ruta seleccionada no está disponible o no pertenece a una empresa activa.",
     "This route is already in your favorites.": "Esta ruta ya se encuentra en tus favoritos.",
     "Favorite route not found.": "Ruta favorita no encontrada.",

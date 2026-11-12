@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Validation\ValidationException;
 
 #[Fillable([
     'company_id',
@@ -42,6 +43,13 @@ class TripAssignment extends Model
             'valid_until' => 'immutable_date',
             'status' => TripAssignmentStatus::class,
         ];
+    }
+
+    public function forceDelete(): bool
+    {
+        throw ValidationException::withMessages([
+            'assignment' => __('Permanent recurring assignment deletion is disabled. Archive the assignment instead.'),
+        ]);
     }
 
     /** @return BelongsTo<Company, $this> */
