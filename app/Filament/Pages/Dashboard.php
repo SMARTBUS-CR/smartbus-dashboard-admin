@@ -17,6 +17,7 @@ use Illuminate\Contracts\Support\Htmlable;
 class Dashboard extends BaseDashboard
 {
     use HasFiltersForm {
+        normalizeTableFilterValuesFromQueryString as protected normalizeFilterValues;
         updatedFilters as protected persistFilters;
     }
 
@@ -71,6 +72,13 @@ class Dashboard extends BaseDashboard
         $this->resetValidation(['filters.from_date', 'filters.until_date']);
         $this->getFiltersForm()->validate();
         $this->persistFilters();
+    }
+
+    protected function normalizeTableFilterValuesFromQueryString(array &$data): void
+    {
+        $this->normalizeFilterValues($data);
+
+        $data['period'] ??= filled($data['from_date'] ?? null) || filled($data['until_date'] ?? null) ? 'custom' : 'today';
     }
 
     public function getTitle(): string|Htmlable

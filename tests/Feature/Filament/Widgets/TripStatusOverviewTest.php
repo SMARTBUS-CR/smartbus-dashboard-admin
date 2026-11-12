@@ -162,6 +162,16 @@ describe('Trip Status Overview', function (): void {
             ->assertHasNoErrors(['filters.until_date']);
     });
 
+    test('shows dates from an existing dashboard link as a custom range', function (): void {
+        actingAsInCompany($this->actor, $this->company);
+
+        Livewire::withQueryParams(['filters' => ['from_date' => '2026-10-01', 'until_date' => '2026-10-15']])
+            ->test(Dashboard::class)
+            ->assertSet('filters.period', 'custom')
+            ->assertSet('filters.from_date', '2026-10-01')
+            ->assertSee('From Date');
+    });
+
     test('keeps aggregate query growth bounded as trip volume increases', function (): void {
         $template = Trip::factory()->for($this->company)->withEligibleDriver()->create([
             'service_date' => '2026-10-01',
