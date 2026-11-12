@@ -30,7 +30,7 @@ class CreateTripAssignment extends CreateRecord
                 $actor,
                 $company,
                 array_values($data['route_schedule_ids'] ?? []),
-                Arr::only($data, ['driver_id', 'bus_id', 'planned_arrival_time', 'ends_next_day', 'valid_from', 'valid_until']),
+                Arr::only($data, ['driver_id', 'bus_id', 'planned_duration_minutes', 'valid_from', 'valid_until']),
             )->firstOrFail();
         } catch (ValidationException $exception) {
             throw $this->forForm($exception);

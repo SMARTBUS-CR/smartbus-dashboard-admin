@@ -2,13 +2,16 @@
 
 namespace App\Filament\Resources\TripAssignments\Schemas;
 
+use App\Enums\DriverStatus;
 use App\Models\Bus;
 use App\Models\Company;
 use App\Models\Driver;
 use App\Models\RouteSchedule;
+use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
@@ -29,12 +32,14 @@ class TripAssignmentForm
                     ->options(fn (): array => static::scheduleOptions())
                     ->searchable()->required()->visibleOn('edit'),
                 Select::make('driver_id')->label(__('Driver'))
-                    ->options(fn (): array => static::driverOptions())->searchable()->required(),
+                    ->options(fn (string $operation): array => static::driverOptions($operation === 'edit'))->searchable()->required(),
                 Select::make('bus_id')->label(__('Bus'))
-                    ->options(fn (): array => static::busOptions())->searchable()->required(),
+                    ->options(fn (string $operation): array => static::busOptions($operation === 'edit'))->searchable()->required(),
+                TextInput::make('planned_duration_minutes')->label(__('Planned Duration (Minutes)'))
+                    ->integer()->minValue(1)->maxValue(1440)->required()->visibleOn('create'),
                 TimePicker::make('planned_arrival_time')->label(__('Planned Arrival'))
-                    ->seconds()->required(),
-                Toggle::make('ends_next_day')->label(__('Ends Next Day'))->default(false),
+                    ->seconds()->required()->visibleOn('edit'),
+                Toggle::make('ends_next_day')->label(__('Ends Next Day'))->default(false)->visibleOn('edit'),
                 DatePicker::make('valid_from')->label(__('Valid From')),
                 DatePicker::make('valid_until')->label(__('Valid Until')),
             ])->columns(2)->columnSpanFull(),
@@ -52,30 +57,45 @@ class TripAssignmentForm
         return RouteSchedule::query()->with('pattern.route')
             ->whereHas('pattern.route', fn ($query) => $query->where('company_id', $company->id))
             ->orderBy('day_of_week')->orderBy('departure_time')->get()
-            ->mapWithKeys(fn (RouteSchedule $schedule): array => [
-                $schedule->id => __('Day :day', ['day' => $schedule->day_of_week])." · {$schedule->departure_time} · {$schedule->pattern->code}",
-            ])->all();
+            ->mapWithKeys(fn (RouteSchedule $schedule): array => [$schedule->id => static::scheduleLabel($schedule)])->all();
     }
 
     /** @return array<string, string> */
-    public static function driverOptions(): array
+    public static function driverOptions(bool $includeHistorical = false): array
     {
         $company = Filament::getTenant();
 
-        return $company instanceof Company ? Driver::withTrashed()->with('user')->where('company_id', $company->id)
+        return $company instanceof Company ? Driver::query()->when($includeHistorical, fn ($query) => $query->withTrashed())
+            ->with('user')->where('company_id', $company->id)
+            ->when(! $includeHistorical, fn ($query) => $query->where('status', DriverStatus::ACTIVE))
             ->orderBy('license')->get()->mapWithKeys(fn (Driver $driver): array => [
                 $driver->id => trim(($driver->user?->name ?? $driver->license).($driver->trashed() ? ' ('.__('Archived').')' : '')),
             ])->all() : [];
     }
 
     /** @return array<string, string> */
-    public static function busOptions(): array
+    public static function busOptions(bool $includeHistorical = false): array
     {
         $company = Filament::getTenant();
 
-        return $company instanceof Company ? Bus::withTrashed()->where('company_id', $company->id)
+        return $company instanceof Company ? Bus::query()->when($includeHistorical, fn ($query) => $query->withTrashed())
+            ->where('company_id', $company->id)->when(! $includeHistorical, fn ($query) => $query->where('is_active', true))
             ->orderBy('unit_number')->get()->mapWithKeys(fn (Bus $bus): array => [
                 $bus->id => $bus->unit_number.($bus->trashed() ? ' ('.__('Archived').')' : ''),
             ])->all() : [];
+    }
+
+    public static function scheduleLabel(RouteSchedule $schedule): string
+    {
+        $direction = $schedule->pattern->headsign ?: ($schedule->pattern->name ?: $schedule->pattern->code);
+
+        return static::weekdayLabel($schedule->day_of_week).' · '.substr($schedule->departure_time, 0, 5)
+            ." · {$schedule->pattern->route->code} · {$direction}";
+    }
+
+    public static function weekdayLabel(int $dayOfWeek): string
+    {
+        return CarbonImmutable::create(2026, 11, 1)->addDays($dayOfWeek)
+            ->locale(app()->getLocale())->translatedFormat('l');
     }
 }

@@ -34,7 +34,8 @@ class TripAssignmentsTable
     {
         return $table
             ->columns([
-                TextColumn::make('schedule.day_of_week')->label(__('Weekday'))->sortable(),
+                TextColumn::make('schedule.day_of_week')->label(__('Weekday'))
+                    ->formatStateUsing(fn (int $state): string => TripAssignmentForm::weekdayLabel($state))->sortable(),
                 TextColumn::make('schedule.departure_time')->label(__('Departure'))->sortable(),
                 TextColumn::make('schedule.pattern.code')->label(__('Route Pattern'))->searchable(),
                 TextColumn::make('driver.user.name')->label(__('Driver'))
@@ -50,8 +51,8 @@ class TripAssignmentsTable
             ->filters([
                 SelectFilter::make('status')->options(TripAssignmentStatus::class),
                 SelectFilter::make('route_schedule_id')->label(__('Scheduled Departure'))->options(fn (): array => TripAssignmentForm::scheduleOptions()),
-                SelectFilter::make('driver_id')->label(__('Driver'))->options(fn (): array => TripAssignmentForm::driverOptions()),
-                SelectFilter::make('bus_id')->label(__('Bus'))->options(fn (): array => TripAssignmentForm::busOptions()),
+                SelectFilter::make('driver_id')->label(__('Driver'))->options(fn (): array => TripAssignmentForm::driverOptions(true)),
+                SelectFilter::make('bus_id')->label(__('Bus'))->options(fn (): array => TripAssignmentForm::busOptions(true)),
                 Filter::make('route_pattern')->schema([Select::make('id')->options(fn (): array => static::patternOptions())])
                     ->query(fn (Builder $query, array $data): Builder => $query->when($data['id'] ?? null, fn (Builder $query, string $id): Builder => $query->whereHas('schedule', fn (Builder $query): Builder => $query->where('route_pattern_id', $id)))),
                 Filter::make('validity')->schema([DatePicker::make('from'), DatePicker::make('until')])

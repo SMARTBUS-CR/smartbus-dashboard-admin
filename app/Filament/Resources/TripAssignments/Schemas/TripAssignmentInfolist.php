@@ -15,7 +15,8 @@ class TripAssignmentInfolist
             Section::make(__('Recurring Assignment'))->schema([
                 TextEntry::make('schedule.pattern.code')->label(__('Pattern Code')),
                 TextEntry::make('schedule.pattern.name')->label(__('Pattern Name')),
-                TextEntry::make('schedule.day_of_week')->label(__('Weekday')),
+                TextEntry::make('schedule.day_of_week')->label(__('Weekday'))
+                    ->formatStateUsing(fn (int $state): string => TripAssignmentForm::weekdayLabel($state)),
                 TextEntry::make('schedule.departure_time')->label(__('Departure')),
                 TextEntry::make('planned_arrival_time')->label(__('Planned Arrival')),
                 IconEntry::make('ends_next_day')->label(__('Ends Next Day'))->boolean(),
