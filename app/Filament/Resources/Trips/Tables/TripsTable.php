@@ -14,6 +14,7 @@ use App\Services\TripManagementService;
 use Carbon\CarbonImmutable;
 use Closure;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
@@ -115,15 +116,9 @@ class TripsTable
                     ->options(fn (): array => static::routeScheduleOptions()),
             ])
             ->recordActions([
-                ViewAction::make(),
-
-                EditAction::make()
-                    ->label(__('Replan'))
-                    ->visible(fn (Trip $record): bool => $record->status === TripStatus::SCHEDULED
-                        && TripResource::canEdit($record)),
-
                 Action::make('start')
                     ->label(__('Start Trip'))
+                    ->button()
                     ->icon(Heroicon::OutlinedPlay)
                     ->color('success')
                     ->requiresConfirmation()
@@ -140,6 +135,7 @@ class TripsTable
 
                 Action::make('complete')
                     ->label(__('Complete Trip'))
+                    ->button()
                     ->icon(Heroicon::OutlinedCheckCircle)
                     ->color('success')
                     ->requiresConfirmation()
@@ -154,37 +150,49 @@ class TripsTable
                         __('Trip Completed'),
                     )),
 
-                Action::make('cancel')
-                    ->label(__('Cancel Trip'))
-                    ->icon(Heroicon::OutlinedXCircle)
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->modalHeading(__('Cancel Trip'))
-                    ->modalDescription(__('The Trip will remain available as historical operational data.'))
-                    ->schema([
-                        Textarea::make('cancellation_reason')
-                            ->label(__('Cancellation Reason'))
-                            ->required()
-                            ->maxLength(500),
-                    ])
-                    ->authorize(fn (Trip $record): bool => TripResource::canCancel($record))
-                    ->visible(fn (Trip $record): bool => $record->status === TripStatus::SCHEDULED)
-                    ->action(fn (Trip $record, array $data, Action $action): bool => static::run(
-                        $action,
-                        fn (User $actor, Company $company): Trip => app(TripManagementService::class)
-                            ->cancel($actor, $company, $record->getKey(), $data['cancellation_reason']),
-                        __('Trip Cancelled'),
-                    )),
+                ActionGroup::make([
+                    EditAction::make()
+                        ->label(__('Replan'))
+                        ->visible(fn (Trip $record): bool => $record->status === TripStatus::SCHEDULED
+                            && TripResource::canEdit($record)),
 
-                Action::make('replace')
-                    ->label(__('Create Replacement'))
-                    ->icon(Heroicon::OutlinedDocumentDuplicate)
-                    ->color('info')
-                    ->authorize(fn (): bool => TripResource::canCreate())
-                    ->visible(fn (Trip $record): bool => $record->status === TripStatus::CANCELLED)
-                    ->url(fn (Trip $record): string => TripResource::getUrl('create', [
-                        'replacement' => $record->getKey(),
-                    ], tenant: Filament::getTenant())),
+                    Action::make('cancel')
+                        ->label(__('Cancel Trip'))
+                        ->icon(Heroicon::OutlinedXCircle)
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->modalHeading(__('Cancel Trip'))
+                        ->modalDescription(__('The Trip will remain available as historical operational data.'))
+                        ->schema([
+                            Textarea::make('cancellation_reason')
+                                ->label(__('Cancellation Reason'))
+                                ->required()
+                                ->maxLength(500),
+                        ])
+                        ->authorize(fn (Trip $record): bool => TripResource::canCancel($record))
+                        ->visible(fn (Trip $record): bool => $record->status === TripStatus::SCHEDULED)
+                        ->action(fn (Trip $record, array $data, Action $action): bool => static::run(
+                            $action,
+                            fn (User $actor, Company $company): Trip => app(TripManagementService::class)
+                                ->cancel($actor, $company, $record->getKey(), $data['cancellation_reason']),
+                            __('Trip Cancelled'),
+                        )),
+
+                    Action::make('replace')
+                        ->label(__('Create Replacement'))
+                        ->icon(Heroicon::OutlinedDocumentDuplicate)
+                        ->color('info')
+                        ->authorize(fn (): bool => TripResource::canCreate())
+                        ->visible(fn (Trip $record): bool => $record->status === TripStatus::CANCELLED)
+                        ->url(fn (Trip $record): string => TripResource::getUrl('create', [
+                            'replacement' => $record->getKey(),
+                        ], tenant: Filament::getTenant())),
+
+                    ViewAction::make()->label(__('View Trip History')),
+                ])
+                    ->label(__('More Actions'))
+                    ->icon(Heroicon::OutlinedEllipsisVertical)
+                    ->color('gray'),
             ])
             ->recordUrl(function (Trip $record): ?string {
                 $parameters = ['record' => $record];
