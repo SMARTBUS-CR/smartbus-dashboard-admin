@@ -6,6 +6,7 @@ use App\Filament\Resources\Trips\Pages\ListTrips;
 use App\Filament\Resources\Trips\TripResource;
 use App\Models\CompanyUser;
 use App\Models\Trip;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -22,6 +23,7 @@ describe('Trip Resource Access', function (): void {
     });
 
     test('lists only trips from the selected company', function (): void {
+        $this->travelTo(CarbonImmutable::parse('2026-10-26T12:30:00Z'));
         $trip = Trip::factory()->for($this->company)->withEligibleDriver()->create();
         $otherTrip = Trip::factory()->withEligibleDriver()->create();
         actingAsInCompany($this->actor, $this->company);

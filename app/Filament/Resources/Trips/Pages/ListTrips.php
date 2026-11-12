@@ -10,6 +10,13 @@ class ListTrips extends ListRecords
 {
     protected static string $resource = TripResource::class;
 
+    public function applyTableFilters(): void
+    {
+        $this->getTableFiltersForm()->validate();
+
+        parent::applyTableFilters();
+    }
+
     protected function getHeaderActions(): array
     {
         return [

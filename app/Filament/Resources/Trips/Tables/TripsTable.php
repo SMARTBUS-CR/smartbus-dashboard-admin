@@ -11,14 +11,17 @@ use App\Models\RouteSchedule;
 use App\Models\Trip;
 use App\Models\User;
 use App\Services\TripManagementService;
+use Carbon\CarbonImmutable;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Enums\FontFamily;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
@@ -78,9 +81,25 @@ class TripsTable
                 Filter::make('service_date')
                     ->label(__('Service Date'))
                     ->schema([
-                        DatePicker::make('from_date')->label(__('From Date')),
-                        DatePicker::make('until_date')->label(__('Until Date')),
+                        Select::make('period')
+                            ->label(__('Date Range'))
+                            ->options(static::serviceDatePeriods())
+                            ->default('today')
+                            ->required()
+                            ->live(),
+                        DatePicker::make('from_date')
+                            ->label(__('From Date'))
+                            ->visible(fn (Get $get): bool => $get('period') === 'custom')
+                            ->requiredWithout('until_date')
+                            ->rule('date_format:Y-m-d'),
+                        DatePicker::make('until_date')
+                            ->label(__('Until Date'))
+                            ->visible(fn (Get $get): bool => $get('period') === 'custom')
+                            ->rule('date_format:Y-m-d')
+                            ->afterOrEqual(fn (Get $get): string => filled($get('from_date')) ? 'from_date' : ''),
                     ])
+                    ->resetState(['period' => 'today'])
+                    ->indicateUsing(fn (array $data): ?string => static::serviceDatePeriods()[$data['period'] ?? 'today'] ?? null)
                     ->query(fn (Builder $query, array $data): Builder => static::applyServiceDateFilter($query, $data)),
 
                 SelectFilter::make('status')
@@ -191,6 +210,17 @@ class TripsTable
         return $time;
     }
 
+    /** @return array<string, string> */
+    private static function serviceDatePeriods(): array
+    {
+        return [
+            'today' => __('Today'),
+            'this_week' => __('This Week'),
+            'custom' => __('Custom'),
+            'all' => __('All Dates'),
+        ];
+    }
+
     /**
      * @param  Builder<Trip>  $query
      * @param  array<string, mixed>  $data
@@ -198,11 +228,44 @@ class TripsTable
      */
     private static function applyServiceDateFilter(Builder $query, array $data): Builder
     {
+        $period = $data['period'] ?? 'today';
+        if ($period === 'all') {
+            return $query;
+        }
+
+        if ($period === 'custom') {
+            return static::applyCustomServiceDateFilter($query, $data);
+        }
+
+        $company = Filament::getTenant();
+        if (! $company instanceof Company) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $today = CarbonImmutable::today($company->timezone);
+
+        return match ($period) {
+            'today' => $query->where('service_date', $today->toDateString()),
+            'this_week' => $query->whereBetween('service_date', [
+                $today->startOfWeek(CarbonImmutable::MONDAY)->toDateString(),
+                $today->endOfWeek(CarbonImmutable::SUNDAY)->toDateString(),
+            ]),
+            default => $query->whereRaw('1 = 0'),
+        };
+    }
+
+    /**
+     * @param  Builder<Trip>  $query
+     * @param  array<string, mixed>  $data
+     * @return Builder<Trip>
+     */
+    private static function applyCustomServiceDateFilter(Builder $query, array $data): Builder
+    {
         $fromDate = $data['from_date'] ?? null;
         $untilDate = $data['until_date'] ?? null;
 
         if (blank($fromDate) && blank($untilDate)) {
-            return $query;
+            return $query->whereRaw('1 = 0');
         }
 
         if ((filled($fromDate) && ! static::isValidDate($fromDate))
