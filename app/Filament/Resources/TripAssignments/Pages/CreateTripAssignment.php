@@ -48,7 +48,11 @@ class CreateTripAssignment extends CreateRecord
 
         return ValidationException::withMessages(collect($exception->errors())->mapWithKeys(
             function (array $messages, string $field) use ($path): array {
-                $field = $field === 'route_schedule_id' ? 'route_schedule_ids' : $field;
+                $field = match ($field) {
+                    'route_schedule_id' => 'route_schedule_ids',
+                    'availability' => 'driver_id',
+                    default => $field,
+                };
 
                 return [filled($path) ? "{$path}.{$field}" : $field => $messages];
             },
