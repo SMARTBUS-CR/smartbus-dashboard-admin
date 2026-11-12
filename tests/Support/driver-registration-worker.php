@@ -146,6 +146,9 @@ try {
         } elseif ($input['barrier_at'] === 'schedule_locked' && str_contains($query->sql, '"drivers"') && str_contains($query->sql, 'for update')) {
             $paused = true;
             $pause('driver_locked');
+        } elseif ($input['barrier_at'] === 'batch_schedules_locked' && str_contains($query->sql, '"route_schedules"') && str_contains($query->sql, 'for update')) {
+            $paused = true;
+            $pause('batch_schedules_locked');
         }
     });
 
@@ -169,6 +172,10 @@ try {
         if (! $paused && $input['barrier_at'] === 'schedule_attempt' && str_contains($sql, '"drivers"') && str_contains($sql, 'for update')) {
             $paused = true;
             $pause('driver_lock_attempt');
+        }
+        if (! $paused && $input['barrier_at'] === 'batch_schedules_attempt' && str_contains($sql, '"route_schedules"') && str_contains($sql, 'for update')) {
+            $paused = true;
+            $pause('batch_schedules_attempt');
         }
         if ($paused || $input['barrier_at'] !== 'registration') {
             return;
