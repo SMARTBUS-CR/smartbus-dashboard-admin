@@ -697,5 +697,9 @@
     "Stop": "Stop",
     "Stop Identifier": "Stop Identifier",
     "Coordinates": "Coordinates",
-    "Minutes From Start": "Minutes From Start"
+    "Minutes From Start": "Minutes From Start",
+    "From Date": "From Date",
+    "Until Date": "Until Date",
+    "Trip Operations": "Trip Operations",
+    "Persisted Trip statuses for the selected local service dates.": "Persisted Trip statuses for the selected local service dates."
 }

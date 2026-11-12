@@ -4,7 +4,10 @@ namespace App\Filament\Resources\Trips\Tables;
 
 use App\Enums\TripStatus;
 use App\Filament\Resources\Trips\TripResource;
+use App\Models\Bus;
 use App\Models\Company;
+use App\Models\Driver;
+use App\Models\RouteSchedule;
 use App\Models\Trip;
 use App\Models\User;
 use App\Services\TripManagementService;
@@ -13,11 +16,15 @@ use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
 
 class TripsTable
@@ -58,7 +65,31 @@ class TripsTable
                     ->badge(),
             ])
             ->defaultSort('scheduled_departure_at')
-            ->filters([])
+            ->filters([
+                Filter::make('service_date')
+                    ->label(__('Service Date'))
+                    ->schema([
+                        DatePicker::make('from_date')->label(__('From Date')),
+                        DatePicker::make('until_date')->label(__('Until Date')),
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder => static::applyServiceDateFilter($query, $data)),
+
+                SelectFilter::make('status')
+                    ->label(__('Status'))
+                    ->options(TripStatus::class),
+
+                SelectFilter::make('driver_id')
+                    ->label(__('Driver'))
+                    ->options(fn (): array => static::driverOptions()),
+
+                SelectFilter::make('bus_id')
+                    ->label(__('Bus'))
+                    ->options(fn (): array => static::busOptions()),
+
+                SelectFilter::make('route_schedule_id')
+                    ->label(__('Route Schedule'))
+                    ->options(fn (): array => static::routeScheduleOptions()),
+            ])
             ->recordActions([
                 ViewAction::make(),
 
@@ -134,6 +165,107 @@ class TripsTable
             ->toolbarActions([])
             ->emptyStateHeading(__('No Trips Planned'))
             ->emptyStateDescription(__('Scheduled company trips will appear here.'));
+    }
+
+    /**
+     * @param  Builder<Trip>  $query
+     * @param  array<string, mixed>  $data
+     * @return Builder<Trip>
+     */
+    private static function applyServiceDateFilter(Builder $query, array $data): Builder
+    {
+        $fromDate = $data['from_date'] ?? null;
+        $untilDate = $data['until_date'] ?? null;
+
+        if (blank($fromDate) && blank($untilDate)) {
+            return $query;
+        }
+
+        if ((filled($fromDate) && ! static::isValidDate($fromDate))
+            || (filled($untilDate) && ! static::isValidDate($untilDate))) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $fromDate = filled($fromDate) ? $fromDate : $untilDate;
+        $untilDate = filled($untilDate) ? $untilDate : $fromDate;
+
+        if ($fromDate > $untilDate) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereBetween('service_date', [$fromDate, $untilDate]);
+    }
+
+    private static function isValidDate(mixed $date): bool
+    {
+        if (! is_string($date) || preg_match('/^\d{4}-\d{2}-\d{2}$/D', $date) !== 1) {
+            return false;
+        }
+
+        $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+
+        return $parsed !== false && $parsed->format('Y-m-d') === $date;
+    }
+
+    /** @return array<string, string> */
+    private static function driverOptions(): array
+    {
+        $company = Filament::getTenant();
+
+        if (! $company instanceof Company) {
+            return [];
+        }
+
+        return Driver::withTrashed()
+            ->where('company_id', $company->getKey())
+            ->orderBy('license')
+            ->pluck('license', 'id')
+            ->all();
+    }
+
+    /** @return array<string, string> */
+    private static function busOptions(): array
+    {
+        $company = Filament::getTenant();
+
+        if (! $company instanceof Company) {
+            return [];
+        }
+
+        return Bus::withTrashed()
+            ->where('company_id', $company->getKey())
+            ->orderBy('unit_number')
+            ->get(['id', 'unit_number', 'plate_number'])
+            ->mapWithKeys(fn (Bus $bus): array => [
+                $bus->getKey() => "{$bus->unit_number} — {$bus->plate_number}",
+            ])
+            ->all();
+    }
+
+    /** @return array<string, string> */
+    private static function routeScheduleOptions(): array
+    {
+        $company = Filament::getTenant();
+
+        if (! $company instanceof Company) {
+            return [];
+        }
+
+        return RouteSchedule::query()
+            ->join('route_patterns', 'route_patterns.id', '=', 'route_schedules.route_pattern_id')
+            ->join('routes', 'routes.id', '=', 'route_patterns.route_id')
+            ->where('routes.company_id', $company->getKey())
+            ->orderBy('route_patterns.code')
+            ->orderBy('route_schedules.departure_time')
+            ->get([
+                'route_schedules.id',
+                'route_schedules.departure_time',
+                'route_patterns.code as pattern_code',
+            ])
+            ->mapWithKeys(fn (RouteSchedule $schedule): array => [
+                $schedule->getKey() => "{$schedule->pattern_code} — {$schedule->departure_time}",
+            ])
+            ->all();
     }
 
     /** @param Closure(User, Company): Trip $operation */

@@ -737,5 +737,9 @@
     "Stop": "Parada",
     "Stop Identifier": "Identificador de la parada",
     "Coordinates": "Coordenadas",
-    "Minutes From Start": "Minutos desde el inicio"
+    "Minutes From Start": "Minutos desde el inicio",
+    "From Date": "Fecha inicial",
+    "Until Date": "Fecha final",
+    "Trip Operations": "Operaciones de viajes",
+    "Persisted Trip statuses for the selected local service dates.": "Estados de viaje almacenados para las fechas locales de servicio seleccionadas."
 }

@@ -162,7 +162,11 @@ class TripResource extends Resource
 
         return $query
             ->where('company_id', $company->getKey())
-            ->with(['company', 'bus', 'driver']);
+            ->with([
+                'company:id,timezone',
+                'bus:id,unit_number,deleted_at',
+                'driver:id,license,deleted_at',
+            ]);
     }
 
     private static function allows(string $ability, ?Trip $trip = null): bool
