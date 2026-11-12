@@ -16,6 +16,7 @@ use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
@@ -33,6 +34,26 @@ class TripAssignmentManagementService
     public function create(User $actor, Company $company, array $data): TripAssignment
     {
         return $this->persist($actor, $company, null, $data);
+    }
+
+    /**
+     * @param  list<string>  $routeScheduleIds
+     * @param  array<string, mixed>  $data
+     * @return Collection<int, TripAssignment>
+     */
+    public function createMany(User $actor, Company $company, array $routeScheduleIds, array $data): Collection
+    {
+        Validator::make(['route_schedule_ids' => $routeScheduleIds], [
+            'route_schedule_ids' => ['required', 'array', 'min:1'],
+            'route_schedule_ids.*' => ['required', 'uuid', 'distinct'],
+        ])->validate();
+
+        return DB::connection('pgsql')->transaction(fn (): Collection => collect($routeScheduleIds)
+            ->map(fn (string $scheduleId): TripAssignment => $this->create(
+                $actor,
+                $company,
+                array_replace($data, ['route_schedule_id' => $scheduleId]),
+            )));
     }
 
     /** @param array<string, mixed> $data */
