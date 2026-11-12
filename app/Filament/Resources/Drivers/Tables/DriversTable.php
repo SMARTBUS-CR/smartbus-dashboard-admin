@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\DriverManagementService;
 use Closure;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\RestoreAction;
@@ -66,64 +67,66 @@ class DriversTable
                 EditAction::make()
                     ->visible(fn (Driver $record): bool => ! $record->trashed() && DriverResource::canEdit($record)),
 
-                Action::make('deactivate')
-                    ->label(__('Deactivate'))
-                    ->icon(Heroicon::OutlinedNoSymbol)
-                    ->color('warning')
-                    ->requiresConfirmation()
-                    ->authorize(fn (Driver $record): bool => DriverResource::canEdit($record))
-                    ->visible(fn (Driver $record): bool => ! $record->trashed()
-                        && $record->status === DriverStatus::ACTIVE)
-                    ->action(fn (Driver $record, Action $action): bool => static::run(
-                        $action,
-                        fn (User $actor, Company $company): Driver => app(DriverManagementService::class)
-                            ->setActive($actor, $company, $record, false),
-                        __('Driver Deactivated'),
-                    )),
+                ActionGroup::make([
+                    Action::make('deactivate')
+                        ->label(__('Deactivate'))
+                        ->icon(Heroicon::OutlinedNoSymbol)
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->authorize(fn (Driver $record): bool => DriverResource::canEdit($record))
+                        ->visible(fn (Driver $record): bool => ! $record->trashed()
+                            && $record->status === DriverStatus::ACTIVE)
+                        ->action(fn (Driver $record, Action $action): bool => static::run(
+                            $action,
+                            fn (User $actor, Company $company): Driver => app(DriverManagementService::class)
+                                ->setActive($actor, $company, $record, false),
+                            __('Driver Deactivated'),
+                        )),
 
-                Action::make('activate')
-                    ->label(__('Activate'))
-                    ->icon(Heroicon::OutlinedCheckCircle)
-                    ->color('success')
-                    ->requiresConfirmation()
-                    ->authorize(fn (Driver $record): bool => DriverResource::canEdit($record))
-                    ->visible(fn (Driver $record): bool => ! $record->trashed()
-                        && $record->status === DriverStatus::INACTIVE)
-                    ->action(fn (Driver $record, Action $action): bool => static::run(
-                        $action,
-                        fn (User $actor, Company $company): Driver => app(DriverManagementService::class)
-                            ->setActive($actor, $company, $record, true),
-                        __('Driver Activated'),
-                    )),
+                    Action::make('activate')
+                        ->label(__('Activate'))
+                        ->icon(Heroicon::OutlinedCheckCircle)
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->authorize(fn (Driver $record): bool => DriverResource::canEdit($record))
+                        ->visible(fn (Driver $record): bool => ! $record->trashed()
+                            && $record->status === DriverStatus::INACTIVE)
+                        ->action(fn (Driver $record, Action $action): bool => static::run(
+                            $action,
+                            fn (User $actor, Company $company): Driver => app(DriverManagementService::class)
+                                ->setActive($actor, $company, $record, true),
+                            __('Driver Activated'),
+                        )),
 
-                DeleteAction::make()
-                    ->label(__('Archive'))
-                    ->icon(Heroicon::OutlinedArchiveBox)
-                    ->modalHeading(__('Archive Driver Employment'))
-                    ->modalDescription(__('Employment will be archived without changing the shared user identity or company memberships.'))
-                    ->modalSubmitActionLabel(__('Archive'))
-                    ->successNotificationTitle(__('Driver Employment Archived'))
-                    ->using(fn (Driver $record, DeleteAction $action): bool => static::run(
-                        $action,
-                        function (User $actor, Company $company) use ($record): Driver {
-                            app(DriverManagementService::class)->archive($actor, $company, $record);
+                    DeleteAction::make()
+                        ->label(__('Archive'))
+                        ->icon(Heroicon::OutlinedArchiveBox)
+                        ->modalHeading(__('Archive Driver Employment'))
+                        ->modalDescription(__('Employment will be archived without changing the shared user identity or company memberships.'))
+                        ->modalSubmitActionLabel(__('Archive'))
+                        ->successNotificationTitle(__('Driver Employment Archived'))
+                        ->using(fn (Driver $record, DeleteAction $action): bool => static::run(
+                            $action,
+                            function (User $actor, Company $company) use ($record): Driver {
+                                app(DriverManagementService::class)->archive($actor, $company, $record);
 
-                            return $record;
-                        },
-                    )),
+                                return $record;
+                            },
+                        )),
 
-                RestoreAction::make()
-                    ->label(__('Restore'))
-                    ->icon(Heroicon::OutlinedArrowUturnLeft)
-                    ->modalHeading(__('Restore Driver Employment'))
-                    ->modalDescription(__('Employment will be restored with its original identity and UUID.'))
-                    ->modalSubmitActionLabel(__('Restore'))
-                    ->successNotificationTitle(__('Driver Employment Restored'))
-                    ->using(fn (Driver $record, RestoreAction $action): bool => static::run(
-                        $action,
-                        fn (User $actor, Company $company): Driver => app(DriverManagementService::class)
-                            ->restore($actor, $company, $record),
-                    )),
+                    RestoreAction::make()
+                        ->label(__('Restore'))
+                        ->icon(Heroicon::OutlinedArrowUturnLeft)
+                        ->modalHeading(__('Restore Driver Employment'))
+                        ->modalDescription(__('Employment will be restored with its original identity and UUID.'))
+                        ->modalSubmitActionLabel(__('Restore'))
+                        ->successNotificationTitle(__('Driver Employment Restored'))
+                        ->using(fn (Driver $record, RestoreAction $action): bool => static::run(
+                            $action,
+                            fn (User $actor, Company $company): Driver => app(DriverManagementService::class)
+                                ->restore($actor, $company, $record),
+                        )),
+                ])->label(__('More Actions'))->icon(Heroicon::OutlinedEllipsisVertical)->color('gray'),
             ])
             ->toolbarActions([])
             ->emptyStateHeading(__('No Driver Employment Available'))

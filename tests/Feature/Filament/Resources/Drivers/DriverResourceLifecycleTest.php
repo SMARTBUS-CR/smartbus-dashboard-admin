@@ -56,11 +56,15 @@ describe('Driver Resource Lifecycle', function (): void {
     test('deactivates and reactivates employment through explicit actions', function (): void {
         $driver = Driver::factory()->for($this->company)->active()->create();
 
-        Livewire::test(ListDrivers::class)
+        $list = Livewire::test(ListDrivers::class)
+            ->set('activeTab', 'active')
             ->callAction(TestAction::make('deactivate')->table($driver))
-            ->assertNotified();
+            ->assertNotified()
+            ->assertCanNotSeeTableRecords([$driver]);
 
         expect($driver->fresh()->status)->toBe(DriverStatus::INACTIVE);
+        expect($list->instance()->getCachedTabs()['inactive']->getBadge())->toBe('1');
+        expect($list->instance()->getTable()->getAction('deactivate')->getGroup())->not->toBeNull();
 
         Livewire::test(ListDrivers::class)
             ->callAction(TestAction::make('activate')->table($driver->fresh()))
