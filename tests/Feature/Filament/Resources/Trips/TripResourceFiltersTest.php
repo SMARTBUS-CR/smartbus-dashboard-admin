@@ -46,6 +46,31 @@ describe('Trip Resource Filters', function (): void {
             ->assertCanSeeTableRecords([$today]);
     });
 
+    test('filters by status tabs while keeping badge counts on the company local day', function (): void {
+        $scheduled = Trip::factory()->for($this->company)->withEligibleDriver()->create();
+        $completed = Trip::factory()->for($this->company)->withEligibleDriver()->completed()->create();
+        $past = Trip::factory()->for($this->company)->withEligibleDriver()->completed()->create(['service_date' => '2026-10-25']);
+        $foreign = Trip::factory()->withEligibleDriver()->completed()->create();
+        actingAsInCompany($this->actor, $this->company);
+
+        $list = Livewire::test(ListTrips::class)
+            ->assertSet('activeTab', 'all')
+            ->set('activeTab', TripStatus::COMPLETED->value)
+            ->assertCanSeeTableRecords([$completed])
+            ->assertCanNotSeeTableRecords([$scheduled, $past, $foreign])
+            ->filterTable('service_date', ['period' => 'custom', 'from_date' => '2026-10-25'])
+            ->assertCanSeeTableRecords([$past])
+            ->assertCanNotSeeTableRecords([$scheduled, $completed, $foreign]);
+
+        $tabs = $list->instance()->getCachedTabs();
+        expect(array_keys($tabs))->toBe(['all', 'scheduled', 'in_progress', 'completed', 'cancelled']);
+        expect($tabs['all']->getBadge())->toBe('2')
+            ->and($tabs['completed']->getBadge())->toBe('1')
+            ->and($tabs['scheduled']->getBadge())->toBe('1')
+            ->and($tabs['in_progress']->getBadge())->toBe('0')
+            ->and($tabs['cancelled']->getBadge())->toBe('0');
+    });
+
     test('filters company trips by local dates status driver bus and schedule', function (): void {
         $completed = Trip::factory()->for($this->company)->withEligibleDriver()->completed()->create([
             'service_date' => '2026-10-26',
@@ -67,10 +92,6 @@ describe('Trip Resource Filters', function (): void {
             ->assertCanSeeTableRecords([$completed, $scheduled])
             ->assertCanNotSeeTableRecords([$foreign])
             ->resetTableFilters()
-            ->filterTable('status', TripStatus::COMPLETED)
-            ->assertCanSeeTableRecords([$completed])
-            ->assertCanNotSeeTableRecords([$scheduled, $foreign])
-            ->resetTableFilters()
             ->filterTable('driver_id', $completed->driver_id)
             ->assertCanSeeTableRecords([$completed])
             ->assertCanNotSeeTableRecords([$scheduled, $foreign])
@@ -86,7 +107,7 @@ describe('Trip Resource Filters', function (): void {
 
         $component
             ->filterTable('service_date', ['period' => 'custom', 'from_date' => '2026-10-26', 'until_date' => '2026-10-27'])
-            ->filterTable('status', TripStatus::COMPLETED)
+            ->set('activeTab', TripStatus::COMPLETED->value)
             ->filterTable('driver_id', $completed->driver_id)
             ->filterTable('bus_id', $completed->bus_id)
             ->assertCanSeeTableRecords([$completed])

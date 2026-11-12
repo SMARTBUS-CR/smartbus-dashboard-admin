@@ -102,10 +102,6 @@ class TripsTable
                     ->indicateUsing(fn (array $data): ?string => static::serviceDatePeriods()[$data['period'] ?? 'today'] ?? null)
                     ->query(fn (Builder $query, array $data): Builder => static::applyServiceDateFilter($query, $data)),
 
-                SelectFilter::make('status')
-                    ->label(__('Status'))
-                    ->options(TripStatus::class),
-
                 SelectFilter::make('driver_id')
                     ->label(__('Driver'))
                     ->options(fn (): array => static::driverOptions()),
