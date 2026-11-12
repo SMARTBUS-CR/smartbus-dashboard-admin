@@ -84,6 +84,21 @@ class TripResource extends Resource
         return $record instanceof Trip && static::allows('update', $record);
     }
 
+    public static function canStart(Model $record): bool
+    {
+        return $record instanceof Trip && static::allows('start', $record);
+    }
+
+    public static function canComplete(Model $record): bool
+    {
+        return $record instanceof Trip && static::allows('complete', $record);
+    }
+
+    public static function canCancel(Model $record): bool
+    {
+        return $record instanceof Trip && static::allows('cancel', $record);
+    }
+
     public static function canDelete(Model $record): bool
     {
         return false;
