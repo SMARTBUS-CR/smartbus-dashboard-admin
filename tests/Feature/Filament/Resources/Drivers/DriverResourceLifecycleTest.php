@@ -68,6 +68,19 @@ describe('Driver Resource Lifecycle', function (): void {
         expect($driver->fresh()->status)->toBe(DriverStatus::ACTIVE);
     });
 
+    test('rejects an end date before the employment start in the form', function (): void {
+        $driver = Driver::factory()->for($this->company)->create();
+        $originalEnd = $driver->employment_ends_on?->toDateString();
+
+        Livewire::test(EditDriver::class, ['record' => $driver->getKey()])
+            ->fillForm(['employment_starts_on' => '2026-10-28', 'employment_ends_on' => '2026-10-27'])
+            ->call('save')
+            ->assertHasFormErrors(['employment_ends_on' => 'after_or_equal'])
+            ->assertNotNotified();
+
+        expect($driver->fresh()->employment_ends_on?->toDateString())->toBe($originalEnd);
+    });
+
     test('archives and restores employment using the original uuid', function (): void {
         $driver = Driver::factory()->for($this->company)->create();
         $driverId = $driver->getKey();
