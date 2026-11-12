@@ -65,7 +65,7 @@ class TripAssignmentsTable
                 ViewAction::make(),
                 Action::make('dailyTrips')->label(__('Daily Trips'))->icon(Heroicon::OutlinedListBullet)
                     ->url(fn (TripAssignment $record): string => TripResource::getUrl('index', [
-                        'tableFilters' => ['route_schedule_id' => ['value' => $record->route_schedule_id]],
+                        'filters' => ['route_schedule_id' => ['value' => $record->route_schedule_id]],
                     ], tenant: Filament::getTenant())),
                 EditAction::make()->visible(fn (TripAssignment $record): bool => ! $record->trashed()),
                 Action::make('deactivate')->label(__('Deactivate'))->icon(Heroicon::OutlinedNoSymbol)
