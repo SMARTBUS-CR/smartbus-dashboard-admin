@@ -16,6 +16,7 @@ use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
@@ -33,6 +34,58 @@ class TripAssignmentManagementService
     public function create(User $actor, Company $company, array $data): TripAssignment
     {
         return $this->persist($actor, $company, null, $data);
+    }
+
+    /**
+     * @param  list<string>  $routeScheduleIds
+     * @param  array<string, mixed>  $data
+     * @return Collection<int, TripAssignment>
+     */
+    public function createMany(User $actor, Company $company, array $routeScheduleIds, array $data): Collection
+    {
+        $durationMinutes = $data['planned_duration_minutes'] ?? null;
+        Validator::make([
+            'route_schedule_ids' => $routeScheduleIds,
+            'planned_duration_minutes' => $durationMinutes,
+            'driver_id' => $data['driver_id'] ?? null,
+            'bus_id' => $data['bus_id'] ?? null,
+        ], [
+            'route_schedule_ids' => ['required', 'array', 'min:1'],
+            'route_schedule_ids.*' => ['required', 'uuid', 'distinct'],
+            'planned_duration_minutes' => ['required', 'integer', 'between:1,1440'],
+            'driver_id' => ['required', 'uuid'],
+            'bus_id' => ['required', 'uuid'],
+        ])->validate();
+        unset($data['planned_duration_minutes']);
+
+        $routeScheduleIds = collect($routeScheduleIds)->sort(SORT_STRING)->values()->all();
+
+        return DB::connection('pgsql')->transaction(function () use ($actor, $company, $routeScheduleIds, $data, $durationMinutes): Collection {
+            $company = Company::query()->whereKey($company->getKey())->where('status', CompanyStatus::ACTIVE)
+                ->sharedLock()->firstOrFail();
+            $identities = Driver::withTrashed()->whereKey($data['driver_id'])->get(['id', 'user_id']);
+            $this->reservations->lockPeople($identities->pluck('user_id')->all());
+            Bus::withTrashed()->whereKey($data['bus_id'])->lockForUpdate()->get();
+            Driver::withTrashed()->whereKey($data['driver_id'])->lockForUpdate()->get();
+            $schedules = RouteSchedule::query()->whereIn('id', $routeScheduleIds)
+                ->whereHas('pattern.route', fn (Builder $query): Builder => $query->where('company_id', $company->getKey()))
+                ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            if ($schedules->count() !== count($routeScheduleIds)) {
+                $this->reject('route_schedule_ids', 'The selected recurring departure is unavailable for this company.');
+            }
+
+            return collect($routeScheduleIds)->map(function (string $scheduleId) use ($actor, $company, $data, $durationMinutes, $schedules): TripAssignment {
+                $schedule = $schedules->get($scheduleId);
+                $departureSeconds = $this->seconds($schedule->departure_time);
+                $arrivalSeconds = $departureSeconds + ((int) $durationMinutes * 60);
+
+                return $this->create($actor, $company, array_replace($data, [
+                    'route_schedule_id' => $scheduleId,
+                    'planned_arrival_time' => gmdate('H:i:s', $arrivalSeconds % 86400),
+                    'ends_next_day' => $arrivalSeconds >= 86400,
+                ]));
+            });
+        });
     }
 
     /** @param array<string, mixed> $data */
