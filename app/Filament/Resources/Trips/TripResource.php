@@ -6,7 +6,9 @@ use App\Enums\NavigationGroup;
 use App\Filament\Resources\Trips\Pages\CreateTrip;
 use App\Filament\Resources\Trips\Pages\EditTrip;
 use App\Filament\Resources\Trips\Pages\ListTrips;
+use App\Filament\Resources\Trips\Pages\ViewTrip;
 use App\Filament\Resources\Trips\Schemas\TripForm;
+use App\Filament\Resources\Trips\Schemas\TripInfolist;
 use App\Filament\Resources\Trips\Tables\TripsTable;
 use App\Models\Company;
 use App\Models\Trip;
@@ -35,6 +37,11 @@ class TripResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return TripForm::configure($schema);
+    }
+
+    public static function infolist(Schema $schema): Schema
+    {
+        return TripInfolist::configure($schema);
     }
 
     public static function table(Table $table): Table
@@ -134,6 +141,7 @@ class TripResource extends Resource
         return [
             'index' => ListTrips::route('/'),
             'create' => CreateTrip::route('/create'),
+            'view' => ViewTrip::route('/{record}'),
             'edit' => EditTrip::route('/{record}/edit'),
         ];
     }
@@ -154,7 +162,7 @@ class TripResource extends Resource
 
         return $query
             ->where('company_id', $company->getKey())
-            ->with(['company', 'pattern', 'schedule', 'bus', 'driver']);
+            ->with(['company', 'bus', 'driver']);
     }
 
     private static function allows(string $ability, ?Trip $trip = null): bool
