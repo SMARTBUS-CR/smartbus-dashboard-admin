@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Services\TripAssignmentMaterializationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -21,6 +22,18 @@ class MaterializeRecurringTrips extends Command
 
     public function handle(TripAssignmentMaterializationService $materializer): int
     {
+        if ($this->optionWasProvidedWithoutValue('company')) {
+            $this->components->error('The --company option requires a Company UUID.');
+
+            return self::INVALID;
+        }
+
+        if ($this->optionWasProvidedWithoutValue('date')) {
+            $this->components->error('The --date option requires a YYYY-MM-DD value.');
+
+            return self::INVALID;
+        }
+
         $days = filter_var($this->option('days'), FILTER_VALIDATE_INT);
         if ($days === false || $days < 1 || $days > 31) {
             $this->components->error('The --days option must be an integer between 1 and 31.');
@@ -75,9 +88,17 @@ class MaterializeRecurringTrips extends Command
             $totals['ineligible'], $totals['conflicting'], $totals['failed'],
         ]]);
 
+        Log::info('Recurring Trip materialization completed.', $totals);
+
         return ($totals['ineligible'] + $totals['conflicting'] + $totals['failed']) > 0
             ? self::FAILURE
             : self::SUCCESS;
+    }
+
+    private function optionWasProvidedWithoutValue(string $option): bool
+    {
+        return $this->input->hasParameterOption("--{$option}")
+            && blank($this->option($option));
     }
 
     private function isDate(mixed $date): bool
