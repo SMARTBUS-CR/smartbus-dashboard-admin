@@ -11,6 +11,7 @@ use App\Services\TripManagementService;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
@@ -30,9 +31,9 @@ class TripsTable
                     ->date()
                     ->sortable(),
 
-                TextColumn::make('pattern.name')
+                TextColumn::make('planned_route_snapshot.pattern_name')
                     ->label(__('Route Pattern'))
-                    ->formatStateUsing(fn (string $state, Trip $record): string => "{$record->pattern->code} — {$state}"),
+                    ->formatStateUsing(fn (string $state, Trip $record): string => "{$record->planned_route_snapshot['pattern_code']} — {$state}"),
 
                 TextColumn::make('scheduled_departure_at')
                     ->label(__('Scheduled Departure'))
@@ -59,6 +60,8 @@ class TripsTable
             ->defaultSort('scheduled_departure_at')
             ->filters([])
             ->recordActions([
+                ViewAction::make(),
+
                 EditAction::make()
                     ->label(__('Replan'))
                     ->visible(fn (Trip $record): bool => $record->status === TripStatus::SCHEDULED
