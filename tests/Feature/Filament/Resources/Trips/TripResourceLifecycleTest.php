@@ -3,7 +3,9 @@
 use App\Enums\TripStatus;
 use App\Enums\UserRole;
 use App\Filament\Resources\Trips\Pages\ListTrips;
+use App\Filament\Resources\Trips\TripResource;
 use App\Models\CompanyUser;
+use App\Models\Trip;
 use App\Services\TripManagementService;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Testing\TestAction;
@@ -14,6 +16,28 @@ use Tests\Support\WithDriverTrips;
 pest()->use(WithDriverTrips::class);
 
 describe('Trip Resource Lifecycle', function (): void {
+    test('opens editable trip rows in replanning and other authorized rows in history', function (): void {
+        [$actor, $trip] = $this->createAssignedDriverTrip();
+        $company = $trip->company;
+        grantShield($actor, ['ViewAny:Trip', 'View:Trip'], $company);
+        $completed = Trip::factory()->for($company)->withEligibleDriver()->completed()->create();
+        actingAsInCompany($actor, $company);
+
+        $table = Livewire::test(ListTrips::class)->instance()->getTable();
+
+        expect($table->getRecordUrl($trip))->toBe(TripResource::getUrl('edit', ['record' => $trip], tenant: $company))
+            ->and($table->getRecordUrl($completed))->toBe(TripResource::getUrl('view', ['record' => $completed], tenant: $company));
+
+        $reader = createUserWithRole(UserRole::Admin, $company);
+        CompanyUser::factory()->for($company)->for($reader, 'user')->create();
+        grantShield($reader, ['ViewAny:Trip', 'View:Trip'], $company);
+        actingAsInCompany($reader, $company);
+
+        $table = Livewire::test(ListTrips::class)->instance()->getTable();
+
+        expect($table->getRecordUrl($trip))->toBe(TripResource::getUrl('view', ['record' => $trip], tenant: $company));
+    });
+
     test('starts and completes a trip through the canonical lifecycle service', function (): void {
         [$actor, $trip] = $this->createAssignedDriverTrip();
         grantShield($actor, ['ViewAny:Trip', 'View:Trip'], $trip->company);
