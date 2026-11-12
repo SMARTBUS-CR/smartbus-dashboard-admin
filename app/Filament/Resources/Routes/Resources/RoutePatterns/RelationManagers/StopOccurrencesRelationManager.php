@@ -194,7 +194,8 @@ class StopOccurrencesRelationManager extends RelationManager
                 TextColumn::make('minutes_from_start')
                     ->label(__('Minutes From Departure'))
                     ->suffix(' '.__('min'))
-                    ->placeholder(__('Not Set')),
+                    ->placeholder(__('Not Set'))
+                    ->toggleable(),
             ])
             ->defaultSort('stop_sequence')
             ->reorderable('stop_sequence')
