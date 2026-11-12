@@ -656,5 +656,17 @@
     "Day :day at :time": "Day :day at :time",
     "Replan": "Replan",
     "No Trips Planned": "No Trips Planned",
-    "Scheduled company trips will appear here.": "Scheduled company trips will appear here."
+    "Scheduled company trips will appear here.": "Scheduled company trips will appear here.",
+    "Start Trip": "Start Trip",
+    "The actual departure time will be recorded by the server.": "The actual departure time will be recorded by the server.",
+    "Trip Started": "Trip Started",
+    "Complete Trip": "Complete Trip",
+    "The actual arrival time will be recorded by the server.": "The actual arrival time will be recorded by the server.",
+    "Trip Completed": "Trip Completed",
+    "Cancel Trip": "Cancel Trip",
+    "The Trip will remain available as historical operational data.": "The Trip will remain available as historical operational data.",
+    "Cancellation Reason": "Cancellation Reason",
+    "Trip Cancelled": "Trip Cancelled",
+    "Create Replacement": "Create Replacement",
+    "Trip Change Rejected": "Trip Change Rejected"
 }
