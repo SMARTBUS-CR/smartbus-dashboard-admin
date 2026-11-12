@@ -55,6 +55,8 @@ class TripAssignmentManagementService
         unset($data['planned_duration_minutes']);
 
         return DB::connection('pgsql')->transaction(fn (): Collection => collect($routeScheduleIds)
+            ->sort(SORT_STRING)
+            ->values()
             ->map(function (string $scheduleId) use ($actor, $company, $data, $durationMinutes): TripAssignment {
                 $schedule = RouteSchedule::query()->whereKey($scheduleId)
                     ->whereHas('pattern.route', fn (Builder $query): Builder => $query->where('company_id', $company->getKey()))
