@@ -152,12 +152,14 @@ class FaresRelationManager extends RelationManager
                 TextColumn::make('valid_from')
                     ->label(__('Valid From'))
                     ->date()
-                    ->placeholder(__('No Start Date')),
+                    ->placeholder(__('No Start Date'))
+                    ->toggleable(),
 
                 TextColumn::make('valid_until')
                     ->label(__('Valid Until'))
                     ->date()
-                    ->placeholder(__('No End Date')),
+                    ->placeholder(__('No End Date'))
+                    ->toggleable(),
             ])
             ->defaultSort('currency')
             ->headerActions([
