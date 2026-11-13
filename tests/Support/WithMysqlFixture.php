@@ -95,8 +95,10 @@ trait WithMysqlFixture
     protected function tearDownWithMysqlFixture(): void
     {
         $this->ensureTestingDatabases();
+        Schema::connection('mysql')->disableForeignKeyConstraints();
         foreach (['role_has_permissions', 'model_has_permissions', 'model_has_roles', 'permissions', 'roles', 'personal_access_tokens', 'users'] as $table) {
             Schema::connection('mysql')->dropIfExists($table);
         }
+        Schema::connection('mysql')->enableForeignKeyConstraints();
     }
 }

@@ -11,6 +11,7 @@ use App\Models\RouteScheduleException;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
@@ -353,6 +354,15 @@ class SchedulesRelationManager extends RelationManager
                                 ->title(__('Departure Resumed'))
                                 ->send();
                         }),
+                    DeleteAction::make()
+                        ->label(__('Remove Departure'))
+                        ->modalHeading(__('Remove Departure'))
+                        ->modalDescription(__(
+                            'Are you sure you want to remove this scheduled departure?',
+                        ))
+                        ->modalSubmitActionLabel(__('Remove Departure'))
+                        ->successNotificationTitle(__('Departure Removed'))
+                        ->authorize(fn (): bool => $this->canManageSchedules()),
                 ])
                     ->label(__('More Actions'))
                     ->icon(Heroicon::OutlinedEllipsisVertical)
