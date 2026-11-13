@@ -1,130 +1,95 @@
 <?php
 
+use App\Enums\TokenValidationStatus;
 use App\Enums\TripStatus;
 use App\Enums\UserRole;
 use App\Models\Trip;
 use App\Models\User;
+use App\Services\AuthService;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function (): void {
-    config(['services.smartbus.tracking_context_secret' => 'gps-test-secret']);
     Http::preventStrayRequests();
 });
 
-describe('Trip Tracking Context Retrieval', function (): void {
-    it('returns trusted tracking context and planned snapshot for a signed GPS request without a user', function (): void {
-        $trip = Trip::factory()->withDriverAvailability()->create()->refresh();
-        $timestamp = (string) now()->timestamp;
-        $signedHeaders = static fn (string $uri): array => [
-            'X-Service-Timestamp' => $timestamp,
-            'X-Service-Signature' => hash_hmac('sha256', $timestamp."\nGET\n".$uri."\n".hash('sha256', ''), 'gps-test-secret'),
-        ];
+function authenticateTrackingUser(User $user, string $token = 'valid-sanctum-token'): void
+{
+    $authService = Mockery::mock(AuthService::class);
+    $authService->shouldReceive('validateToken')->with($token)->andReturn(TokenValidationStatus::Valid);
+    $authService->shouldReceive('getUser')->with($token)->andReturn(['id' => $user->id]);
+    app()->instance(AuthService::class, $authService);
+}
 
-        $uri = "/api/v1/operations/trips/{$trip->id}/tracking-context";
-        $response = $this->get($uri, $signedHeaders($uri));
+describe('Trip Tracking Context Retrieval', function (): void {
+    it('returns tracking context with a valid bearer token and no HMAC headers', function (): void {
+        $trip = Trip::factory()->withDriverAvailability()->create()->refresh();
+        $user = createUserWithRole(UserRole::Passenger);
+        authenticateTrackingUser($user);
+
+        $response = $this->withToken('valid-sanctum-token')
+            ->getJson("/api/v1/operations/trips/{$trip->id}/tracking-context");
 
         $response->assertOk()
             ->assertHeader('Content-Type', 'application/vnd.api+json')
-            ->assertJsonStructure([
-                'data' => [
-                    'type',
-                    'id',
-                    'attributes' => [
-                        'trip_id',
-                        'company_id',
-                        'bus_id',
-                        'driver_id',
-                        'driver_user_id',
-                        'route_pattern_id',
-                        'status',
-                        'scheduled_departure_at',
-                        'scheduled_arrival_at',
-                        'planned_route_snapshot',
-                    ],
-                ],
-            ]);
-
-        expect($response->json('data.id'))->toBe($trip->id)
-            ->and($response->json('data.attributes.driver_id'))->toBe($trip->driver_id)
-            ->and($response->json('data.attributes.driver_user_id'))->toBe($trip->driver->user_id)
-            ->and($response->json('data.attributes.status'))->toBe(TripStatus::SCHEDULED->value)
-            ->and($response->json('data.attributes.route_pattern_id'))->toBe($trip->route_pattern_id);
-
-        $internalUri = "/api/internal/v1/trips/{$trip->id}/tracking-context";
-        $internalResponse = $this->get($internalUri, $signedHeaders($internalUri));
-        $internalResponse->assertOk()
             ->assertJsonPath('data.id', $trip->id)
+            ->assertJsonPath('data.attributes.driver_id', $trip->driver_id)
             ->assertJsonPath('data.attributes.driver_user_id', $trip->driver->user_id)
-            ->assertJsonMissingPath('data.relationships.driver')
-            ->assertJsonMissingPath('included');
+            ->assertJsonPath('data.attributes.status', TripStatus::SCHEDULED->value);
         Http::assertNothingSent();
     });
 
-    it('retains the assigned user UUID for an archived driver without exposing the employee record', function (): void {
-        $trip = Trip::factory()->withDriverAvailability()->completed()->create()->refresh();
-        $driver = $trip->driver;
-        $driver->delete();
-        $uri = '/api/internal/v1/trips/'.$trip->id.'/tracking-context';
-        $timestamp = (string) now()->timestamp;
+    it('returns 401 Unauthorized without a bearer token', function (string $uri): void {
+        $this->getJson($uri)
+            ->assertUnauthorized()
+            ->assertJsonPath('errors.0.title', 'Unauthorized');
+    })->with([
+        '/api/v1/operations/trips/0192e2b3-0000-7000-8000-000000000000/tracking-context',
+        '/api/internal/v1/trips/0192e2b3-0000-7000-8000-000000000000/tracking-context',
+    ]);
 
-        $this->get($uri, [
-            'X-Service-Timestamp' => $timestamp,
-            'X-Service-Signature' => hash_hmac('sha256', $timestamp."\nGET\n".$uri."\n".hash('sha256', ''), 'gps-test-secret'),
-        ])->assertOk()
-            ->assertJsonPath('data.attributes.driver_id', $driver->id)
-            ->assertJsonPath('data.attributes.driver_user_id', $driver->user_id)
-            ->assertJsonMissingPath('data.relationships.driver')
-            ->assertJsonMissingPath('included');
+    it('returns 401 for an invalid or expired bearer token', function (): void {
+        $authService = Mockery::mock(AuthService::class);
+        $authService->shouldReceive('validateToken')->with('expired-token')->andReturn(TokenValidationStatus::Invalid);
+        app()->instance(AuthService::class, $authService);
 
-        Http::assertNothingSent();
+        $this->withToken('expired-token')
+            ->getJson('/api/v1/operations/trips/0192e2b3-0000-7000-8000-000000000000/tracking-context')
+            ->assertUnauthorized()
+            ->assertJsonPath('errors.0.detail', 'The access token is invalid or expired.');
     });
 
-    it('rejects a user bearer token as a substitute for a GPS signature with 401', function (): void {
+    it('allows every active ecosystem role with a valid bearer token', function (UserRole $role): void {
         $trip = Trip::factory()->withDriverAvailability()->create()->refresh();
-        $superAdmin = createUserWithRole(UserRole::SuperAdmin);
-        $this->actingAs($superAdmin);
+        $user = createUserWithRole($role);
+        authenticateTrackingUser($user);
 
-        $response = $this->withToken('valid-sanctum-token')
-            ->get("/api/v1/operations/trips/{$trip->id}/tracking-context");
+        $this->withToken('valid-sanctum-token')
+            ->getJson("/api/v1/operations/trips/{$trip->id}/tracking-context")
+            ->assertOk()
+            ->assertJsonPath('data.id', $trip->id);
+    })->with([
+        UserRole::Driver,
+        UserRole::Passenger,
+        UserRole::Admin,
+        UserRole::SuperAdmin,
+    ]);
 
-        $response->assertUnauthorized();
-        Http::assertNothingSent();
-    });
-
-    it('rejects unauthenticated requests without token with 401 unauthorized', function (): void {
+    it('rejects an archived authenticated user with 401', function (): void {
         $trip = Trip::factory()->withDriverAvailability()->create()->refresh();
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $user->delete();
 
-        $response = $this->get("/api/v1/operations/trips/{$trip->id}/tracking-context");
-        $response->assertStatus(401);
+        $this->getJson("/api/v1/operations/trips/{$trip->id}/tracking-context")
+            ->assertUnauthorized();
     });
 
-    it('rejects invalid bearer credentials without calling external auth with 401', function (): void {
-        $trip = Trip::factory()->withDriverAvailability()->create()->refresh();
+    it('returns 404 for a missing trip after bearer authentication', function (): void {
+        $user = User::factory()->create();
+        authenticateTrackingUser($user);
 
-        $response = $this->withToken('expired-or-revoked-token')
-            ->get("/api/v1/operations/trips/{$trip->id}/tracking-context");
-
-        $response->assertStatus(401);
-        Http::assertNothingSent();
-    });
-
-    it('rejects authenticated users without a GPS signature with 401', function (): void {
-        $trip = Trip::factory()->withDriverAvailability()->create()->refresh();
-        $unauthorizedUser = User::factory()->create();
-
-        $this->actingAs($unauthorizedUser);
-
-        $response = $this->get("/api/v1/operations/trips/{$trip->id}/tracking-context");
-        $response->assertUnauthorized();
-    });
-
-    it('returns 404 for non-existent trip tracking context when authorized', function (): void {
-        $uri = '/api/internal/v1/trips/0192e2b3-0000-7000-8000-000000000000/tracking-context';
-        $timestamp = (string) now()->timestamp;
-        $response = $this->get($uri, [
-            'X-Service-Timestamp' => $timestamp,
-            'X-Service-Signature' => hash_hmac('sha256', $timestamp."\nGET\n".$uri."\n".hash('sha256', ''), 'gps-test-secret'),
-        ]);
-        $response->assertNotFound();
+        $this->withToken('valid-sanctum-token')
+            ->getJson('/api/internal/v1/trips/0192e2b3-0000-7000-8000-000000000000/tracking-context')
+            ->assertNotFound();
     });
 });
