@@ -39,7 +39,7 @@ describe('Route Pattern Relation Manager Navigation', function (): void {
 
         actingAsInCompany($actor, $company);
 
-        Livewire::test(PatternsRelationManager::class, [
+        $manager = Livewire::test(PatternsRelationManager::class, [
             'ownerRecord' => $route,
             'pageClass' => EditRoute::class,
         ])
@@ -58,6 +58,13 @@ describe('Route Pattern Relation Manager Navigation', function (): void {
                     tenant: $company,
                 ),
             );
+
+        expect($manager->instance()->getTable()->getRecordUrl($pattern))
+            ->toBe(RoutePatternResource::getUrl('edit', ['route' => $route, 'record' => $pattern], tenant: $company));
+
+        $manager->toggleAllTableColumns(false)
+            ->assertCanRenderTableColumn('code')
+            ->assertCanNotRenderTableColumn('headsign');
     })->with([
         'system admin' => UserRole::SuperAdmin->value,
         'company admin with permissions' => UserRole::Admin->value,
@@ -85,7 +92,7 @@ describe('Route Pattern Relation Manager Navigation', function (): void {
 
         actingAsInCompany($actor, $company);
 
-        Livewire::test(PatternsRelationManager::class, [
+        $manager = Livewire::test(PatternsRelationManager::class, [
             'ownerRecord' => $route,
             'pageClass' => ViewRoute::class,
         ])
@@ -104,6 +111,9 @@ describe('Route Pattern Relation Manager Navigation', function (): void {
                     tenant: $company,
                 ),
             );
+
+        expect($manager->instance()->getTable()->getRecordUrl($pattern))
+            ->toBe(RoutePatternResource::getUrl('view', ['route' => $route, 'record' => $pattern], tenant: $company));
     });
 
     test('hides the full-page link without viewing or editing permission', function (): void {
@@ -126,12 +136,14 @@ describe('Route Pattern Relation Manager Navigation', function (): void {
 
         actingAsInCompany($actor, $company);
 
-        Livewire::test(PatternsRelationManager::class, [
+        $manager = Livewire::test(PatternsRelationManager::class, [
             'ownerRecord' => $route,
             'pageClass' => ViewRoute::class,
         ])
             ->assertActionHidden(TestAction::make('edit')->table($pattern))
             ->assertActionHidden(TestAction::make('view')->table($pattern))
             ->assertActionDoesNotExist(TestAction::make('open')->table($pattern));
+
+        expect($manager->instance()->getTable()->getRecordUrl($pattern))->toBeNull();
     });
 });

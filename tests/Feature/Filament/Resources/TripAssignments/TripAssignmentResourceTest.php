@@ -115,7 +115,7 @@ describe('Trip Assignment Resource', function (): void {
                 'planned_duration_minutes' => 60,
                 'valid_from' => '2026-12-01',
                 'valid_until' => '2026-11-01',
-            ])->call('create')->assertHasFormErrors(['valid_until']);
+            ])->call('create')->assertHasFormErrors(['valid_until' => 'after_or_equal']);
     });
 
     test('opens daily trips filtered to the assignment departure', function (): void {
@@ -127,16 +127,37 @@ describe('Trip Assignment Resource', function (): void {
             'driver_id' => $first->driver_id,
             'bus_id' => $first->bus_id,
         ]);
-        $filters = ['route_schedule_id' => ['value' => $first->route_schedule_id]];
+        $filters = [
+            'route_schedule_id' => ['value' => $first->route_schedule_id],
+            'service_date' => ['period' => 'all'],
+        ];
         actingAsInCompany($this->actor, $this->company);
 
         Livewire::test(ListTripAssignments::class)->assertActionHasUrl(
             TestAction::make('dailyTrips')->table($assignment),
             TripResource::getUrl('index', ['filters' => $filters], tenant: $this->company),
         );
+        $this->travel(1)->day();
         Livewire::withQueryParams(['filters' => $filters])->test(ListTrips::class)
             ->assertCanSeeTableRecords([$first])
             ->assertCanNotSeeTableRecords([$second]);
+    });
+
+    test('opens editable assignments in the form and archived assignments in read-only detail', function (): void {
+        $assignment = TripAssignment::factory()->for($this->company)->create();
+        $archived = TripAssignment::factory()->for($this->company)->create();
+        $archived->delete();
+        actingAsInCompany($this->actor, $this->company);
+
+        $list = Livewire::test(ListTripAssignments::class)
+            ->filterTable('trashed', true)
+            ->assertActionVisible(TestAction::make('edit')->table($assignment))
+            ->assertActionHidden(TestAction::make('edit')->table($archived));
+        $table = $list->instance()->getTable();
+
+        expect($table->getRecordUrl($assignment))->toBe(TripAssignmentResource::getUrl('edit', ['record' => $assignment], tenant: $this->company))
+            ->and($table->getRecordUrl($archived))->toBe(TripAssignmentResource::getUrl('view', ['record' => $archived], tenant: $this->company))
+            ->and($table->getAction('dailyTrips')->getGroup())->not->toBeNull();
     });
 
     test('maps unavailable Driver coverage to the visible Driver field on create and edit', function (): void {

@@ -15,14 +15,16 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 
 class TripAssignmentForm
 {
     public static function configure(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make(__('Recurring Operation'))->schema([
+            Section::make(__('Recurring Operation'))->icon(Heroicon::OutlinedArrowPath)->schema([
                 Select::make('route_schedule_ids')
                     ->label(__('Scheduled Departures'))
                     ->options(fn (): array => static::scheduleOptions())
@@ -36,12 +38,18 @@ class TripAssignmentForm
                 Select::make('bus_id')->label(__('Bus'))
                     ->options(fn (string $operation): array => static::busOptions($operation === 'edit'))->searchable()->required(),
                 TextInput::make('planned_duration_minutes')->label(__('Planned Duration (Minutes)'))
+                    ->placeholder('90')
+                    ->helperText(__('The duration is applied to each selected departure.'))
                     ->integer()->minValue(1)->maxValue(1440)->required()->visibleOn('create'),
                 TimePicker::make('planned_arrival_time')->label(__('Planned Arrival'))
                     ->seconds()->required()->visibleOn('edit'),
                 Toggle::make('ends_next_day')->label(__('Ends Next Day'))->default(false)->visibleOn('edit'),
-                DatePicker::make('valid_from')->label(__('Valid From')),
-                DatePicker::make('valid_until')->label(__('Valid Until')),
+                DatePicker::make('valid_from')->label(__('Valid From'))
+                    ->helperText(__('Leave blank when there is no starting boundary.')),
+                DatePicker::make('valid_until')->label(__('Valid Until'))
+                    ->helperText(__('Leave blank when there is no ending boundary.'))
+                    ->afterOrEqual(fn (Get $get): string => filled($get('valid_from')) ? 'valid_from' : '')
+                    ->validationMessages(['after_or_equal' => __('The validity end date must be on or after the start date.')]),
             ])->columns(2)->columnSpanFull(),
         ]);
     }
