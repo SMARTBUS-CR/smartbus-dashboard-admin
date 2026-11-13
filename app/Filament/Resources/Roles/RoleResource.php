@@ -93,7 +93,8 @@ class RoleResource extends Resource
             ->components([
                 Grid::make()
                     ->schema([
-                        Section::make()
+                        Section::make(__('Role Details'))
+                            ->icon(Heroicon::OutlinedKey)
                             ->schema([
                                 TextInput::make('display_name')
                                     ->label(__('Name'))
@@ -193,10 +194,12 @@ class RoleResource extends Resource
                     ->badge()
                     ->label(__('filament-shield::filament-shield.column.permissions'))
                     ->counts('permissions')
-                    ->color('primary'),
+                    ->color('primary')
+                    ->toggleable(),
                 TextColumn::make('updated_at')
                     ->label(__('Last Updated'))
-                    ->dateTime(),
+                    ->dateTime()
+                    ->toggleable(),
             ])
             ->filters([
                 //
