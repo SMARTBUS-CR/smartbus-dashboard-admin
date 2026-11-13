@@ -26,6 +26,19 @@ describe('Driver Resource Lifecycle', function (): void {
         actingAsInCompany($this->actor, $this->company);
     });
 
+    test('rejects an end date before the employment start in the form', function (): void {
+        $driver = Driver::factory()->for($this->company)->create();
+        $originalEnd = $driver->employment_ends_on?->toDateString();
+
+        Livewire::test(EditDriver::class, ['record' => $driver->getKey()])
+            ->fillForm(['employment_starts_on' => '2026-10-28', 'employment_ends_on' => '2026-10-27'])
+            ->call('save')
+            ->assertHasFormErrors(['employment_ends_on' => 'after_or_equal'])
+            ->assertNotNotified();
+
+        expect($driver->fresh()->employment_ends_on?->toDateString())->toBe($originalEnd);
+    });
+
     test('updates employment fields without allowing identity or status injection', function (): void {
         $driver = Driver::factory()->for($this->company)->active()->create();
         $originalUserId = $driver->user_id;

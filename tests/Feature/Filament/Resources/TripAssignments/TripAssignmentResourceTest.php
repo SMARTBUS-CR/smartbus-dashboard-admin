@@ -115,7 +115,7 @@ describe('Trip Assignment Resource', function (): void {
                 'planned_duration_minutes' => 60,
                 'valid_from' => '2026-12-01',
                 'valid_until' => '2026-11-01',
-            ])->call('create')->assertHasFormErrors(['valid_until']);
+            ])->call('create')->assertHasFormErrors(['valid_until' => 'after_or_equal']);
     });
 
     test('opens daily trips filtered to the assignment departure', function (): void {

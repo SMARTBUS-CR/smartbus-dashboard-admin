@@ -93,7 +93,8 @@ class RoleResource extends Resource
             ->components([
                 Grid::make()
                     ->schema([
-                        Section::make()
+                        Section::make(__('Role Details'))
+                            ->icon(Heroicon::OutlinedKey)
                             ->schema([
                                 TextInput::make('display_name')
                                     ->label(__('Name'))
