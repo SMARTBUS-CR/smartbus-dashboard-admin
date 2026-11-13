@@ -17,6 +17,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 
 class TripForm
@@ -25,6 +26,7 @@ class TripForm
     {
         return $schema->components([
             Section::make(__('Trip Plan'))
+                ->icon(Heroicon::OutlinedCalendarDays)
                 ->description(__('Select a company route departure and the resources required for the complete planned interval.'))
                 ->schema([
                     Select::make('route_pattern_id')
@@ -53,6 +55,7 @@ class TripForm
 
                     DateTimePicker::make('arrival_at')
                         ->label(__('Scheduled Arrival'))
+                        ->helperText(__('Enter the arrival date in the company timezone, including the next day for overnight trips.'))
                         ->timezone(fn (): string => static::company()?->timezone ?? config('app.timezone'))
                         ->seconds()
                         ->required()

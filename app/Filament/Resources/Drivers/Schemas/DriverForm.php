@@ -11,6 +11,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 
 class DriverForm
@@ -19,6 +20,7 @@ class DriverForm
     {
         return $schema->components([
             Section::make(__('Identity Provisioning'))
+                ->icon(Heroicon::OutlinedUserCircle)
                 ->description(__('Create a new account or associate an existing active identity.'))
                 ->schema([
                     Select::make('registration_type')
@@ -80,9 +82,11 @@ class DriverForm
                 ->visible(fn (string $operation): bool => $operation === 'create'),
 
             Section::make(__('Employment Details'))
+                ->icon(Heroicon::OutlinedIdentification)
                 ->schema([
                     TextInput::make('license')
                         ->label(__('License'))
+                        ->placeholder('B-40291')
                         ->required()
                         ->maxLength(50),
 
@@ -96,12 +100,15 @@ class DriverForm
 
                     DatePicker::make('employment_ends_on')
                         ->label(__('Employment End'))
-                        ->rule('after_or_equal:employment_starts_on'),
+                        ->helperText(__('Leave blank when there is no ending boundary.'))
+                        ->afterOrEqual(fn (Get $get): string => filled($get('employment_starts_on')) ? 'employment_starts_on' : '')
+                        ->validationMessages(['after_or_equal' => __('The employment end date must be on or after the start date.')]),
                 ])
                 ->columns(2)
                 ->columnSpanFull(),
 
             Section::make(__('Initial Monthly Salary'))
+                ->icon(Heroicon::OutlinedCurrencyDollar)
                 ->description(__('Salary is required to create employment and remains confidential after registration.'))
                 ->schema(static::salaryFields())
                 ->columns(2)
@@ -134,6 +141,7 @@ class DriverForm
 
         return [
             $amount
+                ->placeholder('450000.00')
                 ->required()
                 ->rule('decimal:0,2')
                 ->minValue(0)

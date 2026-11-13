@@ -24,13 +24,18 @@ describe('Stop Resource Archival', function (): void {
     test('archives an unused stop through the table', function (): void {
         $stop = Stop::factory()->for($this->company)->create();
 
-        Livewire::test(ListStops::class)
+        $list = Livewire::test(ListStops::class)
+            ->toggleAllTableColumns(false)
+            ->assertCanRenderTableColumn('name')
+            ->assertCanNotRenderTableColumn('latitude')
+            ->assertCanNotRenderTableColumn('longitude')
             ->callAction(TestAction::make('delete')->table($stop))
             ->assertHasNoErrors()
             ->assertNotified('Stop Archived')
             ->assertCanNotSeeTableRecords([$stop]);
 
         expect($stop->fresh()->trashed())->toBeTrue();
+        expect($list->instance()->getTable()->getAction('delete')->getGroup())->not->toBeNull();
     });
 
     test('restores an archived stop through the table', function (): void {
