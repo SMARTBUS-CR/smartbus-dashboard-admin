@@ -11,6 +11,7 @@ use Dedoc\Scramble\Attributes\QueryParameter;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class TrackingContextController extends Controller
 {
@@ -19,14 +20,16 @@ class TrackingContextController extends Controller
      */
     public function show(Request $request, string $tripId): TripTrackingContextResource
     {
-        $this->ensureActiveUser($request);
-        $trip = Trip::query()->withAggregate('driver', 'user_id')->find($tripId);
+        $user = $this->ensureActiveUser($request);
+        $trip = Trip::query()->with('company')->withAggregate('driver', 'user_id')->find($tripId);
 
         if (! $trip) {
             abort(404, __('The requested trip was not found.'));
         }
 
-        return new TripTrackingContextResource($trip);
+        $includeDriverUserId = $this->authorizeTrackingContext($user, $trip);
+
+        return (new TripTrackingContextResource($trip))->includeDriverUserId($includeDriverUserId);
     }
 
     /**
@@ -35,16 +38,18 @@ class TrackingContextController extends Controller
     #[QueryParameter('projection', description: 'Use eta-v1 for the ETA projection. Omit for the standard tracking context.', type: 'string', example: 'eta-v1')]
     public function showInternal(Request $request, string $tripId, EtaTripContext $etaContext): TripTrackingContextResource|JsonResponse
     {
-        $this->ensureActiveUser($request);
+        $user = $this->ensureActiveUser($request);
 
         if ($request->query('projection') !== 'eta-v1') {
             return $this->show($request, $tripId);
         }
 
-        $trip = Trip::query()->find($tripId);
+        $trip = Trip::query()->with('company')->find($tripId);
         if (! $trip) {
             abort(404, __('The requested trip was not found.'));
         }
+
+        $this->authorizeTrackingContext($user, $trip);
 
         try {
             $projection = $etaContext->project($trip);
@@ -63,5 +68,21 @@ class TrackingContextController extends Controller
         }
 
         return $user;
+    }
+
+    private function authorizeTrackingContext(User $user, Trip $trip): bool
+    {
+        $previousTeam = getPermissionsTeamId();
+
+        try {
+            setPermissionsTeamId($trip->company_id);
+            $user->unsetRelation('roles')->unsetRelation('permissions');
+            Gate::forUser($user)->authorize('viewTrackingContext', $trip);
+
+            return Gate::forUser($user)->allows('viewTrackingIdentity', $trip);
+        } finally {
+            setPermissionsTeamId($previousTeam);
+            $user->unsetRelation('roles')->unsetRelation('permissions');
+        }
     }
 }
