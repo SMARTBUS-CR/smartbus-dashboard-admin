@@ -4,6 +4,7 @@ use App\Enums\TripStatus;
 use App\Enums\UserRole;
 use App\Filament\Resources\Trips\Pages\CreateTrip;
 use App\Filament\Resources\Trips\Pages\EditTrip;
+use App\Models\Bus;
 use App\Models\Company;
 use App\Models\CompanyUser;
 use App\Models\Driver;
@@ -107,6 +108,30 @@ describe('Trip Resource Planning', function (): void {
             ->and($trip->service_date->toDateString())->toBe('2026-11-02')
             ->and($trip->scheduled_arrival_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-02 13:45:00')
             ->and($trip->getRawOriginal('created_at'))->toBe($createdAt);
+    });
+
+    test('reassigns the bus without changing the scheduled trip times', function (): void {
+        [$company, $data] = tripResourcePlanningFixture();
+        $trip = app(TripManagementService::class)->schedule(auth()->user(), $company, [
+            ...$data,
+            'arrival_at' => '2026-10-26T07:30:00-06:00',
+        ]);
+        $newBus = Bus::factory()->for($company)->active()->create();
+
+        Livewire::test(EditTrip::class, ['record' => $trip->getKey()])
+            ->assertFormSet(['bus_id' => $trip->bus_id])
+            ->fillForm(['bus_id' => $newBus->getKey()])
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertNotified();
+
+        $replanned = $trip->fresh();
+
+        expect($replanned->bus_id)->toBe($newBus->getKey())
+            ->and($replanned->driver_id)->toBe($trip->driver_id)
+            ->and($replanned->status)->toBe(TripStatus::SCHEDULED)
+            ->and($replanned->scheduled_departure_at->equalTo($trip->scheduled_departure_at))->toBeTrue()
+            ->and($replanned->scheduled_arrival_at->equalTo($trip->scheduled_arrival_at))->toBeTrue();
     });
 
     test('preserves the scheduled plan when replanning is rejected', function (): void {
