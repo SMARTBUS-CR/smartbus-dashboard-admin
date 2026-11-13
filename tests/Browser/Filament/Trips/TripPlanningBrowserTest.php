@@ -118,4 +118,52 @@ describe('Trip Planning Browser Flows', function (): void {
             ->assertSee('Actual Arrival')
             ->assertNoJavaScriptErrors();
     });
+
+    test('Cancelar un viaje y preparar su reemplazo', function (): void {
+        [$actor, $trip] = $this->createAssignedDriverTrip();
+        $company = $trip->company;
+        grantShield($actor, ['ViewAny:Trip', 'View:Trip'], $company);
+        BrowserSession::start($actor);
+
+        $index = parse_url(TripResource::getUrl('index', tenant: $company), PHP_URL_PATH);
+        $create = parse_url(TripResource::getUrl('create', tenant: $company), PHP_URL_PATH);
+        $moreActions = Selector::getByRoleSelector('button', ['name' => 'More Actions', 'exact' => true]);
+        $cancel = Selector::getByRoleSelector('button', ['name' => 'Cancel Trip', 'exact' => true]);
+        $confirm = Selector::getByRoleSelector('button', ['name' => 'Confirm', 'exact' => true]);
+        $replacement = Selector::getByRoleSelector('link', ['name' => 'Create Replacement', 'exact' => true]);
+        $reasonInput = 'textarea[id$=".cancellation_reason"]';
+        $reason = 'The assigned bus needs maintenance.';
+
+        $page = visit($index)
+            ->click($moreActions)
+            ->assertNotPresent($replacement)
+            ->click($cancel)
+            ->click($confirm)
+            ->assertVisible($reasonInput.':invalid:focus');
+
+        $validationMessage = $page->script("document.querySelector('textarea:invalid:focus').validationMessage");
+
+        expect($validationMessage)->not->toBeEmpty()
+            ->and($trip->refresh()->status)->toBe(TripStatus::SCHEDULED);
+
+        $page->fill($reasonInput, $reason)
+            ->click($confirm)
+            ->assertSee('Trip Cancelled')
+            ->assertSeeIn('td.fi-ta-cell-status', 'Cancelled')
+            ->assertSeeIn(Selector::getByRoleSelector('tab', ['name' => 'Cancelled']), '1')
+            ->assertNotPresent(Selector::getByRoleSelector('button', ['name' => 'Start Trip', 'exact' => true]))
+            ->click($moreActions)
+            ->assertNotPresent($cancel)
+            ->click($replacement)
+            ->assertPathIs($create)
+            ->assertQueryStringHas('replacement', (string) $trip->getKey())
+            ->assertValue(Selector::getByLabelSelector('Service Date', false), $trip->service_date->toDateString())
+            ->assertSee($trip->bus->unit_number)
+            ->assertSee($trip->driver->license)
+            ->assertNoJavaScriptErrors();
+
+        expect($trip->refresh()->status)->toBe(TripStatus::CANCELLED)
+            ->and($trip->cancellation_reason)->toBe($reason)
+            ->and($trip->actual_departure_at)->toBeNull();
+    });
 });
