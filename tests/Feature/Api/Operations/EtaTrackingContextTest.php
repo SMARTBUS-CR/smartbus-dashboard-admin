@@ -1,13 +1,13 @@
 <?php
 
 use App\Enums\TripStatus;
+use App\Enums\UserRole;
 use App\Models\Trip;
-use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 beforeEach(function (): void {
-    $this->actingAs(User::factory()->create());
+    $this->actingAs(createUserWithRole(UserRole::Passenger));
     Http::preventStrayRequests();
 });
 
