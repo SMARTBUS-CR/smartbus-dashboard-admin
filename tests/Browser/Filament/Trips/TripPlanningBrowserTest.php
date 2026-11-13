@@ -119,7 +119,7 @@ describe('Trip Planning Browser Flows', function (): void {
             ->assertNoJavaScriptErrors();
     });
 
-    test('Cancelar un viaje y preparar su reemplazo', function (): void {
+    test('cancels a scheduled trip and prepares its replacement', function (): void {
         [$actor, $trip] = $this->createAssignedDriverTrip();
         $company = $trip->company;
         grantShield($actor, ['ViewAny:Trip', 'View:Trip'], $company);
