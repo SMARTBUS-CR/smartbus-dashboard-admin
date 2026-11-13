@@ -111,15 +111,65 @@ describe('Trip Status Overview', function (): void {
 
         Livewire::test(Dashboard::class)
             ->assertSuccessful()
+            ->assertSet('filters.period', 'today')
+            ->assertDontSee('From Date')
+            ->assertDontSee('Until Date')
+            ->assertSeeInOrder(['Welcome', 'Filament', 'Date Range', 'Trip Operations'])
+            ->set('filters.period', 'custom')
             ->assertSee('From Date')
-            ->assertSee('Until Date')
-            ->assertSee('2026-10-26')
-            ->assertSee('Trip Operations');
+            ->assertSee('Until Date');
 
         Livewire::test(TripStatusOverview::class)
             ->assertSuccessful()
             ->assertSeeInOrder(['Scheduled', '1', 'In progress', '0', 'Completed', '0', 'Cancelled', '0'])
             ->assertDontSee($trip->driver->salary_amount);
+    });
+
+    test('counts rolling periods inclusively using the company local day', function (string $period, int $count): void {
+        $this->travelTo('2026-11-01 02:00:00 UTC');
+        foreach (['2026-10-01', '2026-10-24', '2026-10-25', '2026-10-31', '2026-11-01'] as $date) {
+            Trip::factory()->for($this->company)->withEligibleDriver()->create(['service_date' => $date]);
+        }
+        actingAsInCompany($this->actor, $this->company);
+
+        Livewire::test(TripStatusOverview::class, ['pageFilters' => [
+            'period' => $period,
+            'from_date' => '2026-11-01',
+        ]])->assertSeeInOrder(['Scheduled', (string) $count, 'In progress', '0']);
+    })->with([['today', 1], ['last_7_days', 2], ['last_30_days', 3]]);
+
+    test('hides the range controls when the trip summary is forbidden', function (): void {
+        $unauthorized = createUserWithRole(UserRole::Admin, $this->company);
+        CompanyUser::factory()->for($this->company)->for($unauthorized, 'user')->create();
+        actingAsInCompany($unauthorized, $this->company);
+
+        Livewire::test(Dashboard::class)
+            ->assertSuccessful()
+            ->assertDontSee('Date Range')
+            ->assertDontSee('From Date')
+            ->assertDontSee('Trip Operations');
+    });
+
+    test('reports inverted custom dates and clears the error after correction', function (): void {
+        actingAsInCompany($this->actor, $this->company);
+
+        Livewire::test(Dashboard::class)
+            ->set('filters.period', 'custom')
+            ->set('filters.from_date', '2026-10-27')
+            ->set('filters.until_date', '2026-10-26')
+            ->assertHasErrors(['filters.until_date' => 'after_or_equal'])
+            ->set('filters.until_date', '2026-10-28')
+            ->assertHasNoErrors(['filters.until_date']);
+    });
+
+    test('shows dates from an existing dashboard link as a custom range', function (): void {
+        actingAsInCompany($this->actor, $this->company);
+
+        Livewire::withQueryParams(['filters' => ['from_date' => '2026-10-01', 'until_date' => '2026-10-15']])
+            ->test(Dashboard::class)
+            ->assertSet('filters.period', 'custom')
+            ->assertSet('filters.from_date', '2026-10-01')
+            ->assertSee('From Date');
     });
 
     test('keeps aggregate query growth bounded as trip volume increases', function (): void {
