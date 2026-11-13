@@ -119,7 +119,7 @@ describe('Trip Assignment Resource', function (): void {
     });
 
     test('opens daily trips filtered to the assignment departure', function (): void {
-        $this->travelTo('2026-11-12 12:00:00 UTC');
+        $this->travelTo('2026-10-26 12:00:00 UTC');
         $first = Trip::factory()->for($this->company)->withEligibleDriver()->create();
         $second = Trip::factory()->for($this->company)->withEligibleDriver()->create();
         $assignment = TripAssignment::factory()->for($this->company)->create([
@@ -137,6 +137,7 @@ describe('Trip Assignment Resource', function (): void {
             TestAction::make('dailyTrips')->table($assignment),
             TripResource::getUrl('index', ['filters' => $filters], tenant: $this->company),
         );
+        $this->travel(1)->day();
         Livewire::withQueryParams(['filters' => $filters])->test(ListTrips::class)
             ->assertCanSeeTableRecords([$first])
             ->assertCanNotSeeTableRecords([$second]);
