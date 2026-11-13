@@ -194,10 +194,12 @@ class RoleResource extends Resource
                     ->badge()
                     ->label(__('filament-shield::filament-shield.column.permissions'))
                     ->counts('permissions')
-                    ->color('primary'),
+                    ->color('primary')
+                    ->toggleable(),
                 TextColumn::make('updated_at')
                     ->label(__('Last Updated'))
-                    ->dateTime(),
+                    ->dateTime()
+                    ->toggleable(),
             ])
             ->filters([
                 //
