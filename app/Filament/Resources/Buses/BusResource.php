@@ -6,7 +6,6 @@ use App\Enums\NavigationGroup;
 use App\Filament\Resources\Buses\Pages\CreateBus;
 use App\Filament\Resources\Buses\Pages\EditBus;
 use App\Filament\Resources\Buses\Pages\ListBuses;
-use App\Filament\Resources\Buses\Pages\ViewBus;
 use App\Filament\Resources\Buses\Schemas\BusForm;
 use App\Filament\Resources\Buses\Schemas\BusInfolist;
 use App\Filament\Resources\Buses\Tables\BusesTable;
@@ -62,7 +61,6 @@ class BusResource extends Resource
         return [
             'index' => ListBuses::route('/'),
             'create' => CreateBus::route('/create'),
-            'view' => ViewBus::route('/{record}'),
             'edit' => EditBus::route('/{record}/edit'),
         ];
     }

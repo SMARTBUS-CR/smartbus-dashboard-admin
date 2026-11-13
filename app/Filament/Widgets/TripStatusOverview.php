@@ -101,11 +101,22 @@ class TripStatusOverview extends StatsOverviewWidget
     {
         $fromDate = $this->pageFilters['from_date'] ?? null;
         $untilDate = $this->pageFilters['until_date'] ?? null;
+        $today = CarbonImmutable::today($company->timezone);
+        $period = $this->pageFilters['period'] ?? (filled($fromDate) || filled($untilDate) ? 'custom' : 'today');
+
+        if ($period !== 'custom') {
+            $daysBack = match ($period) {
+                'today' => 0,
+                'last_7_days' => 6,
+                'last_30_days' => 29,
+                default => null,
+            };
+
+            return $daysBack === null ? null : [$today->subDays($daysBack)->toDateString(), $today->toDateString()];
+        }
 
         if (blank($fromDate) && blank($untilDate)) {
-            $today = CarbonImmutable::now($company->timezone)->toDateString();
-
-            return [$today, $today];
+            return [$today->toDateString(), $today->toDateString()];
         }
 
         if (! static::isValidDate($fromDate) && ! blank($fromDate)) {
