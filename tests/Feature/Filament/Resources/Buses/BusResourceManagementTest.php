@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Filament\Resources\Buses\BusResource;
 use App\Filament\Resources\Buses\Pages\CreateBus;
 use App\Filament\Resources\Buses\Pages\EditBus;
 use App\Filament\Resources\Buses\Pages\ListBuses;
@@ -8,6 +9,7 @@ use App\Models\Bus;
 use App\Models\CompanyUser;
 use App\Models\Trip;
 use Filament\Actions\Testing\TestAction;
+use Filament\Facades\Filament;
 use Livewire\Livewire;
 
 describe('Bus Resource Management', function (): void {
@@ -113,6 +115,70 @@ describe('Bus Resource Management', function (): void {
             ->assertNotified();
 
         expect($bus->fresh()->is_active)->toBeTrue();
+    });
+
+    test('filters fleet tabs and counts within the selected archive scope', function (): void {
+        Filament::setTenant(null, isQuiet: true);
+        $foreign = Bus::factory()->active()->create();
+        actingAsInCompany($this->actor, $this->company);
+        $active = Bus::factory()->for($this->company)->active()->create();
+        $inactive = Bus::factory()->for($this->company)->inactive()->create();
+        $archived = Bus::factory()->for($this->company)->inactive()->create();
+        $archived->delete();
+
+        $list = Livewire::test(ListBuses::class)
+            ->assertSet('activeTab', 'all')
+            ->assertCanSeeTableRecords([$active, $inactive])
+            ->assertCanNotSeeTableRecords([$archived, $foreign])
+            ->set('activeTab', 'active')
+            ->assertCanSeeTableRecords([$active])
+            ->assertCanNotSeeTableRecords([$inactive, $archived, $foreign])
+            ->set('activeTab', 'inactive')
+            ->filterTable('trashed', false)
+            ->assertCanSeeTableRecords([$archived])
+            ->assertCanNotSeeTableRecords([$active, $inactive, $foreign]);
+
+        $tabs = $list->instance()->getCachedTabs();
+        expect($tabs['all']->getBadge())->toBe('1')
+            ->and($tabs['active']->getBadge())->toBe('0')
+            ->and($tabs['inactive']->getBadge())->toBe('1');
+    });
+
+    test('combines vehicle filters and scopes their options to the company', function (): void {
+        Filament::setTenant(null, isQuiet: true);
+        $foreign = Bus::factory()->create(['brand' => 'Scania', 'model' => 'K250', 'capacity' => 60]);
+        actingAsInCompany($this->actor, $this->company);
+        $bus = Bus::factory()->for($this->company)->create(['brand' => 'Volvo', 'model' => 'B8R', 'capacity' => 48]);
+        $different = Bus::factory()->for($this->company)->create(['brand' => 'Volvo', 'model' => 'B8R', 'capacity' => 55]);
+
+        $list = Livewire::test(ListBuses::class)
+            ->assertTableColumnExists('country_code')
+            ->filterTable('brand', 'Volvo')
+            ->filterTable('model', 'B8R')
+            ->filterTable('capacity', 48)
+            ->assertCanSeeTableRecords([$bus])
+            ->assertCanNotSeeTableRecords([$different, $foreign]);
+
+        expect($list->instance()->getTable()->getFilter('brand')->getOptions())->toBe(['Volvo' => 'Volvo']);
+    });
+
+    test('opens fleet details in a read-only modal for a viewer', function (): void {
+        $bus = Bus::factory()->for($this->company)->create();
+        $viewer = createUserWithRole(UserRole::Admin, $this->company);
+        CompanyUser::factory()->for($this->company)->for($viewer, 'user')->create();
+        grantShield($viewer, ['ViewAny:Bus', 'View:Bus'], $this->company);
+        actingAsInCompany($viewer, $this->company);
+
+        expect(BusResource::hasPage('view'))->toBeFalse();
+
+        $list = Livewire::test(ListBuses::class)
+            ->assertActionHidden(TestAction::make('edit')->table($bus))
+            ->mountAction(TestAction::make('view')->table($bus))
+            ->assertActionMounted(TestAction::make('view')->table($bus));
+
+        $component = $list->instance();
+        $schema = $component->getSchema($component->getMountedActionSchemaName());
+        expect($schema->getComponents()[0]->getHeading())->toBe(__('Fleet Identification'));
     });
 
     test('archives and restores a bus without physical deletion', function (): void {

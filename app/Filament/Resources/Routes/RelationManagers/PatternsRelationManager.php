@@ -108,7 +108,8 @@ class PatternsRelationManager extends RelationManager
 
                 TextColumn::make('headsign')
                     ->label(__('Destination'))
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(),
             ])
             ->defaultSort('code')
             ->headerActions([
