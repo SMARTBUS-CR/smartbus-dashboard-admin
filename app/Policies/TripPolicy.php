@@ -35,6 +35,25 @@ class TripPolicy
         return $this->allowsReading($user, $company, $trip, 'View:Trip');
     }
 
+    public function viewTrackingContext(User $user, Trip $trip): bool
+    {
+        $persistedUser = User::query()->find($user->getKey());
+        if ($persistedUser === null) {
+            return false;
+        }
+
+        if ($this->hasRoleAssignment($persistedUser, UserRole::Passenger)) {
+            return true;
+        }
+
+        return $this->allowsReading($persistedUser, $trip->company, $trip, 'View:Trip');
+    }
+
+    public function viewTrackingIdentity(User $user, Trip $trip): bool
+    {
+        return $this->allowsReading($user, $trip->company, $trip, 'View:Trip');
+    }
+
     private function allowsReading(User $user, Company $company, ?Trip $trip, string $permission): bool
     {
         if (($trip !== null && (string) $trip->company_id !== (string) $company->getKey())
@@ -153,6 +172,17 @@ class TripPolicy
             ->where('assignments.model_uuid', $user->getKey())->where('assignments.model_type', $user->getMorphClass())
             ->where('assignments.company_id', $company->getKey())->where('roles.company_id', $company->getKey())
             ->where('roles.guard_name', 'web')->pluck('roles.name')->all();
+    }
+
+    private function hasRoleAssignment(User $user, UserRole $role): bool
+    {
+        return $user->getConnection()->table('model_has_roles as assignments')
+            ->join('roles', 'roles.id', '=', 'assignments.role_id')
+            ->where('assignments.model_uuid', $user->getKey())
+            ->where('assignments.model_type', $user->getMorphClass())
+            ->where('roles.name', $role->value)
+            ->where('roles.guard_name', 'web')
+            ->exists();
     }
 
     public function deleteAny(User $user): bool

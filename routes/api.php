@@ -54,6 +54,10 @@ Route::prefix('v1/operations')->group(function (): void {
         Route::post('trips/{id}/start', [TripExecutionController::class, 'start'])->whereUuid('id')->name('operations.trips.start');
         Route::post('trips/{id}/complete', [TripExecutionController::class, 'complete'])->whereUuid('id')->name('operations.trips.complete');
 
+        Route::get('trips/{id}/tracking-context', [TrackingContextController::class, 'show'])
+            ->whereUuid('id')
+            ->name('operations.trips.tracking-context');
+
         // Passenger Favorite Routes
         Route::get('favorites', [FavoriteRouteController::class, 'index'])->name('operations.favorites.index');
         Route::post('favorites', [FavoriteRouteController::class, 'store'])->name('operations.favorites.store');
@@ -61,17 +65,12 @@ Route::prefix('v1/operations')->group(function (): void {
         Route::delete('favorites/{route_id}', [FavoriteRouteController::class, 'destroy'])->whereUuid('route_id')->name('operations.favorites.destroy');
     });
 
-    // Telemetry Tracking Context (for GPS Service)
-    Route::get('trips/{id}/tracking-context', [TrackingContextController::class, 'show'])
-        ->middleware('auth.gps')
-        ->whereUuid('id')
-        ->name('operations.trips.tracking-context');
 });
 
 // Internal Service Routes (GPS & ETA microservices)
 Route::prefix('internal/v1')->group(function (): void {
     Route::get('trips/{id}/tracking-context', [TrackingContextController::class, 'showInternal'])
-        ->middleware('auth.gps:eta-v1')
+        ->middleware('auth.api')
         ->whereUuid('id')
         ->name('internal.trips.tracking-context');
 });

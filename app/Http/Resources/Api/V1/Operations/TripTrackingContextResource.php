@@ -11,6 +11,15 @@ use Illuminate\Http\Request;
  */
 class TripTrackingContextResource extends JsonApiResource
 {
+    private bool $includeDriverUserId = false;
+
+    public function includeDriverUserId(bool $include = true): static
+    {
+        $this->includeDriverUserId = $include;
+
+        return $this;
+    }
+
     /**
      * Transform the resource into an array.
      *
@@ -23,7 +32,7 @@ class TripTrackingContextResource extends JsonApiResource
             'company_id' => (string) $this->company_id,
             'bus_id' => (string) $this->bus_id,
             'driver_id' => (string) $this->driver_id,
-            'driver_user_id' => (string) $this->driver_user_id,
+            ...($this->includeDriverUserId ? ['driver_user_id' => (string) $this->driver_user_id] : []),
             'route_pattern_id' => (string) $this->route_pattern_id,
             'status' => $this->status->value,
             'scheduled_departure_at' => $this->scheduled_departure_at?->toISOString(),
