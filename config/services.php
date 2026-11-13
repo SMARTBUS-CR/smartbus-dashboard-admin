@@ -41,8 +41,6 @@ return [
             'timeout' => env('API_GATEWAY_TIMEOUT', 30),
             'log_failures' => env('API_GATEWAY_LOG_FAILURES', true),
         ],
-        'tracking_context_secret' => env('TRIP_CONTEXT_SECRET'),
-        'trip_context_token' => env('TRIP_CONTEXT_TOKEN'),
     ],
 
     'photon' => [
