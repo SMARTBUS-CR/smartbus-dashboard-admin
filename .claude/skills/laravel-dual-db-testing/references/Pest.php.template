@@ -1,0 +1,37 @@
+<?php
+
+// Merge into the project's existing tests/Pest.php — keep any pest()->extend()
+// / expect()->extend() calls already there. This file only shows the pattern
+// for the two kinds of helper that belong here.
+
+use Illuminate\Support\Str;
+
+/*
+|--------------------------------------------------------------------------
+| Example 1: unpersisted model instance with a valid primary key
+|--------------------------------------------------------------------------
+| Only needed if the app uses UUID/ULID primary keys AND some code under
+| test needs a model instance that has a valid key WITHOUT being saved
+| (e.g. a pivot-attach method called with an in-memory user). Adjust the
+| model class and primary key strategy to match the real app.
+*/
+function modelWithUuid(string $class): object
+{
+    $model = new $class();
+    $model->forceFill(['id' => (string) Str::uuid()]); // forceFill: bypasses $fillable
+
+    return $model;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Example 2: acting as an authenticated user under a non-trivial guard
+|--------------------------------------------------------------------------
+| Only write this if the real app's login flow does more than Eloquent's
+| default guard (e.g. populates session state, calls an external auth
+| service, attaches tenant/roles). READ THE REAL GUARD/PROVIDER CLASSES
+| before writing this — do not guess at what state a real login leaves
+| behind. If the app uses a plain Eloquent guard, Laravel's own actingAs()
+| is enough and this helper is unnecessary.
+*/
+// function actingAsAuthenticatedUser(array $roles = [], array $permissions = []): object { ... }

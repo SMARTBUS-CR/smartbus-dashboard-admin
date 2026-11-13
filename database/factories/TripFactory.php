@@ -2,16 +2,64 @@
 
 namespace Database\Factories;
 
+use App\Enums\TripStatus;
+use App\Enums\UserRole;
+use App\Models\Bus;
+use App\Models\Company;
+use App\Models\CompanyUser;
+use App\Models\Driver;
+use App\Models\DriverSchedule;
+use App\Models\Role;
+use App\Models\Route;
+use App\Models\RoutePattern;
+use App\Models\RouteSchedule;
 use App\Models\Trip;
+use App\Services\TripPlanSnapshotService;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
 
 /**
  * @extends Factory<Trip>
  */
 class TripFactory extends Factory
 {
+    /** Persist an execution fixture after normal scheduled creation, retaining model guards. */
+    public function inProgress(): static
+    {
+        return $this->afterCreating(function (Trip $trip): void {
+            Trip::query()->whereKey($trip->getKey())->update([
+                'status' => TripStatus::IN_PROGRESS->value,
+                'actual_departure_at' => $trip->scheduled_departure_at->utc()->format('Y-m-d H:i:s.uP'),
+            ]);
+            $trip->refresh();
+        });
+    }
+
+    /** Persist a completed fixture with actual times matching its planned window. */
+    public function completed(): static
+    {
+        return $this->inProgress()->afterCreating(function (Trip $trip): void {
+            Trip::query()->whereKey($trip->getKey())->update([
+                'status' => TripStatus::COMPLETED->value,
+                'actual_arrival_at' => $trip->scheduled_arrival_at->utc()->format('Y-m-d H:i:s.uP'),
+            ]);
+            $trip->refresh();
+        });
+    }
+
+    /** Persist cancellation history without creating actual departure or arrival times. */
+    public function cancelled(): static
+    {
+        return $this->afterCreating(function (Trip $trip): void {
+            Trip::query()->whereKey($trip->getKey())->update([
+                'status' => TripStatus::CANCELLED->value,
+                'cancelled_at' => $trip->scheduled_departure_at->subHour()->utc()->format('Y-m-d H:i:s.uP'),
+                'cancellation_reason' => 'Demo cancellation',
+            ]);
+            $trip->refresh();
+        });
+    }
+
     /**
      * Define the model's default state.
      *
@@ -20,21 +68,75 @@ class TripFactory extends Factory
     public function definition(): array
     {
         return [
-            'route_id' => (string) Str::uuid(),
-            'bus_id' => (string) Str::uuid(),
-            'driver_id' => (string) Str::uuid(),
-            'status' => 'scheduled',
-            'started_at' => null,
-            'completed_at' => null,
+            'company_id' => Company::factory()->state(['timezone' => 'America/Costa_Rica']),
+            'route_pattern_id' => fn (array $attributes): string => RoutePattern::factory()
+                ->for(Route::factory()->state(['company_id' => $attributes['company_id']]))->withSavedPlan()->create()->getKey(),
+            'service_date' => '2026-10-26',
+            'route_schedule_id' => fn (array $attributes): string => RouteSchedule::factory()->create([
+                'route_pattern_id' => $attributes['route_pattern_id'],
+                'day_of_week' => CarbonImmutable::parse($attributes['service_date'])->dayOfWeek,
+                'departure_time' => '06:30:00',
+            ])->getKey(),
+            'bus_id' => fn (array $attributes): string => Bus::factory()->active()->create(['company_id' => $attributes['company_id']])->getKey(),
+            'driver_id' => fn (array $attributes): string => Driver::factory()->create(['company_id' => $attributes['company_id']])->getKey(),
+            'scheduled_departure_at' => fn (array $attributes): CarbonImmutable => CarbonImmutable::parse(
+                $attributes['service_date'].' '.RouteSchedule::query()->findOrFail($attributes['route_schedule_id'])->departure_time,
+                Company::query()->findOrFail($attributes['company_id'])->timezone,
+            )->utc(),
+            'scheduled_arrival_at' => fn (array $attributes): CarbonImmutable => CarbonImmutable::parse($attributes['scheduled_departure_at'])->addHour(),
+            'planned_route_snapshot' => function (array $attributes): array {
+                $company = Company::query()->findOrFail($attributes['company_id']);
+                $plan = app(TripPlanSnapshotService::class)->prepare($company, [
+                    'route_pattern_id' => $attributes['route_pattern_id'], 'route_schedule_id' => $attributes['route_schedule_id'],
+                    'bus_id' => $attributes['bus_id'], 'service_date' => $attributes['service_date'],
+                    'arrival_at' => CarbonImmutable::parse($attributes['scheduled_arrival_at'])->setTimezone($company->timezone)->format('Y-m-d\TH:i:s.uP'),
+                    'departure_utc_offset' => CarbonImmutable::parse($attributes['scheduled_departure_at'])->setTimezone($company->timezone)->format('P'),
+                ]);
+
+                return $plan['planned_route_snapshot'];
+            },
         ];
     }
 
-    public function completed(): static
+    /** Prepare identity eligibility only; this does not provide availability or reservations. */
+    public function withEligibleDriver(): static
     {
-        return $this->state(fn (array $attributes) => [
-            'status' => 'completed',
-            'started_at' => Carbon::now()->subHour(),
-            'completed_at' => Carbon::now(),
+        return $this->state(fn (array $attributes): array => [
+            'driver_id' => function (array $attributes): string {
+                $driver = Driver::factory()->create([
+                    'company_id' => $attributes['company_id'],
+                    'employment_starts_on' => $attributes['service_date'],
+                    'employment_ends_on' => null,
+                    'license_expires_at' => CarbonImmutable::parse($attributes['service_date'])->addYear()->toDateString(),
+                ]);
+                CompanyUser::factory()->create(['company_id' => $driver->company_id, 'user_id' => $driver->user_id]);
+                $previousTeam = getPermissionsTeamId();
+                try {
+                    setPermissionsTeamId($driver->company_id);
+                    $driver->user->assignRole(Role::findOrCreate(UserRole::Driver->value, 'web'));
+                } finally {
+                    setPermissionsTeamId($previousTeam);
+                }
+
+                return $driver->getKey();
+            },
         ]);
+    }
+
+    /** Include eligible identity and dated availability for the touched local dates, without reservation guarantees. */
+    public function withDriverAvailability(): static
+    {
+        return $this->withEligibleDriver()->afterMaking(function (Trip $trip): void {
+            $timezone = Company::query()->findOrFail($trip->company_id)->timezone;
+            for ($day = $trip->scheduled_departure_at->setTimezone($timezone)->startOfDay();
+                $day < $trip->scheduled_arrival_at;
+                $day = $day->addDay()->startOfDay()) {
+                DriverSchedule::factory()->create([
+                    'driver_id' => $trip->driver_id, 'day_of_week' => $day->dayOfWeek,
+                    'start_time' => '00:00:00', 'end_time' => '00:00:00', 'ends_next_day' => true,
+                    'valid_from' => $day->toDateString(), 'valid_until' => $day->toDateString(),
+                ]);
+            }
+        });
     }
 }

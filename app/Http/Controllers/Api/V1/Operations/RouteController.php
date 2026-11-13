@@ -1,0 +1,84 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1\Operations;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\Operations\CatalogueIndexRequest;
+use App\Http\Resources\Api\V1\Operations\RoutePatternResource;
+use App\Http\Resources\Api\V1\Operations\RouteResource;
+use App\Models\Route;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
+
+class RouteController extends Controller
+{
+    /**
+     * List active routes in the public catalogue.
+     *
+     * @response AnonymousResourceCollection<RouteResource>
+     */
+    public function index(CatalogueIndexRequest $request): AnonymousResourceCollection
+    {
+        $pageSize = (int) $request->input('page.size', 20);
+        $pageNumber = (int) $request->input('page.number', 1);
+
+        $routes = QueryBuilder::for(Route::query()->with('company'))
+            ->inPublicCatalogue()
+            ->allowedFilters(
+                AllowedFilter::exact('company_id'),
+                AllowedFilter::partial('name'),
+                AllowedFilter::exact('code'),
+            )
+            ->allowedSorts('name', 'code', 'created_at')
+            ->allowedIncludes('company', 'patterns')
+            ->defaultSort('code')
+            ->orderBy('id')
+            ->paginate($pageSize, ['*'], 'page[number]', $pageNumber)
+            ->withQueryString();
+
+        $routes->getCollection()->filter(fn (Route $route): bool => $route->relationLoaded('patterns'))
+            ->loadMissing('patterns.stopOccurrences.stop');
+
+        return RouteResource::collection($routes);
+    }
+
+    /**
+     * Get details of a single route.
+     */
+    public function show(string $id): RouteResource
+    {
+        $route = Route::query()
+            ->inPublicCatalogue()
+            ->with(['company', 'patterns.stopOccurrences.stop'])
+            ->find($id);
+
+        if (! $route) {
+            abort(404, __('The requested route does not exist or has been archived.'));
+        }
+
+        return new RouteResource($route);
+    }
+
+    /**
+     * List patterns belonging to a route.
+     *
+     * @response AnonymousResourceCollection<RoutePatternResource>
+     */
+    public function patterns(string $id): AnonymousResourceCollection
+    {
+        $route = Route::query()->inPublicCatalogue()->find($id);
+
+        if (! $route) {
+            abort(404, __('The requested route does not exist or has been archived.'));
+        }
+
+        $patterns = $route->patterns()
+            ->whereNull('deleted_at')
+            ->with('stopOccurrences.stop')
+            ->orderBy('code')
+            ->get();
+
+        return RoutePatternResource::collection($patterns);
+    }
+}

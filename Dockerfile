@@ -13,6 +13,7 @@ RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf
 RUN apt-get update && apt-get install -y \
     git \
     curl \
+    libpq-dev \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
@@ -23,7 +24,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # 5. Instalar extensiones de PHP fundamentales para el framework y paquetes como Filament / OpenSpout
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd intl zip
+RUN docker-php-ext-install pdo_mysql pdo_pgsql mbstring exif pcntl bcmath gd intl zip
 
 # 6. Instalar Composer copiándolo desde su imagen oficial
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

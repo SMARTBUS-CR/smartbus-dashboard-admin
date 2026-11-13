@@ -10,11 +10,20 @@
     "guidelines": true,
     "mcp": true,
     "nightwatch": false,
+    "packages": [
+        "filament/filament",
+        "spatie/laravel-permission",
+        "pestphp/pest-plugin-agent"
+    ],
     "sail": false,
     "skills": [
         "infer-conventions",
         "laravel-best-practices",
         "testing-best-practices",
-        "tailwindcss-development"
+        "tailwindcss-development",
+        "filament-development",
+        "laravel-permission-development",
+        "pest-plugin-agent",
+        "laravel-dual-db-testing"
     ]
 }

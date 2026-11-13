@@ -1,0 +1,52 @@
+<?php
+
+namespace Tests\Support;
+
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Creates a minimal fixture table on a SECONDARY connection (one
+ * RefreshDatabase does not manage) for the duration of each test.
+ *
+ * Rename the trait, the connection name, and the table/columns to match
+ * the real project. Only include the columns the code under test actually
+ * reads or writes — this is a test fixture, not a copy of another
+ * service's real migrations.
+ *
+ * WHY A TRAIT AND NOT A bare beforeEach(): Schema:: (and most facades)
+ * are not safe to call from a Pest beforeEach() closure, because that
+ * runs before Laravel's test bootstrap attaches the app container to the
+ * facade. Laravel's TestCase automatically invokes
+ * setUp{ThisClassName}() / tearDown{ThisClassName}() at the correct point
+ * in the real PHPUnit lifecycle for every trait a test `uses()` — so put
+ * the logic there instead.
+ *
+ * WHY PER-TEST CREATE/DROP AND NOT RefreshDatabase: RefreshDatabase only
+ * refreshes the app's DEFAULT connection. DDL on most databases (MySQL
+ * included) also commits implicitly, so it can't be rolled back by a
+ * surrounding transaction the way DML can — hence explicit
+ * create/drop per test rather than relying on transactional rollback.
+ */
+trait WithSecondaryConnectionFixture
+{
+    protected function setUpWithSecondaryConnectionFixture(): void
+    {
+        Schema::connection('mysql')->dropIfExists('users');
+        Schema::connection('mysql')->create('users', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('name');
+            $table->string('email')->unique();
+            $table->timestamp('email_verified_at')->nullable();
+            $table->string('password');
+            $table->rememberToken();
+            $table->timestamps();
+            $table->softDeletes();
+        });
+    }
+
+    protected function tearDownWithSecondaryConnectionFixture(): void
+    {
+        Schema::connection('mysql')->dropIfExists('users');
+    }
+}

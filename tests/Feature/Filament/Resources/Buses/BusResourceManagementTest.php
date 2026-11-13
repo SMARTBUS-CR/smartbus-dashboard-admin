@@ -1,0 +1,217 @@
+<?php
+
+use App\Enums\UserRole;
+use App\Filament\Resources\Buses\BusResource;
+use App\Filament\Resources\Buses\Pages\CreateBus;
+use App\Filament\Resources\Buses\Pages\EditBus;
+use App\Filament\Resources\Buses\Pages\ListBuses;
+use App\Models\Bus;
+use App\Models\CompanyUser;
+use App\Models\Trip;
+use Filament\Actions\Testing\TestAction;
+use Filament\Facades\Filament;
+use Livewire\Livewire;
+
+describe('Bus Resource Management', function (): void {
+    beforeEach(function (): void {
+        $this->company = createCompany();
+        $this->actor = createUserWithRole(UserRole::Admin, $this->company);
+        CompanyUser::create([
+            'company_id' => $this->company->getKey(),
+            'user_id' => $this->actor->getKey(),
+        ]);
+        grantShield($this->actor, [
+            'ViewAny:Bus', 'View:Bus', 'Create:Bus', 'Update:Bus', 'Delete:Bus', 'Restore:Bus',
+        ], $this->company);
+        actingAsInCompany($this->actor, $this->company);
+    });
+
+    test('creates a normalized bus through the canonical fleet workflow', function (): void {
+        Livewire::test(CreateBus::class)
+            ->fillForm([
+                'country_code' => 'CR',
+                'plate_number' => ' bus-123 ',
+                'unit_number' => ' 17 ',
+                'brand' => ' Mercedes-Benz ',
+                'model' => ' O 500 ',
+                'year' => 2026,
+                'capacity' => 55,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors()
+            ->assertNotified()
+            ->assertRedirect();
+
+        $this->assertDatabaseHas(Bus::class, [
+            'company_id' => $this->company->getKey(),
+            'country_code' => 'CR',
+            'plate_number' => 'BUS-123',
+            'unit_number' => '17',
+            'brand' => 'Mercedes-Benz',
+            'model' => 'O 500',
+            'year' => 2026,
+            'capacity' => 55,
+            'is_active' => true,
+        ]);
+    });
+
+    test('rejects invalid fleet identifiers and capacity', function (): void {
+        Livewire::test(CreateBus::class)
+            ->fillForm([
+                'country_code' => 'XX',
+                'plate_number' => null,
+                'unit_number' => null,
+                'year' => 1800,
+                'capacity' => 0,
+            ])
+            ->call('create')
+            ->assertHasFormErrors([
+                'country_code', 'plate_number', 'unit_number', 'year', 'capacity',
+            ])
+            ->assertNotNotified();
+
+        expect(Bus::query()->exists())->toBeFalse();
+    });
+
+    test('updates bus details without allowing company ownership to be forged', function (): void {
+        $bus = Bus::factory()->for($this->company)->create();
+        $otherCompany = createCompany();
+
+        Livewire::test(EditBus::class, ['record' => $bus->getKey()])
+            ->fillForm([
+                'country_code' => 'CR',
+                'plate_number' => 'new-plate',
+                'unit_number' => 'NEW-UNIT',
+                'brand' => 'Volvo',
+                'model' => 'B8R',
+                'year' => 2025,
+                'capacity' => 48,
+            ])
+            ->set('data.company_id', $otherCompany->getKey())
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertNotified();
+
+        $this->assertDatabaseHas(Bus::class, [
+            'id' => $bus->getKey(),
+            'company_id' => $this->company->getKey(),
+            'plate_number' => 'NEW-PLATE',
+            'unit_number' => 'NEW-UNIT',
+            'capacity' => 48,
+        ]);
+    });
+
+    test('deactivates and reactivates a bus through explicit actions', function (): void {
+        $bus = Bus::factory()->for($this->company)->active()->create();
+
+        Livewire::test(ListBuses::class)
+            ->callAction(TestAction::make('deactivate')->table($bus))
+            ->assertNotified();
+
+        expect($bus->fresh()->is_active)->toBeFalse();
+
+        Livewire::test(ListBuses::class)
+            ->callAction(TestAction::make('activate')->table($bus->fresh()))
+            ->assertNotified();
+
+        expect($bus->fresh()->is_active)->toBeTrue();
+    });
+
+    test('filters fleet tabs and counts within the selected archive scope', function (): void {
+        Filament::setTenant(null, isQuiet: true);
+        $foreign = Bus::factory()->active()->create();
+        actingAsInCompany($this->actor, $this->company);
+        $active = Bus::factory()->for($this->company)->active()->create();
+        $inactive = Bus::factory()->for($this->company)->inactive()->create();
+        $archived = Bus::factory()->for($this->company)->inactive()->create();
+        $archived->delete();
+
+        $list = Livewire::test(ListBuses::class)
+            ->assertSet('activeTab', 'all')
+            ->assertCanSeeTableRecords([$active, $inactive])
+            ->assertCanNotSeeTableRecords([$archived, $foreign])
+            ->set('activeTab', 'active')
+            ->assertCanSeeTableRecords([$active])
+            ->assertCanNotSeeTableRecords([$inactive, $archived, $foreign])
+            ->set('activeTab', 'inactive')
+            ->filterTable('trashed', false)
+            ->assertCanSeeTableRecords([$archived])
+            ->assertCanNotSeeTableRecords([$active, $inactive, $foreign]);
+
+        $tabs = $list->instance()->getCachedTabs();
+        expect($tabs['all']->getBadge())->toBe('1')
+            ->and($tabs['active']->getBadge())->toBe('0')
+            ->and($tabs['inactive']->getBadge())->toBe('1');
+    });
+
+    test('combines vehicle filters and scopes their options to the company', function (): void {
+        Filament::setTenant(null, isQuiet: true);
+        $foreign = Bus::factory()->create(['brand' => 'Scania', 'model' => 'K250', 'capacity' => 60]);
+        actingAsInCompany($this->actor, $this->company);
+        $bus = Bus::factory()->for($this->company)->create(['brand' => 'Volvo', 'model' => 'B8R', 'capacity' => 48]);
+        $different = Bus::factory()->for($this->company)->create(['brand' => 'Volvo', 'model' => 'B8R', 'capacity' => 55]);
+
+        $list = Livewire::test(ListBuses::class)
+            ->assertTableColumnExists('country_code')
+            ->filterTable('brand', 'Volvo')
+            ->filterTable('model', 'B8R')
+            ->filterTable('capacity', 48)
+            ->assertCanSeeTableRecords([$bus])
+            ->assertCanNotSeeTableRecords([$different, $foreign]);
+
+        expect($list->instance()->getTable()->getFilter('brand')->getOptions())->toBe(['Volvo' => 'Volvo']);
+    });
+
+    test('opens fleet details in a read-only modal for a viewer', function (): void {
+        $bus = Bus::factory()->for($this->company)->create();
+        $viewer = createUserWithRole(UserRole::Admin, $this->company);
+        CompanyUser::factory()->for($this->company)->for($viewer, 'user')->create();
+        grantShield($viewer, ['ViewAny:Bus', 'View:Bus'], $this->company);
+        actingAsInCompany($viewer, $this->company);
+
+        expect(BusResource::hasPage('view'))->toBeFalse();
+
+        $list = Livewire::test(ListBuses::class)
+            ->assertActionHidden(TestAction::make('edit')->table($bus))
+            ->mountAction(TestAction::make('view')->table($bus))
+            ->assertActionMounted(TestAction::make('view')->table($bus));
+
+        $component = $list->instance();
+        $schema = $component->getSchema($component->getMountedActionSchemaName());
+        expect($schema->getComponents()[0]->getHeading())->toBe(__('Fleet Identification'));
+    });
+
+    test('archives and restores a bus without physical deletion', function (): void {
+        $bus = Bus::factory()->for($this->company)->create();
+
+        Livewire::test(ListBuses::class)
+            ->callAction(TestAction::make('delete')->table($bus))
+            ->assertNotified();
+
+        $this->assertSoftDeleted($bus);
+        $this->assertDatabaseCount('buses', 1);
+
+        Livewire::test(ListBuses::class)
+            ->filterTable('trashed', false)
+            ->callAction(TestAction::make('restore')->table($bus))
+            ->assertNotified();
+
+        $this->assertNotSoftDeleted($bus);
+        $this->assertDatabaseCount('buses', 1);
+    });
+
+    test('preserves an active bus when a committed trip blocks deactivation', function (): void {
+        $bus = Bus::factory()->for($this->company)->active()->create();
+        Trip::factory()->create([
+            'company_id' => $this->company->getKey(),
+            'bus_id' => $bus->getKey(),
+        ]);
+
+        Livewire::test(ListBuses::class)
+            ->callAction(TestAction::make('deactivate')->table($bus))
+            ->assertNotified();
+
+        expect($bus->fresh()->is_active)->toBeTrue();
+        $this->assertNotSoftDeleted($bus);
+    });
+});
