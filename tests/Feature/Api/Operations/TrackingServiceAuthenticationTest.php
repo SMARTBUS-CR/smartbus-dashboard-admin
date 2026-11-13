@@ -1,8 +1,8 @@
 <?php
 
 use App\Enums\TokenValidationStatus;
+use App\Enums\UserRole;
 use App\Models\Trip;
-use App\Models\User;
 use App\Services\AuthService;
 use Illuminate\Support\Facades\Http;
 
@@ -12,7 +12,7 @@ beforeEach(function (): void {
 
 test('keeps auth.gps as a backwards-compatible alias of bearer authentication', function (): void {
     $trip = Trip::factory()->withDriverAvailability()->create()->refresh();
-    $user = User::factory()->create();
+    $user = createUserWithRole(UserRole::Passenger);
     $authService = Mockery::mock(AuthService::class);
     $authService->shouldReceive('validateToken')->with('active-user-token')->andReturn(TokenValidationStatus::Valid);
     $authService->shouldReceive('getUser')->with('active-user-token')->andReturn(['id' => $user->id]);
@@ -36,7 +36,7 @@ test('does not accept a legacy HMAC signature without a bearer token', function 
 
 test('ignores legacy HMAC headers when the bearer token is valid', function (): void {
     $trip = Trip::factory()->withDriverAvailability()->create()->refresh();
-    $user = User::factory()->create();
+    $user = createUserWithRole(UserRole::Passenger);
     $authService = Mockery::mock(AuthService::class);
     $authService->shouldReceive('validateToken')->andReturn(TokenValidationStatus::Valid);
     $authService->shouldReceive('getUser')->andReturn(['id' => $user->id]);
