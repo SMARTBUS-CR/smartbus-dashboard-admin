@@ -2,6 +2,7 @@
 
 use App\Enums\TripStatus;
 use App\Enums\UserRole;
+use App\Filament\Resources\Trips\Pages\EditTrip;
 use App\Filament\Resources\Trips\Pages\ListTrips;
 use App\Filament\Resources\Trips\TripResource;
 use App\Models\CompanyUser;
@@ -61,4 +62,11 @@ describe('Trip Resource Access', function (): void {
         expect(TripResource::canViewAny())->toBeFalse()
             ->and(TripResource::canCreate())->toBeFalse();
     });
+
+    test('forbids opening the edit form after a trip leaves scheduled status', function (string $factoryState): void {
+        $trip = Trip::factory()->for($this->company)->withEligibleDriver()->{$factoryState}()->create();
+        actingAsInCompany($this->actor, $this->company);
+
+        Livewire::test(EditTrip::class, ['record' => $trip->getKey()])->assertForbidden();
+    })->with(['in progress' => 'inProgress', 'completed' => 'completed', 'cancelled' => 'cancelled']);
 });

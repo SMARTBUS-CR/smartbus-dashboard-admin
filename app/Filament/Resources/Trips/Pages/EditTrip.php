@@ -28,9 +28,7 @@ class EditTrip extends EditRecord
         $trip = $this->getRecord();
 
         if ($company instanceof Company && $trip instanceof Trip) {
-            $data['arrival_at'] = $trip->scheduled_arrival_at
-                ->setTimezone($company->timezone)
-                ->format('Y-m-d H:i:s');
+            $data['arrival_at'] = $trip->scheduled_arrival_at;
             $data['departure_utc_offset'] = $trip->scheduled_departure_at
                 ->setTimezone($company->timezone)
                 ->format('P');
