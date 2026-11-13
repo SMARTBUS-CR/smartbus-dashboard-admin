@@ -11,7 +11,7 @@ use Pest\Browser\Support\Selector;
 use Tests\Support\BrowserSession;
 
 describe('Route Pattern Adjustment Move Browser Flow', function (): void {
-    test('moves an adjustment marker while preserving its segment and leaving changes unsaved', function (): void {
+    test('CP-0053: Moves an adjustment marker while preserving its segment and leaving changes unsaved', function (): void {
         config([
             'app.locale' => 'en',
             'services.osrm.url' => 'https://osrm.test',

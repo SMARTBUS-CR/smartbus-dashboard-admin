@@ -13,7 +13,7 @@ describe('External Token Validation In The Browser', function (): void {
         app()->setLocale('en');
     });
 
-    test('redirects an opened form to login without saving when its token expires', function (): void {
+    test('CP-0007: Redirects an opened form to login without saving when its token expires', function (): void {
         $company = createCompany();
         $originalName = $company->legal_name;
         $expired = false;

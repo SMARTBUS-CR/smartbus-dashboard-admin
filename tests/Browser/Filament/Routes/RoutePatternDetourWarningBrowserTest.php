@@ -12,7 +12,7 @@ use Pest\Browser\Support\Selector;
 use Tests\Support\BrowserSession;
 
 describe('Route Pattern Detour Warning Browser Flow', function (): void {
-    test('preserves the warning after saving and reopening and clears it when the origin changes', function (): void {
+    test('CP-0055: Preserves the warning after saving and reopening and clears it when the origin changes', function (): void {
         config([
             'app.locale' => 'en',
             'services.osrm.url' => 'https://osrm.test',

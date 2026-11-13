@@ -13,7 +13,7 @@ describe('Stop Map Browser Flows', function (): void {
         app()->setLocale('en');
     });
 
-    test('selects a boarding point with a map click and saves its coordinates', function (): void {
+    test('CP-0037: Selects a boarding point with a map click and saves its coordinates', function (): void {
         $company = createCompany();
 
         BrowserSession::start(
@@ -66,7 +66,7 @@ describe('Stop Map Browser Flows', function (): void {
         BrowserSession::assertTokenWasValidated();
     });
 
-    test('moves the marker after manual coordinate changes and saves the new location', function (): void {
+    test('CP-0038: Moves the marker after manual coordinate changes and saves the new location', function (): void {
         $company = createCompany();
 
         $stop = Stop::factory()->for($company)->create([

@@ -10,7 +10,7 @@ use Pest\Browser\Execution;
 use Tests\Support\BrowserSession;
 
 describe('Route Pattern View Map Browser Flow', function (): void {
-    test('displays saved route geometry and stop markers without calculating again', function (): void {
+    test('CP-0057: Displays saved route geometry and stop markers without calculating again', function (): void {
         config([
             'app.locale' => 'en',
             'services.osrm.url' => 'https://osrm.test',

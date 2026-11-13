@@ -12,7 +12,7 @@ use Pest\Browser\Support\Selector;
 use Tests\Support\BrowserSession;
 
 describe('Route Pattern Endpoint Browser Flow', function (): void {
-    test('previews searched endpoints and saves them while preserving the intermediate stop', function (): void {
+    test('CP-0056: Previews searched endpoints and saves them while preserving the intermediate stop', function (): void {
         config([
             'app.locale' => 'en',
             'services.photon.url' => 'https://photon.test',
