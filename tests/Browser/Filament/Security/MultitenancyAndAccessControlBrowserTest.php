@@ -130,7 +130,36 @@ describe('Multitenancy And Access Control Browser Security', function (): void {
 
         BrowserSession::assertTokenWasValidated();
 
-        // Attempt forged mutation targeting foreign tenant record under Company A's scope
+        $this->actingAs($actorA);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Filament::setTenant($companyA);
+
+        // 1. Livewire mounting foreign record under Company A rejects with 404
+        Livewire::actingAs($actorA)
+            ->test(EditBus::class, ['record' => $busB->getRouteKey()])
+            ->assertStatus(404);
+
+        // 2. Forged Livewire mutation request sending distinct value rejects with 404
+        $livewireResponse = $this->post('/livewire/update', [
+            'components' => [
+                [
+                    'snapshot' => json_encode([
+                        'data' => ['data' => ['unit_number' => 'BUS-MUTATED-666']],
+                        'memo' => [
+                            'id' => 'forged-component-id',
+                            'name' => 'app.filament.resources.buses.pages.edit-bus',
+                            'path' => "admin/{$companyA->slug}/buses/{$busB->id}/edit",
+                        ],
+                        'checksum' => 'forged-checksum',
+                    ]),
+                    'updates' => ['data.unit_number' => 'BUS-MUTATED-666'],
+                    'calls' => [['method' => 'save', 'params' => []]],
+                ],
+            ],
+        ]);
+        $livewireResponse->assertNotFound();
+
+        // 3. Attempt forged mutation targeting foreign tenant record under Company A's scope
         expect(function () use ($actorA, $companyA, $busB): void {
             app(BusManagementService::class)->update(
                 $actorA,
@@ -140,19 +169,7 @@ describe('Multitenancy And Access Control Browser Security', function (): void {
             );
         })->toThrow(ModelNotFoundException::class);
 
-        // Attempt forged Livewire component mount/action targeting foreign tenant record
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
-        Filament::setTenant($companyA);
-
-        try {
-            Livewire::actingAs($actorA)
-                ->test(EditBus::class, ['record' => $busB->getRouteKey()])
-                ->call('save');
-        } catch (Throwable $exception) {
-            expect($exception)->toBeInstanceOf(Throwable::class);
-        }
-
-        // Verify foreign record in database remains unmodified
+        // 4. Verify foreign record in database remains unmodified
         expect($busB->fresh()->unit_number)->toBe('BUS-FOREIGN-999');
     });
 

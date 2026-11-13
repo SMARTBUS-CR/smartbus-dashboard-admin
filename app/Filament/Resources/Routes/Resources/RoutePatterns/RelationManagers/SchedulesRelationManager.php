@@ -380,7 +380,11 @@ class SchedulesRelationManager extends RelationManager
                         ->using(function (RouteSchedule $record, DeleteAction $action): bool {
                             try {
                                 return (bool) $record->delete();
-                            } catch (QueryException) {
+                            } catch (QueryException $exception) {
+                                if (! $this->isForeignKeyViolation($exception)) {
+                                    throw $exception;
+                                }
+
                                 Notification::make()
                                     ->danger()
                                     ->title(__('Cannot Remove Departure'))
@@ -653,5 +657,13 @@ class SchedulesRelationManager extends RelationManager
         $route->loadMissing('company');
 
         return (string) $route->company->timezone;
+    }
+
+    private function isForeignKeyViolation(QueryException $exception): bool
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
+        $driverCode = (int) ($exception->errorInfo[1] ?? 0);
+
+        return $sqlState === '23503' || ($sqlState === '23000' && in_array($driverCode, [1451, 1452], true));
     }
 }
