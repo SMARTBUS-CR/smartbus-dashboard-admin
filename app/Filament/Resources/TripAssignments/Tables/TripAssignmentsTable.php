@@ -64,7 +64,7 @@ class TripAssignmentsTable
             ])
             ->recordActions([
                 ViewAction::make()->visible(fn (TripAssignment $record): bool => ! TripAssignmentResource::canEdit($record)),
-                EditAction::make(),
+                EditAction::make()->visible(fn (TripAssignment $record): bool => TripAssignmentResource::canEdit($record)),
                 ActionGroup::make([
                     Action::make('dailyTrips')->label(__('Daily Trips'))->icon(Heroicon::OutlinedListBullet)
                         ->url(fn (TripAssignment $record): string => TripResource::getUrl('index', [

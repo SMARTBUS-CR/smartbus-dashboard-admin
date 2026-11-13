@@ -149,7 +149,11 @@ describe('Trip Assignment Resource', function (): void {
         $archived->delete();
         actingAsInCompany($this->actor, $this->company);
 
-        $table = Livewire::test(ListTripAssignments::class)->instance()->getTable();
+        $list = Livewire::test(ListTripAssignments::class)
+            ->filterTable('trashed', true)
+            ->assertActionVisible(TestAction::make('edit')->table($assignment))
+            ->assertActionHidden(TestAction::make('edit')->table($archived));
+        $table = $list->instance()->getTable();
 
         expect($table->getRecordUrl($assignment))->toBe(TripAssignmentResource::getUrl('edit', ['record' => $assignment], tenant: $this->company))
             ->and($table->getRecordUrl($archived))->toBe(TripAssignmentResource::getUrl('view', ['record' => $archived], tenant: $this->company))
