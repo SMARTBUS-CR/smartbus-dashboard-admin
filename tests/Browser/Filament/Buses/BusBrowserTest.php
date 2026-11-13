@@ -42,8 +42,10 @@ describe('Bus Fleet Browser Management', function (): void {
 
         visit($path)
             ->assertSee('U-101')
-            ->assertSee('CR - ABC-123')
-            ->assertSee('Mercedes-Benz Sprinter')
+            ->assertSee('ABC-123')
+            ->assertSee('CR')
+            ->assertSee('Mercedes-Benz')
+            ->assertSee('Sprinter')
             ->assertSee('24')
             ->assertNoJavaScriptErrors();
 
@@ -234,7 +236,8 @@ describe('Bus Fleet Browser Management', function (): void {
 
         visit($path)
             ->assertSee('DEACT-01')
-            ->click('button:has-text("Deactivate")')
+            ->click(Selector::getByRoleSelector('button', ['name' => 'More Actions', 'exact' => true]))
+            ->click(Selector::getByRoleSelector('button', ['name' => 'Deactivate', 'exact' => true]))
             ->assertSee('Are you sure')
             ->click('[aria-modal="true"] button:has-text("Confirm")')
             ->assertSee('Bus Deactivated')
@@ -256,7 +259,8 @@ describe('Bus Fleet Browser Management', function (): void {
 
         visit($path)
             ->assertSee('ACT-01')
-            ->click('button:has-text("Activate")')
+            ->click(Selector::getByRoleSelector('button', ['name' => 'More Actions', 'exact' => true]))
+            ->click(Selector::getByRoleSelector('button', ['name' => 'Activate', 'exact' => true]))
             ->assertSee('Are you sure')
             ->click('[aria-modal="true"] button:has-text("Confirm")')
             ->assertSee('Bus Activated')
@@ -282,7 +286,8 @@ describe('Bus Fleet Browser Management', function (): void {
 
         visit($path)
             ->assertSee('COMMITTED-BUS')
-            ->click('button:has-text("Deactivate")')
+            ->click(Selector::getByRoleSelector('button', ['name' => 'More Actions', 'exact' => true]))
+            ->click(Selector::getByRoleSelector('button', ['name' => 'Deactivate', 'exact' => true]))
             ->click('[aria-modal="true"] button:has-text("Confirm")')
             ->assertSee('Fleet Change Rejected')
             ->assertNoJavaScriptErrors();
@@ -303,7 +308,8 @@ describe('Bus Fleet Browser Management', function (): void {
 
         visit($path)
             ->assertSee('ARCHIVE-ME')
-            ->click('button:has-text("Archive")')
+            ->click(Selector::getByRoleSelector('button', ['name' => 'More Actions', 'exact' => true]))
+            ->click(Selector::getByRoleSelector('button', ['name' => 'Archive', 'exact' => true]))
             ->assertSee('Archive Bus')
             ->click('[aria-modal="true"] button:has-text("Archive")')
             ->assertSee('Bus Archived')
@@ -328,7 +334,8 @@ describe('Bus Fleet Browser Management', function (): void {
 
         visit($path)
             ->assertSee('INPROGRESS-BUS')
-            ->click('button:has-text("Archive")')
+            ->click(Selector::getByRoleSelector('button', ['name' => 'More Actions', 'exact' => true]))
+            ->click(Selector::getByRoleSelector('button', ['name' => 'Archive', 'exact' => true]))
             ->click('[aria-modal="true"] button:has-text("Archive")')
             ->assertSee('Fleet Change Rejected')
             ->assertNoJavaScriptErrors();
@@ -354,7 +361,8 @@ describe('Bus Fleet Browser Management', function (): void {
             ->click('button:has-text("Apply filters")')
             ->click('button[aria-label="Filter"]')
             ->assertSee('RESTORE-ME')
-            ->click('button:has-text("Restore")')
+            ->click(Selector::getByRoleSelector('button', ['name' => 'More Actions', 'exact' => true]))
+            ->click(Selector::getByRoleSelector('button', ['name' => 'Restore', 'exact' => true]))
             ->assertSee('Restore Bus')
             ->click('[aria-modal="true"] button:has-text("Restore")')
             ->assertSee('Bus Restored')

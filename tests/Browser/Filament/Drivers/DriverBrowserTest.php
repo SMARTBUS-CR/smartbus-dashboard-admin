@@ -284,7 +284,8 @@ describe('Driver Workforce Browser Management', function (): void {
 
         visit($path)
             ->assertSee('DEACT-DRV-01')
-            ->click('button:has-text("Deactivate")')
+            ->click(Selector::getByRoleSelector('button', ['name' => 'More Actions', 'exact' => true]))
+            ->click(Selector::getByRoleSelector('button', ['name' => 'Deactivate', 'exact' => true]))
             ->assertSee('Are you sure')
             ->click('[aria-modal="true"] button:has-text("Confirm")')
             ->assertSee('Driver Deactivated')
@@ -306,7 +307,8 @@ describe('Driver Workforce Browser Management', function (): void {
 
         visit($path)
             ->assertSee('REACT-DRV-01')
-            ->click('button:has-text("Activate")')
+            ->click(Selector::getByRoleSelector('button', ['name' => 'More Actions', 'exact' => true]))
+            ->click(Selector::getByRoleSelector('button', ['name' => 'Activate', 'exact' => true]))
             ->assertSee('Are you sure')
             ->click('[aria-modal="true"] button:has-text("Confirm")')
             ->assertSee('Driver Activated')
@@ -332,7 +334,8 @@ describe('Driver Workforce Browser Management', function (): void {
 
         visit($path)
             ->assertSee('TRIP-COMMITTED-DRV')
-            ->click('button:has-text("Deactivate")')
+            ->click(Selector::getByRoleSelector('button', ['name' => 'More Actions', 'exact' => true]))
+            ->click(Selector::getByRoleSelector('button', ['name' => 'Deactivate', 'exact' => true]))
             ->click('[aria-modal="true"] button:has-text("Confirm")')
             ->assertSee('Employment Change Rejected')
             ->assertNoJavaScriptErrors();
@@ -355,7 +358,8 @@ describe('Driver Workforce Browser Management', function (): void {
 
         visit($path)
             ->assertSee('ARCHIVE-DRV-UUID')
-            ->click('button:has-text("Archive")')
+            ->click(Selector::getByRoleSelector('button', ['name' => 'More Actions', 'exact' => true]))
+            ->click(Selector::getByRoleSelector('button', ['name' => 'Archive', 'exact' => true]))
             ->assertSee('Archive Driver Employment')
             ->click('[aria-modal="true"] button:has-text("Archive")')
             ->assertSee('Driver Employment Archived')
@@ -386,7 +390,8 @@ describe('Driver Workforce Browser Management', function (): void {
             ->click('button:has-text("Apply filters")')
             ->click('button[aria-label="Filter"]')
             ->assertSee('RESTORE-DRV-UUID')
-            ->click('button:has-text("Restore")')
+            ->click(Selector::getByRoleSelector('button', ['name' => 'More Actions', 'exact' => true]))
+            ->click(Selector::getByRoleSelector('button', ['name' => 'Restore', 'exact' => true]))
             ->assertSee('Restore Driver Employment')
             ->click('[aria-modal="true"] button:has-text("Restore")')
             ->assertSee('Driver Employment Restored')

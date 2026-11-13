@@ -51,6 +51,9 @@ describe('Dashboard Trip Operations Overview', function (): void {
 
         visit("/admin/{$company->slug}")
             ->assertSee('Trip Operations')
+            ->select('select[id$=".period"]', 'custom')
+            ->assertVisible('input[id$=".from_date"]')
+            ->assertVisible('input[id$=".until_date"]')
             ->type('input[id$=".from_date"]', $pastDate)
             ->type('input[id$=".until_date"]', $pastDate)
             ->assertSee('Trip Operations')
@@ -68,6 +71,10 @@ describe('Dashboard Trip Operations Overview', function (): void {
         BrowserSession::start($actor);
 
         visit("/admin/{$company->slug}")
+            ->assertVisible('select[id$=".period"]')
+            ->assertNotPresent('input[id$=".from_date"]')
+            ->assertNotPresent('input[id$=".until_date"]')
+            ->select('select[id$=".period"]', 'custom')
             ->assertVisible('input[id$=".from_date"]')
             ->assertVisible('input[id$=".until_date"]')
             ->assertNoJavaScriptErrors();
