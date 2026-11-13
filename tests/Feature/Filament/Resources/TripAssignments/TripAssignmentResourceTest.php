@@ -119,6 +119,7 @@ describe('Trip Assignment Resource', function (): void {
     });
 
     test('opens daily trips filtered to the assignment departure', function (): void {
+        $this->travelTo('2026-10-26 12:00:00 UTC');
         $first = Trip::factory()->for($this->company)->withEligibleDriver()->create();
         $second = Trip::factory()->for($this->company)->withEligibleDriver()->create();
         $assignment = TripAssignment::factory()->for($this->company)->create([
