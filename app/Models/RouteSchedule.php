@@ -148,4 +148,19 @@ class RouteSchedule extends Model
     {
         return $this->hasMany(TripAssignment::class);
     }
+
+    /**
+     * @return HasMany<Trip, $this>
+     */
+    public function trips(): HasMany
+    {
+        return $this->hasMany(Trip::class);
+    }
+
+    public function hasDependencies(): bool
+    {
+        return $this->trips()->exists()
+            || $this->tripAssignments()->exists()
+            || $this->exceptions()->exists();
+    }
 }

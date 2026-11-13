@@ -1,6 +1,7 @@
 <?php
 
 use App\Filament\Resources\Buses\BusResource;
+use App\Filament\Resources\Buses\Pages\EditBus;
 use App\Filament\Resources\Drivers\DriverResource;
 use App\Filament\Resources\Trips\TripResource;
 use App\Models\Bus;
@@ -8,7 +9,11 @@ use App\Models\Company;
 use App\Models\Driver;
 use App\Models\Trip;
 use App\Models\User;
+use App\Services\BusManagementService;
 use Carbon\CarbonImmutable;
+use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Livewire\Livewire;
 use Tests\Support\BrowserSession;
 use Tests\Support\WithDriverTrips;
 
@@ -124,6 +129,31 @@ describe('Multitenancy And Access Control Browser Security', function (): void {
             ->assertDontSee('BUS-FOREIGN-999');
 
         BrowserSession::assertTokenWasValidated();
+
+        // Attempt forged mutation targeting foreign tenant record under Company A's scope
+        expect(function () use ($actorA, $companyA, $busB): void {
+            app(BusManagementService::class)->update(
+                $actorA,
+                $companyA,
+                $busB->id,
+                ['unit_number' => 'BUS-MUTATED-666'],
+            );
+        })->toThrow(ModelNotFoundException::class);
+
+        // Attempt forged Livewire component mount/action targeting foreign tenant record
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Filament::setTenant($companyA);
+
+        try {
+            Livewire::actingAs($actorA)
+                ->test(EditBus::class, ['record' => $busB->getRouteKey()])
+                ->call('save');
+        } catch (Throwable $exception) {
+            expect($exception)->toBeInstanceOf(Throwable::class);
+        }
+
+        // Verify foreign record in database remains unmodified
+        expect($busB->fresh()->unit_number)->toBe('BUS-FOREIGN-999');
     });
 
     test('CP-0119: Denies panel access with 403 for user holding only Driver role', function (): void {

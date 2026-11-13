@@ -9,6 +9,7 @@ use App\Models\RouteFare;
 use App\Models\RoutePattern;
 use App\Models\RoutePatternStop;
 use App\Models\RouteSchedule;
+use App\Models\RouteScheduleException;
 use App\Models\Stop;
 use Pest\Browser\Support\Selector;
 use Tests\Support\BrowserSession;
@@ -329,7 +330,7 @@ describe('Route CRUD Browser Management', function () {
     test('CP-0064: Removes planned schedule with confirmation modal', function () {
         $route = Route::factory()->for($this->company)->create();
         $pattern = RoutePattern::factory()->for($route)->create();
-        RouteSchedule::create([
+        $schedule = RouteSchedule::create([
             'route_pattern_id' => $pattern->id,
             'day_of_week' => 2,
             'departure_time' => '09:00:00',
@@ -347,5 +348,37 @@ describe('Route CRUD Browser Management', function () {
             ->click('[aria-modal="true"] button:has-text("Remove Departure")')
             ->assertSee('Departure Removed')
             ->assertNoJavaScriptErrors();
+
+        expect(RouteSchedule::whereKey($schedule->id)->exists())->toBeFalse();
+    });
+
+    test('CP-0065: Prevents removing planned schedule with existing dependencies', function () {
+        $route = Route::factory()->for($this->company)->create();
+        $pattern = RoutePattern::factory()->for($route)->create();
+        $schedule = RouteSchedule::create([
+            'route_pattern_id' => $pattern->id,
+            'day_of_week' => 3,
+            'departure_time' => '10:00:00',
+        ]);
+
+        RouteScheduleException::create([
+            'route_schedule_id' => $schedule->id,
+            'service_date' => '2026-11-25',
+        ]);
+
+        BrowserSession::start($this->actor);
+
+        $path = parse_url(RoutePatternResource::getUrl('edit', ['route' => $route, 'record' => $pattern], tenant: $this->company), PHP_URL_PATH);
+
+        visit($path)
+            ->click('[role="tab"]:has-text("Schedules")')
+            ->click(Selector::getByRoleSelector('button', ['name' => 'More Actions', 'exact' => true]))
+            ->click(Selector::getByRoleSelector('button', ['name' => 'Remove Departure', 'exact' => true]))
+            ->assertSee('Remove Departure')
+            ->click('[aria-modal="true"] button:has-text("Remove Departure")')
+            ->assertSee('Cannot Remove Departure')
+            ->assertNoJavaScriptErrors();
+
+        expect(RouteSchedule::whereKey($schedule->id)->exists())->toBeTrue();
     });
 });

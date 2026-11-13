@@ -29,6 +29,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -362,7 +363,35 @@ class SchedulesRelationManager extends RelationManager
                         ))
                         ->modalSubmitActionLabel(__('Remove Departure'))
                         ->successNotificationTitle(__('Departure Removed'))
-                        ->authorize(fn (): bool => $this->canManageSchedules()),
+                        ->authorize(fn (): bool => $this->canManageSchedules())
+                        ->before(function (DeleteAction $action, RouteSchedule $record): void {
+                            if ($record->hasDependencies()) {
+                                Notification::make()
+                                    ->danger()
+                                    ->title(__('Cannot Remove Departure'))
+                                    ->body(__(
+                                        'This departure cannot be removed because it is referenced by existing trips, assignments, or suspensions.',
+                                    ))
+                                    ->send();
+
+                                $action->halt();
+                            }
+                        })
+                        ->using(function (RouteSchedule $record, DeleteAction $action): bool {
+                            try {
+                                return (bool) $record->delete();
+                            } catch (QueryException) {
+                                Notification::make()
+                                    ->danger()
+                                    ->title(__('Cannot Remove Departure'))
+                                    ->body(__(
+                                        'This departure cannot be removed because it is referenced by existing trips, assignments, or suspensions.',
+                                    ))
+                                    ->send();
+
+                                $action->halt();
+                            }
+                        }),
                 ])
                     ->label(__('More Actions'))
                     ->icon(Heroicon::OutlinedEllipsisVertical)
