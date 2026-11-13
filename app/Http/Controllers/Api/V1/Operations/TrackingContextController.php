@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Api\V1\Operations;
 
 use App\Http\Controllers\Controller;
-use App\Http\Middleware\AuthenticateTrackingService;
 use App\Http\Resources\Api\V1\Operations\TripTrackingContextResource;
 use App\Models\Trip;
+use App\Models\User;
 use App\Services\Operations\EtaTripContext;
 use Dedoc\Scramble\Attributes\QueryParameter;
 use DomainException;
@@ -17,8 +17,9 @@ class TrackingContextController extends Controller
     /**
      * Expose authoritative tracking context and planned snapshot for GPS telemetry.
      */
-    public function show(string $tripId): TripTrackingContextResource
+    public function show(Request $request, string $tripId): TripTrackingContextResource
     {
+        $this->ensureActiveUser($request);
         $trip = Trip::query()->withAggregate('driver', 'user_id')->find($tripId);
 
         if (! $trip) {
@@ -29,14 +30,15 @@ class TrackingContextController extends Controller
     }
 
     /**
-     * With projection=eta-v1, authenticate with the ETA service Bearer token
-     * and return the frozen trip plan. Other requests use the GPS contract.
+     * With projection=eta-v1, return the frozen trip plan.
      */
-    #[QueryParameter('projection', description: 'Use eta-v1 with the ETA service Bearer token. Omit for the signed GPS context.', type: 'string', example: 'eta-v1')]
-    public function showInternal(string $tripId, Request $request, EtaTripContext $etaContext): TripTrackingContextResource|JsonResponse
+    #[QueryParameter('projection', description: 'Use eta-v1 for the ETA projection. Omit for the standard tracking context.', type: 'string', example: 'eta-v1')]
+    public function showInternal(Request $request, string $tripId, EtaTripContext $etaContext): TripTrackingContextResource|JsonResponse
     {
-        if (! $request->attributes->getBoolean(AuthenticateTrackingService::ETA_CONTEXT_ATTRIBUTE)) {
-            return $this->show($tripId);
+        $this->ensureActiveUser($request);
+
+        if ($request->query('projection') !== 'eta-v1') {
+            return $this->show($request, $tripId);
         }
 
         $trip = Trip::query()->find($tripId);
@@ -51,5 +53,15 @@ class TrackingContextController extends Controller
         }
 
         return response()->json($projection)->header('Cache-Control', 'no-store');
+    }
+
+    private function ensureActiveUser(Request $request): User
+    {
+        $user = $request->user();
+        if (! $user instanceof User || $user->trashed()) {
+            abort(401, __('The access token is invalid or expired.'));
+        }
+
+        return $user;
     }
 }
