@@ -3,6 +3,7 @@
 use App\Enums\TokenValidationStatus;
 use App\Enums\TripStatus;
 use App\Enums\UserRole;
+use App\Models\CompanyUser;
 use App\Models\Trip;
 use App\Models\User;
 use App\Services\AuthService;
@@ -33,7 +34,7 @@ describe('Trip Tracking Context Retrieval', function (): void {
             ->assertHeader('Content-Type', 'application/vnd.api+json')
             ->assertJsonPath('data.id', $trip->id)
             ->assertJsonPath('data.attributes.driver_id', $trip->driver_id)
-            ->assertJsonPath('data.attributes.driver_user_id', $trip->driver->user_id)
+            ->assertJsonMissingPath('data.attributes.driver_user_id')
             ->assertJsonPath('data.attributes.status', TripStatus::SCHEDULED->value);
         Http::assertNothingSent();
     });
@@ -60,7 +61,15 @@ describe('Trip Tracking Context Retrieval', function (): void {
 
     it('allows every active ecosystem role with a valid bearer token', function (UserRole $role): void {
         $trip = Trip::factory()->withDriverAvailability()->create()->refresh();
-        $user = createUserWithRole($role);
+        $user = match ($role) {
+            UserRole::Driver => $trip->driver->user,
+            UserRole::Admin => createUserWithRole($role, $trip->company),
+            default => createUserWithRole($role),
+        };
+        if ($role === UserRole::Admin) {
+            CompanyUser::factory()->create(['company_id' => $trip->company_id, 'user_id' => $user->id]);
+            grantShield($user, ['View:Trip'], $trip->company);
+        }
         authenticateTrackingUser($user);
 
         $this->withToken('valid-sanctum-token')
@@ -73,6 +82,35 @@ describe('Trip Tracking Context Retrieval', function (): void {
         UserRole::Admin,
         UserRole::SuperAdmin,
     ]);
+
+    it('returns 403 when a company administrator requests another company trip', function (): void {
+        [$company, $otherCompany] = createTenantPair();
+        $trip = Trip::factory()->for($otherCompany)->withDriverAvailability()->create()->refresh();
+        $administrator = createUserWithRole(UserRole::Admin, $company);
+        CompanyUser::factory()->create(['company_id' => $company->id, 'user_id' => $administrator->id]);
+        grantShield($administrator, ['View:Trip'], $company);
+        authenticateTrackingUser($administrator);
+
+        $this->withToken('valid-sanctum-token')
+            ->getJson("/api/v1/operations/trips/{$trip->id}/tracking-context")
+            ->assertForbidden();
+        $this->withToken('valid-sanctum-token')
+            ->getJson("/api/internal/v1/trips/{$trip->id}/tracking-context?projection=eta-v1")
+            ->assertForbidden();
+    });
+
+    it('includes the driver identity only for an authorized company administrator', function (): void {
+        $trip = Trip::factory()->withDriverAvailability()->create()->refresh();
+        $administrator = createUserWithRole(UserRole::Admin, $trip->company);
+        CompanyUser::factory()->create(['company_id' => $trip->company_id, 'user_id' => $administrator->id]);
+        grantShield($administrator, ['View:Trip'], $trip->company);
+        authenticateTrackingUser($administrator);
+
+        $this->withToken('valid-sanctum-token')
+            ->getJson("/api/v1/operations/trips/{$trip->id}/tracking-context")
+            ->assertOk()
+            ->assertJsonPath('data.attributes.driver_user_id', $trip->driver->user_id);
+    });
 
     it('rejects an archived authenticated user with 401', function (): void {
         $trip = Trip::factory()->withDriverAvailability()->create()->refresh();
