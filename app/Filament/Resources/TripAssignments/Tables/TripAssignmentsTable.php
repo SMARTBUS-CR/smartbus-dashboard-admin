@@ -12,6 +12,7 @@ use App\Models\TripAssignment;
 use App\Models\User;
 use App\Services\TripAssignmentManagementService;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
@@ -42,10 +43,10 @@ class TripAssignmentsTable
                     ->formatStateUsing(fn (?string $state, TripAssignment $record): string => ($state ?? $record->driver->license).($record->driver->trashed() ? ' ('.__('Archived').')' : '')),
                 TextColumn::make('bus.unit_number')->label(__('Bus'))
                     ->formatStateUsing(fn (string $state, TripAssignment $record): string => $state.($record->bus->trashed() ? ' ('.__('Archived').')' : '')),
-                TextColumn::make('planned_arrival_time')->label(__('Planned Arrival')),
-                IconColumn::make('ends_next_day')->label(__('Overnight'))->boolean(),
-                TextColumn::make('valid_from')->label(__('Valid From'))->date(),
-                TextColumn::make('valid_until')->label(__('Valid Until'))->date(),
+                TextColumn::make('planned_arrival_time')->label(__('Planned Arrival'))->toggleable(),
+                IconColumn::make('ends_next_day')->label(__('Overnight'))->boolean()->toggleable(),
+                TextColumn::make('valid_from')->label(__('Valid From'))->date()->toggleable(),
+                TextColumn::make('valid_until')->label(__('Valid Until'))->date()->toggleable(),
                 TextColumn::make('status')->badge(),
             ])
             ->filters([
@@ -62,25 +63,39 @@ class TripAssignmentsTable
                 TrashedFilter::make()->label(__('Archive Status')),
             ])
             ->recordActions([
-                ViewAction::make(),
-                Action::make('dailyTrips')->label(__('Daily Trips'))->icon(Heroicon::OutlinedListBullet)
-                    ->url(fn (TripAssignment $record): string => TripResource::getUrl('index', [
-                        'filters' => ['route_schedule_id' => ['value' => $record->route_schedule_id]],
-                    ], tenant: Filament::getTenant())),
-                EditAction::make()->visible(fn (TripAssignment $record): bool => ! $record->trashed()),
-                Action::make('deactivate')->label(__('Deactivate'))->icon(Heroicon::OutlinedNoSymbol)
-                    ->visible(fn (TripAssignment $record): bool => ! $record->trashed() && $record->status === TripAssignmentStatus::ACTIVE && TripAssignmentResource::canEdit($record))
-                    ->action(fn (TripAssignment $record, Action $action): bool => static::lifecycle($record, $action, 'setActive', false)),
-                Action::make('activate')->label(__('Activate'))->icon(Heroicon::OutlinedCheckCircle)
-                    ->visible(fn (TripAssignment $record): bool => ! $record->trashed() && $record->status === TripAssignmentStatus::INACTIVE && TripAssignmentResource::canEdit($record))
-                    ->action(fn (TripAssignment $record, Action $action): bool => static::lifecycle($record, $action, 'setActive', true)),
-                Action::make('archive')->label(__('Archive'))->icon(Heroicon::OutlinedArchiveBox)
-                    ->requiresConfirmation()->visible(fn (TripAssignment $record): bool => ! $record->trashed() && TripAssignmentResource::canDelete($record))
-                    ->action(fn (TripAssignment $record, Action $action): bool => static::lifecycle($record, $action, 'archive')),
-                Action::make('restore')->label(__('Restore'))->icon(Heroicon::OutlinedArrowUturnLeft)
-                    ->requiresConfirmation()->visible(fn (TripAssignment $record): bool => $record->trashed() && TripAssignmentResource::canRestore($record))
-                    ->action(fn (TripAssignment $record, Action $action): bool => static::lifecycle($record, $action, 'restore')),
+                ViewAction::make()->visible(fn (TripAssignment $record): bool => ! TripAssignmentResource::canEdit($record)),
+                EditAction::make()->visible(fn (TripAssignment $record): bool => TripAssignmentResource::canEdit($record)),
+                ActionGroup::make([
+                    Action::make('dailyTrips')->label(__('Daily Trips'))->icon(Heroicon::OutlinedListBullet)
+                        ->url(fn (TripAssignment $record): string => TripResource::getUrl('index', [
+                            'filters' => [
+                                'route_schedule_id' => ['value' => $record->route_schedule_id],
+                                'service_date' => ['period' => 'all'],
+                            ],
+                        ], tenant: Filament::getTenant())),
+                    Action::make('deactivate')->label(__('Deactivate'))->icon(Heroicon::OutlinedNoSymbol)
+                        ->visible(fn (TripAssignment $record): bool => ! $record->trashed() && $record->status === TripAssignmentStatus::ACTIVE && TripAssignmentResource::canEdit($record))
+                        ->action(fn (TripAssignment $record, Action $action): bool => static::lifecycle($record, $action, 'setActive', false)),
+                    Action::make('activate')->label(__('Activate'))->icon(Heroicon::OutlinedCheckCircle)
+                        ->visible(fn (TripAssignment $record): bool => ! $record->trashed() && $record->status === TripAssignmentStatus::INACTIVE && TripAssignmentResource::canEdit($record))
+                        ->action(fn (TripAssignment $record, Action $action): bool => static::lifecycle($record, $action, 'setActive', true)),
+                    Action::make('archive')->label(__('Archive'))->icon(Heroicon::OutlinedArchiveBox)
+                        ->requiresConfirmation()->visible(fn (TripAssignment $record): bool => ! $record->trashed() && TripAssignmentResource::canDelete($record))
+                        ->action(fn (TripAssignment $record, Action $action): bool => static::lifecycle($record, $action, 'archive')),
+                    Action::make('restore')->label(__('Restore'))->icon(Heroicon::OutlinedArrowUturnLeft)
+                        ->requiresConfirmation()->visible(fn (TripAssignment $record): bool => $record->trashed() && TripAssignmentResource::canRestore($record))
+                        ->action(fn (TripAssignment $record, Action $action): bool => static::lifecycle($record, $action, 'restore')),
+                ])->label(__('More Actions'))->icon(Heroicon::OutlinedEllipsisVertical)->color('gray'),
             ])
+            ->recordUrl(function (TripAssignment $record): ?string {
+                $page = match (true) {
+                    TripAssignmentResource::canEdit($record) => 'edit',
+                    TripAssignmentResource::canView($record) => 'view',
+                    default => null,
+                };
+
+                return $page === null ? null : TripAssignmentResource::getUrl($page, ['record' => $record], tenant: Filament::getTenant());
+            })
             ->toolbarActions([]);
     }
 

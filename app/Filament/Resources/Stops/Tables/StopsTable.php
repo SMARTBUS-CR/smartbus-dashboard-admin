@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Stops\Tables;
 
 use App\Filament\Resources\Stops\StopResource;
 use App\Models\Stop;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\RestoreAction;
@@ -40,11 +41,13 @@ class StopsTable
 
                 TextColumn::make('latitude')
                     ->label(__('Latitude'))
-                    ->fontFamily(FontFamily::Mono),
+                    ->fontFamily(FontFamily::Mono)
+                    ->toggleable(),
 
                 TextColumn::make('longitude')
                     ->label(__('Longitude'))
-                    ->fontFamily(FontFamily::Mono),
+                    ->fontFamily(FontFamily::Mono)
+                    ->toggleable(),
             ])
             ->defaultSort('name')
             ->filters([
@@ -69,53 +72,55 @@ class StopsTable
                     )
                     ->color('primary'),
 
-                DeleteAction::make()
-                    ->label(__('Archive'))
-                    ->color('danger')
-                    ->icon(Heroicon::OutlinedArchiveBox)
-                    ->modalHeading(__('Archive Stop'))
-                    ->modalDescription(__(
-                        'The stop will be hidden from the active catalog. Its data will be preserved and it can be restored.',
-                    ))
-                    ->modalIcon(Heroicon::OutlinedArchiveBox)
-                    ->modalIconColor('danger')
-                    ->modalAlignment(Alignment::Start)
-                    ->modalWidth(Width::Large)
-                    ->modalSubmitActionLabel(__('Archive'))
-                    ->successNotificationTitle(__('Stop Archived'))
-                    ->using(function (Stop $record, DeleteAction $action): bool {
-                        try {
-                            return (bool) $record->delete();
-                        } catch (ValidationException $exception) {
-                            Notification::make()
-                                ->danger()
-                                ->title(__('Could Not Archive Stop'))
-                                ->body(
-                                    collect($exception->errors())
-                                        ->flatten()
-                                        ->first(),
-                                )
-                                ->send();
+                ActionGroup::make([
+                    DeleteAction::make()
+                        ->label(__('Archive'))
+                        ->color('danger')
+                        ->icon(Heroicon::OutlinedArchiveBox)
+                        ->modalHeading(__('Archive Stop'))
+                        ->modalDescription(__(
+                            'The stop will be hidden from the active catalog. Its data will be preserved and it can be restored.',
+                        ))
+                        ->modalIcon(Heroicon::OutlinedArchiveBox)
+                        ->modalIconColor('danger')
+                        ->modalAlignment(Alignment::Start)
+                        ->modalWidth(Width::Large)
+                        ->modalSubmitActionLabel(__('Archive'))
+                        ->successNotificationTitle(__('Stop Archived'))
+                        ->using(function (Stop $record, DeleteAction $action): bool {
+                            try {
+                                return (bool) $record->delete();
+                            } catch (ValidationException $exception) {
+                                Notification::make()
+                                    ->danger()
+                                    ->title(__('Could Not Archive Stop'))
+                                    ->body(
+                                        collect($exception->errors())
+                                            ->flatten()
+                                            ->first(),
+                                    )
+                                    ->send();
 
-                            $action->halt();
-                        }
-                    }),
+                                $action->halt();
+                            }
+                        }),
 
-                RestoreAction::make()
-                    ->label(__('Restore'))
-                    ->color('success')
-                    ->icon(Heroicon::OutlinedArrowUturnLeft)
-                    ->requiresConfirmation()
-                    ->modalHeading(__('Restore Stop'))
-                    ->modalDescription(__(
-                        'The stop will become available in the active catalog again.',
-                    ))
-                    ->modalIcon(Heroicon::OutlinedArrowUturnLeft)
-                    ->modalIconColor('success')
-                    ->modalAlignment(Alignment::Start)
-                    ->modalWidth(Width::Large)
-                    ->modalSubmitActionLabel(__('Restore'))
-                    ->successNotificationTitle(__('Stop Restored')),
+                    RestoreAction::make()
+                        ->label(__('Restore'))
+                        ->color('success')
+                        ->icon(Heroicon::OutlinedArrowUturnLeft)
+                        ->requiresConfirmation()
+                        ->modalHeading(__('Restore Stop'))
+                        ->modalDescription(__(
+                            'The stop will become available in the active catalog again.',
+                        ))
+                        ->modalIcon(Heroicon::OutlinedArrowUturnLeft)
+                        ->modalIconColor('success')
+                        ->modalAlignment(Alignment::Start)
+                        ->modalWidth(Width::Large)
+                        ->modalSubmitActionLabel(__('Restore'))
+                        ->successNotificationTitle(__('Stop Restored')),
+                ])->label(__('More Actions'))->icon(Heroicon::OutlinedEllipsisVertical)->color('gray'),
             ])
             ->toolbarActions([])
             ->emptyStateHeading(__('No Stops Available'))

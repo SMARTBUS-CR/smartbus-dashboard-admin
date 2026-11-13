@@ -48,7 +48,8 @@ class UsersTable
 
                         return Color::hex($color);
                     })
-                    ->width('1%'),
+                    ->width('1%')
+                    ->toggleable(),
             ])
             ->recordActions([
                 EditAction::make(),

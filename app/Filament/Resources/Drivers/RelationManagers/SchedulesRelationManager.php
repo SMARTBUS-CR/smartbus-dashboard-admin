@@ -120,15 +120,18 @@ class SchedulesRelationManager extends RelationManager
                     ->label(__('End Time')),
                 IconColumn::make('ends_next_day')
                     ->label(__('Overnight'))
-                    ->boolean(),
+                    ->boolean()
+                    ->toggleable(),
                 TextColumn::make('valid_from')
                     ->label(__('Valid From'))
                     ->date()
-                    ->placeholder(__('Unbounded')),
+                    ->placeholder(__('Unbounded'))
+                    ->toggleable(),
                 TextColumn::make('valid_until')
                     ->label(__('Valid Until'))
                     ->date()
-                    ->placeholder(__('Unbounded')),
+                    ->placeholder(__('Unbounded'))
+                    ->toggleable(),
             ])
             ->defaultSort('day_of_week')
             ->headerActions([
