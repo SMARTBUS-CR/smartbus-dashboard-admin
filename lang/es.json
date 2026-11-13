@@ -778,6 +778,8 @@
     "Minutes From Start": "Minutos desde el inicio",
     "From Date": "Fecha inicial",
     "Until Date": "Fecha final",
+    "Last 7 Days": "Últimos 7 días",
+    "Last 30 Days": "Últimos 30 días",
     "Trip Operations": "Operaciones de viajes",
     "Persisted Trip statuses for the selected local service dates.": "Estados de viaje almacenados para las fechas locales de servicio seleccionadas."
 }
