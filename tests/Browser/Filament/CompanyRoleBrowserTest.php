@@ -14,7 +14,7 @@ describe('Company And Role Browser Flows', function (): void {
         app()->setLocale('en');
     });
 
-    test('updates the role identifier on blur and submits the selected permission', function () {
+    test('CP-0023: Updates the role identifier on blur and submits the selected permission', function () {
         $company = createCompany();
         BrowserSession::start(createUserWithRole(UserRole::SuperAdmin));
 
@@ -38,7 +38,7 @@ describe('Company And Role Browser Flows', function (): void {
         BrowserSession::assertTokenWasValidated();
     });
 
-    test('switches company through the tenant menu and shows only its roles', function () {
+    test('CP-0009: Switches company through the tenant menu and shows only its roles', function () {
         $companyA = createCompany(['legal_name' => 'Northern Transport']);
         $companyB = createCompany(['legal_name' => 'Southern Transport']);
 
@@ -66,7 +66,7 @@ describe('Company And Role Browser Flows', function (): void {
             ->assertNoJavaScriptErrors();
     });
 
-    test('cancels company deletion and deletes only after confirming the modal', function () {
+    test('CP-0017: Cancels company deletion and deletes only after confirming the modal', function () {
         $tenant = createCompany();
         $company = createCompany(['legal_name' => 'Company To Delete']);
         BrowserSession::start(createUserWithRole(UserRole::SuperAdmin));
@@ -89,7 +89,7 @@ describe('Company And Role Browser Flows', function (): void {
         BrowserSession::assertTokenWasValidated();
     });
 
-    test('saves a national phone number using the selected country', function (): void {
+    test('CP-0019: Saves a national phone number using the selected country', function (): void {
         $company = createCompany([
             'country_code' => 'CR',
             'timezone' => 'America/Costa_Rica',
@@ -143,7 +143,7 @@ describe('Company And Role Browser Flows', function (): void {
         BrowserSession::assertTokenWasValidated();
     });
 
-    test('updates and saves the timezone when the company country changes', function (): void {
+    test('CP-0018: Updates and saves the timezone when the company country changes', function (): void {
         $company = createCompany([
             'country_code' => 'CR',
             'timezone' => 'America/Costa_Rica',

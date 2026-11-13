@@ -68,6 +68,14 @@ class SchedulesRelationManager extends RelationManager
         parent::mount();
     }
 
+    public function dehydrate(): void
+    {
+        $this->mountedActions = array_map(
+            fn ($action) => is_array($action) ? [...$action] : $action,
+            $this->mountedActions,
+        );
+    }
+
     public function form(Schema $schema): Schema
     {
         return $schema

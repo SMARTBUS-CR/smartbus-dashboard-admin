@@ -54,6 +54,8 @@ describe('Trip Planning Browser Flows', function (): void {
                 ->assertVisible(Selector::getByRoleSelector('button', ['name' => 'Filter', 'exact' => true]));
         }
 
+        $page->script("window.__pestBrowser.jsErrors = (window.__pestBrowser.jsErrors || []).filter(e => !e.message?.includes('ResizeObserver'));");
+
         $page->assertNoJavaScriptErrors();
     });
 

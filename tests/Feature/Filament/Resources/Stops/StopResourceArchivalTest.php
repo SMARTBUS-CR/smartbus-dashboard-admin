@@ -34,8 +34,8 @@ describe('Stop Resource Archival', function (): void {
             ->assertNotified('Stop Archived')
             ->assertCanNotSeeTableRecords([$stop]);
 
-        expect($stop->fresh()->trashed())->toBeTrue();
-        expect($list->instance()->getTable()->getAction('delete')->getGroup())->not->toBeNull();
+        expect($stop->fresh()->trashed())->toBeTrue()
+            ->and($list->instance()->getTable()->getAction('delete')->getGroup())->not->toBeNull();
     });
 
     test('restores an archived stop through the table', function (): void {

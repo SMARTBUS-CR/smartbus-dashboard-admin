@@ -63,8 +63,8 @@ describe('Trip Resource Filters', function (): void {
             ->assertCanNotSeeTableRecords([$scheduled, $completed, $foreign]);
 
         $tabs = $list->instance()->getCachedTabs();
-        expect(array_keys($tabs))->toBe(['all', 'scheduled', 'in_progress', 'completed', 'cancelled']);
-        expect($tabs['all']->getBadge())->toBe('2')
+        expect(array_keys($tabs))->toBe(['all', 'scheduled', 'in_progress', 'completed', 'cancelled'])
+            ->and($tabs['all']->getBadge())->toBe('2')
             ->and($tabs['completed']->getBadge())->toBe('1')
             ->and($tabs['scheduled']->getBadge())->toBe('1')
             ->and($tabs['in_progress']->getBadge())->toBe('0')

@@ -8,7 +8,7 @@ use Pest\Browser\Support\Selector;
 use Tests\Support\BrowserSession;
 
 describe('Stop Map Location Lookup', function (): void {
-    test('shows a busy overlay while describing a selected point and preserves the stop name', function (): void {
+    test('CP-0040: Shows a busy overlay while describing a selected point and preserves the stop name', function (): void {
         config([
             'app.locale' => 'en',
             'services.photon.url' => 'https://photon.test',

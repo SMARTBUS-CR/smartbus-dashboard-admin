@@ -9,7 +9,7 @@ use Pest\Browser\Support\Selector;
 use Tests\Support\BrowserSession;
 
 describe('Stop Location Search Browser Flow', function (): void {
-    test('searches for a location and saves the selected boarding point without manual coordinates', function (): void {
+    test('CP-0039: Searches for a location and saves the selected boarding point without manual coordinates', function (): void {
         config([
             'app.locale' => 'en',
             'services.photon.url' => 'https://photon.test',

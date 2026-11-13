@@ -11,6 +11,7 @@ use App\Models\RouteScheduleException;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
@@ -28,6 +29,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -353,6 +355,47 @@ class SchedulesRelationManager extends RelationManager
                                 ->title(__('Departure Resumed'))
                                 ->send();
                         }),
+                    DeleteAction::make()
+                        ->label(__('Remove Departure'))
+                        ->modalHeading(__('Remove Departure'))
+                        ->modalDescription(__(
+                            'Are you sure you want to remove this scheduled departure?',
+                        ))
+                        ->modalSubmitActionLabel(__('Remove Departure'))
+                        ->successNotificationTitle(__('Departure Removed'))
+                        ->authorize(fn (): bool => $this->canManageSchedules())
+                        ->before(function (DeleteAction $action, RouteSchedule $record): void {
+                            if ($record->hasDependencies()) {
+                                Notification::make()
+                                    ->danger()
+                                    ->title(__('Cannot Remove Departure'))
+                                    ->body(__(
+                                        'This departure cannot be removed because it is referenced by existing trips, assignments, or suspensions.',
+                                    ))
+                                    ->send();
+
+                                $action->halt();
+                            }
+                        })
+                        ->using(function (RouteSchedule $record, DeleteAction $action): bool {
+                            try {
+                                return (bool) $record->delete();
+                            } catch (QueryException $exception) {
+                                if (! $this->isForeignKeyViolation($exception)) {
+                                    throw $exception;
+                                }
+
+                                Notification::make()
+                                    ->danger()
+                                    ->title(__('Cannot Remove Departure'))
+                                    ->body(__(
+                                        'This departure cannot be removed because it is referenced by existing trips, assignments, or suspensions.',
+                                    ))
+                                    ->send();
+
+                                $action->halt();
+                            }
+                        }),
                 ])
                     ->label(__('More Actions'))
                     ->icon(Heroicon::OutlinedEllipsisVertical)
@@ -614,5 +657,13 @@ class SchedulesRelationManager extends RelationManager
         $route->loadMissing('company');
 
         return (string) $route->company->timezone;
+    }
+
+    private function isForeignKeyViolation(QueryException $exception): bool
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
+        $driverCode = (int) ($exception->errorInfo[1] ?? 0);
+
+        return $sqlState === '23503' || ($sqlState === '23000' && in_array($driverCode, [1451, 1452], true));
     }
 }

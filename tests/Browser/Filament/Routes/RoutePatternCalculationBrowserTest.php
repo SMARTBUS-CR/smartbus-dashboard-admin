@@ -12,7 +12,7 @@ use Pest\Browser\Support\Selector;
 use Tests\Support\BrowserSession;
 
 describe('Route Pattern Calculation Browser Flow', function (): void {
-    test('draws the calculated route and clears the proposal when the origin changes', function (): void {
+    test('CP-0051: Draws the calculated route and clears the proposal when the origin changes', function (): void {
         config([
             'app.locale' => 'en',
             'services.osrm.url' => 'https://osrm.test',

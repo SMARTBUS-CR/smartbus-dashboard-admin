@@ -12,7 +12,7 @@ use Pest\Browser\Support\Selector;
 use Tests\Support\BrowserSession;
 
 describe('Route Pattern Adjustment Persistence Browser Flow', function (): void {
-    test('saves a calculated adjustment and restores it when reopening the edit page', function (): void {
+    test('CP-0054: Saves a calculated adjustment and restores it when reopening the edit page', function (): void {
         config([
             'app.locale' => 'en',
             'services.osrm.url' => 'https://osrm.test',

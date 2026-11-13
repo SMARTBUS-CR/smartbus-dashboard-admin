@@ -11,7 +11,7 @@ use Pest\Browser\Support\Selector;
 use Tests\Support\BrowserSession;
 
 describe('Route Pattern Adjustment Map Browser Flow', function (): void {
-    test('adds and removes an adjustment point through map clicks without saving or calculating', function (): void {
+    test('CP-0052: Adds and removes an adjustment point through map clicks without saving or calculating', function (): void {
         config([
             'app.locale' => 'en',
             'services.osrm.url' => 'https://osrm.test',

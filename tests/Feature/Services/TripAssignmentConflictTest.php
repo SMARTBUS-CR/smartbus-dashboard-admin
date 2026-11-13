@@ -145,7 +145,7 @@ describe('Trip Assignment Conflicts', function (): void {
         expect(fn () => $service->setActive($actor, $company, $first, true))
             ->toThrow(function (ValidationException $exception): void {
                 expect($exception->errors())->toHaveKey('route_schedule_id');
-            });
-        expect($first->fresh()->status->value)->toBe('inactive');
+            })
+            ->and($first->fresh()->status->value)->toBe('inactive');
     });
 });
