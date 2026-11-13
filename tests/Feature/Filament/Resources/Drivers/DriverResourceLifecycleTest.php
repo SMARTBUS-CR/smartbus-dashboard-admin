@@ -75,9 +75,9 @@ describe('Driver Resource Lifecycle', function (): void {
             ->assertNotified()
             ->assertCanNotSeeTableRecords([$driver]);
 
-        expect($driver->fresh()->status)->toBe(DriverStatus::INACTIVE);
-        expect($list->instance()->getCachedTabs()['inactive']->getBadge())->toBe('1');
-        expect($list->instance()->getTable()->getAction('deactivate')->getGroup())->not->toBeNull();
+        expect($driver->fresh()->status)->toBe(DriverStatus::INACTIVE)
+            ->and($list->instance()->getCachedTabs()['inactive']->getBadge())->toBe('1')
+            ->and($list->instance()->getTable()->getAction('deactivate')->getGroup())->not->toBeNull();
 
         Livewire::test(ListDrivers::class)
             ->callAction(TestAction::make('activate')->table($driver->fresh()))

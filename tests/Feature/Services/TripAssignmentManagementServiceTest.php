@@ -114,9 +114,8 @@ describe('Trip Assignment Management Service', function (): void {
             'deleted_at' => now(),
         ]))->toThrow(function (ValidationException $exception): void {
             expect($exception->errors())->toHaveKeys(['id', 'company_id', 'status', 'deleted_at']);
-        });
-
-        expect($assignment->fresh()->getRawOriginal())->toBe($before);
+        })
+            ->and($assignment->fresh()->getRawOriginal())->toBe($before);
     });
 
     test('rejects invalid local intervals and validity dates with field errors', function (array $changes, string $field): void {
@@ -187,8 +186,8 @@ describe('Trip Assignment Management Service', function (): void {
         expect(fn () => app(TripAssignmentManagementService::class)->setActive($unauthorized, $company, $assignment, false))
             ->toThrow(AuthorizationException::class)
             ->and(fn () => app(TripAssignmentManagementService::class)->archive($actor, $other, $assignment))
-            ->toThrow(ModelNotFoundException::class);
-        expect($assignment->fresh()->status)->toBe(TripAssignmentStatus::ACTIVE)
+            ->toThrow(ModelNotFoundException::class)
+            ->and($assignment->fresh()->status)->toBe(TripAssignmentStatus::ACTIVE)
             ->and($assignment->fresh()->trashed())->toBeFalse();
     });
 });

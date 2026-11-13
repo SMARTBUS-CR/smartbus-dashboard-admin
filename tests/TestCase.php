@@ -4,12 +4,37 @@ namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\ConfigurationUrlParser;
+use Livewire\Features\SupportTesting\Testable;
 use RuntimeException;
 
 use function str_ends_with;
 
 abstract class TestCase extends BaseTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Testable::macro('toggleAllTableColumns', function (bool $condition = true) {
+            /** @phpstan-ignore-next-line */
+            $tableColumns = $this->instance()->tableColumns;
+
+            foreach ($tableColumns as $key => $column) {
+                if (! ($column['isToggleable'] ?? false)) {
+                    continue;
+                }
+
+                $tableColumns[$key]['isToggled'] = $condition;
+            }
+
+            $this->set('tableColumns', $tableColumns);
+
+            $this->call('applyTableColumnManager');
+
+            return $this;
+        });
+    }
+
     /**
      * Point both connections at the testing databases and then validate them,
      * so a misconfigured run can never wipe development data.

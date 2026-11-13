@@ -48,11 +48,11 @@ describe('Public Trip Reads', function (): void {
             'actual_arrival_at' => null,
             'headsign' => $snapshot['headsign'],
             'bus' => ['id' => $trip->bus_id, 'plate_number' => $trip->bus->plate_number, 'unit_number' => $trip->bus->unit_number],
-        ]);
-        expect($response->json('included'))->toBeNull();
-        expect($response->json($data.'.relationships'))->toBeEmpty();
-        expect($response->getContent())->not->toContain('driver_id', 'user_id', 'salary_', 'license', 'password', 'remember_token', 'cancellation_reason', 'planned_route_snapshot');
-        expect($trip->fresh()->getRawOriginal())->toBe($before);
+        ])
+            ->and($response->json('included'))->toBeNull()
+            ->and($response->json($data.'.relationships'))->toBeEmpty()
+            ->and($response->getContent())->not->toContain('driver_id', 'user_id', 'salary_', 'license', 'password', 'remember_token', 'cancellation_reason', 'planned_route_snapshot')
+            ->and($trip->fresh()->getRawOriginal())->toBe($before);
         Http::assertNothingSent();
     })->with(['list', 'detail']);
 

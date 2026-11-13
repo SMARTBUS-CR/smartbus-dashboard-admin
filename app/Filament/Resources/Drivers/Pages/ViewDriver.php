@@ -42,6 +42,14 @@ class ViewDriver extends ViewRecord
         ];
     }
 
+    public function dehydrate(): void
+    {
+        $this->mountedActions = array_map(
+            fn ($action) => is_array($action) ? [...$action] : $action,
+            $this->mountedActions,
+        );
+    }
+
     /** @return array{salary_amount: string, salary_currency: string, salary_period: string} */
     private function salaryProjection(): array
     {

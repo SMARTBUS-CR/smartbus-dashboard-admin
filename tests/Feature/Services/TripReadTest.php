@@ -320,17 +320,12 @@ test('excludes private fields and values from the actual nested history response
         'id', 'status', 'service_date', 'scheduled_departure_at', 'scheduled_arrival_at',
         'actual_departure_at', 'actual_arrival_at', 'cancelled_at', 'cancellation_reason', 'deleted_at',
         'route_pattern_id', 'route_schedule_id', 'company', 'bus', 'driver', 'planned_route_snapshot',
-    ]);
-    expect($row['company'])->toBe(['id' => $trip->company_id, 'name' => $trip->company->legal_name, 'deleted_at' => null]);
-    expect($row['driver'])->toBe(['id' => $driver->id, 'user_id' => $driver->user_id, 'deleted_at' => null]);
-    expect(array_keys($row['bus']))->toEqualCanonicalizing(['id', 'country_code', 'plate_number', 'unit_number', 'deleted_at']);
-    expect($row['planned_route_snapshot'])->toBe($expectedSnapshot);
-    expect(json_encode($row, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR))->not->toContain(
-        '"salary_amount"', '"salary_currency"', '"salary_period"', '"password"', '"remember_token"',
-        '"email"', '"license"', '"credentials"', '"user"',
-        $driver->salary_amount, $driver->license, $user->email, $user->getRawOriginal('password'), $user->remember_token,
-    );
-    expect($trip->fresh()->getRawOriginal())->toBe($before);
+    ])
+        ->and($row)->toMatchArray(['company' => ['id' => $trip->company_id, 'name' => $trip->company->legal_name, 'deleted_at' => null], 'driver' => ['id' => $driver->id, 'user_id' => $driver->user_id, 'deleted_at' => null]])
+        ->and(array_keys($row['bus']))->toEqualCanonicalizing(['id', 'country_code', 'plate_number', 'unit_number', 'deleted_at'])
+        ->and($row['planned_route_snapshot'])->toBe($expectedSnapshot)
+        ->and(json_encode($row, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR))->not->toContain('"salary_amount"', '"salary_currency"', '"salary_period"', '"password"', '"remember_token"', '"email"', '"license"', '"credentials"', '"user"', $driver->salary_amount, $driver->license, $user->email, $user->getRawOriginal('password'), $user->remember_token)
+        ->and($trip->fresh()->getRawOriginal())->toBe($before);
     Http::assertNothingSent();
 })->with(['list', 'detail']);
 

@@ -53,7 +53,7 @@ test('schedule representations expose ordered suspension dates without per-sched
     }
     $connection->flushQueryLog();
     $this->getJson($uri)->assertOk()->assertJsonCount(10, 'data');
-    expect(count($connection->getQueryLog()))->toBe($smallQueryCount);
+    expect($connection->getQueryLog())->toHaveCount($smallQueryCount);
     $connection->disableQueryLog();
 
     $dated = $this->getJson($uri.'?date=2026-11-09')->assertOk();

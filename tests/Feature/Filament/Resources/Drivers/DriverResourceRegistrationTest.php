@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class);
+pest()->use(WithDriverRegistration::class);
 
 describe('Driver Resource Registration', function (): void {
     beforeEach(function (): void {

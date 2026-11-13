@@ -15,7 +15,7 @@ jobs:
     # STEP 1: LINTING (Laravel Pint)
     # ==========================================
     lint:
-        name: Fix Code Style
+        name: Check Code Style
         runs-on: ubuntu-latest
         timeout-minutes: 10
         strategy:
@@ -33,7 +33,7 @@ jobs:
                   tools: pint
 
             - name: Run Pint
-              run: pint
+              run: pint --test
 
     # ==========================================
     # STEP 2: TESTING (Laravel Pest)
@@ -86,7 +86,7 @@ jobs:
               with:
                 php-version: 8.4
                 extensions: pdo_pgsql, pdo_mysql, mbstring, intl, bcmath
-                coverage: xdebug
+                coverage: none
 
             - name: Install Dependencies
               run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
@@ -114,6 +114,9 @@ jobs:
 
             - name: Build Frontend Assets
               run: npm run build
+
+            - name: Optimize Test Databases
+              run: php artisan tinker --execute="DB::connection('mysql')->statement('SET GLOBAL innodb_flush_log_at_trx_commit = 0;'); DB::connection('mysql')->statement('SET GLOBAL sync_binlog = 0;'); DB::connection('pgsql')->statement('ALTER SYSTEM SET synchronous_commit = \'off\';'); DB::connection('pgsql')->statement('ALTER SYSTEM SET fsync = \'off\';'); DB::connection('pgsql')->statement('SELECT pg_reload_conf();');"
 
             - name: Run Tests
               run: php artisan test --ci --compact

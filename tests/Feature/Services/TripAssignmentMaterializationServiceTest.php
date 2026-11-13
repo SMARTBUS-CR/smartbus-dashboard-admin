@@ -44,7 +44,7 @@ describe('Trip Assignment Materialization Service', function (): void {
 
         expect($first['created'])->toHaveCount(1)
             ->and($first['created'][0]['assignment_id'])->toBe($assignment->id)
-            ->and($second['created'])->toBe([])
+            ->and($second['created'])->toBeEmpty()
             ->and($second['skipped'])->toHaveCount(1)
             ->and($trip->status)->toBe(TripStatus::SCHEDULED)
             ->and($trip->service_date->toDateString())->toBe('2026-10-26')
@@ -66,7 +66,7 @@ describe('Trip Assignment Materialization Service', function (): void {
 
         $result = $service->materialize($company, CarbonImmutable::parse('2026-10-26'));
 
-        expect($result['created'])->toBe([])
+        expect($result['created'])->toBeEmpty()
             ->and($result['skipped'])->toHaveCount(1)
             ->and(Trip::query()->sole()->status)->toBe(TripStatus::CANCELLED)
             ->and(Trip::query()->sole()->cancellation_reason)->toBe('Service suspended');

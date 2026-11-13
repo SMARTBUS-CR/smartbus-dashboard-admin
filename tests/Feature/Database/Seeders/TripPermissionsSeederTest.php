@@ -74,8 +74,8 @@ test('uses independently granted seeded history permissions without Filament', f
 
     expect($read)->toThrow(AuthorizationException::class);
     $role->givePermissionTo(Permission::findByName($permission, 'web'));
-    expect($read()['id'])->toBe($trip->id);
-    expect($otherRead)->toThrow(AuthorizationException::class);
+    expect($read()['id'])->toBe($trip->id)
+        ->and($otherRead)->toThrow(AuthorizationException::class);
 
     $this->seed(TripPermissionsSeeder::class);
     expect($read()['id'])->toBe($trip->id);

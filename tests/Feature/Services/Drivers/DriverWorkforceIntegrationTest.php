@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\WithDriverRegistration;
 
-uses(WithDriverRegistration::class);
+pest()->use(WithDriverRegistration::class);
 
 describe('Driver Workforce Integration', function (): void {
     test('keeps identity employment availability trips and historical reporting consistent', function (): void {
@@ -94,8 +94,8 @@ describe('Driver Workforce Integration', function (): void {
             $driver,
             $schedule,
             ['end_time' => '07:00'],
-        ))->toThrow(ValidationException::class);
-        expect($schedule->fresh()->getRawOriginal())->toBe($scheduleBeforeInvalidUpdate)
+        ))->toThrow(ValidationException::class)
+            ->and($schedule->fresh()->getRawOriginal())->toBe($scheduleBeforeInvalidUpdate)
             ->and($trip->fresh()->getRawOriginal())->toBe($tripBeforeEmploymentUpdate);
 
         $this->travelTo(CarbonImmutable::parse('2026-10-26T12:30:00Z'));
@@ -126,10 +126,7 @@ describe('Driver Workforce Integration', function (): void {
                 'in_progress_count' => 0,
                 'first_departure_at' => '2026-10-26T12:30:00.000000Z',
                 'last_arrival_at' => '2026-10-26T13:30:00.000000Z',
-            ]);
-        expect(json_encode($summary, JSON_THROW_ON_ERROR))
-            ->not->toContain('700000.10')
-            ->not->toContain($identity->email)
-            ->not->toContain($identity->password);
+            ])
+            ->and(json_encode($summary, JSON_THROW_ON_ERROR))->not->toContain('700000.10')->not->toContain($identity->email)->not->toContain($identity->password);
     });
 });

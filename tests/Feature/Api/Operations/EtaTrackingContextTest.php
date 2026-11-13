@@ -75,11 +75,14 @@ test('returns the versioned frozen plan with distinct occurrences on a circular 
         ->assertJsonPath('stop_occurrences.4.stop_id', $origin['stop_id'])
         ->assertJsonPath('stop_occurrences.4.planned_arrival_at', $trip->scheduled_arrival_at->toISOString());
 
-    expect($response->json('route_revision'))->toMatch('/\A[0-9a-f]{64}\z/');
-    expect($response->json('stop_occurrences.1.distance_along_route_m'))->toBeGreaterThan(1500)->toBeLessThan(1600);
-    expect($response->json('stop_occurrences.3.distance_along_route_m'))->toBeGreaterThan(4600)->toBeLessThan(4800);
-    expect($response->json('route_distance_m'))->toBeGreaterThan(6200)->toBeLessThan(6400);
-    expect($response->json('stop_occurrences.4.distance_along_route_m'))->toBe($response->json('route_distance_m'));
+    expect($response->json('route_revision'))->toMatch('/\A[0-9a-f]{64}\z/')
+        ->and($response->json('stop_occurrences.1.distance_along_route_m'))->toBeGreaterThan(1500)
+        ->toBeLessThan(1600)
+        ->and($response->json('stop_occurrences.3.distance_along_route_m'))->toBeGreaterThan(4600)
+        ->toBeLessThan(4800)
+        ->and($response->json('route_distance_m'))->toBeGreaterThan(6200)
+        ->toBeLessThan(6400)
+        ->and($response->json('stop_occurrences.4.distance_along_route_m'))->toBe($response->json('route_distance_m'));
     Http::assertNothingSent();
 });
 

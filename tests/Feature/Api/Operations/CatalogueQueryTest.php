@@ -72,8 +72,8 @@ test('stop pagination preserves geographic filters and consistently orders equal
     }
 
     sort($ids);
-    expect($seen)->toBe($ids);
-    expect($uri)->toBeNull();
+    expect($seen)->toBe($ids)
+        ->and($uri)->toBeNull();
 });
 
 test('route pagination preserves filters size and sort with equal route codes', function (): void {
@@ -98,8 +98,8 @@ test('route pagination preserves filters size and sort with equal route codes', 
     }
 
     sort($ids);
-    expect($seen)->toBe($ids);
-    expect($uri)->toBeNull();
+    expect($seen)->toBe($ids)
+        ->and($uri)->toBeNull();
 });
 
 test('rejects empty page sizes instead of using a zero size', function (string $resource): void {
